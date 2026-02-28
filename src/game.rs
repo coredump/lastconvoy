@@ -947,6 +947,14 @@ impl GameState {
             (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32,
             space_very_dark,
         );
+        // Boundary marker: subtle vertical line across the enemy lane
+        draw_rectangle(
+            BOUNDARY_X,
+            ENEMY_LANE_TOP as f32,
+            1.0,
+            (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32,
+            steel_dark,
+        );
 
         // Divider (rows 120–123): Steel Mid flat placeholder
         draw_rectangle(
