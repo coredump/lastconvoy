@@ -244,4 +244,4 @@ debug_log_file = ""
 # gates and shield-full checks. Useful for testing a specific upgrade track.
 # Valid values: "burst", "damage", "defense", "drone", "firerate", "pierce", "stagger"
 # Comment out or remove to restore normal random spawning.
-debug_force_orb = "pierce"
+debug_force_orb = "stagger"

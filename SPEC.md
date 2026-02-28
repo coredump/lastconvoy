@@ -190,7 +190,7 @@ All shot modifiers apply to player shots only at present; drone interaction is t
 - **FireRate** (3 levels): decreases shot interval. Level 1 = 0.18 s, Level 2 = 0.14 s, Level 3 = 0.10 s. Orb removed from pool at max level.
 - **Burst / Charge Burst** (3 levels): on a separate cooldown timer, the next shot deals double damage. Cooldown interval per level: 5.0 s, 3.5 s, 2.0 s. Orb removed from pool at max level.
 - **Pierce** (3 levels): projectile passes through up to N additional enemies (level = max enemies pierced beyond the first). A shot cannot hit the same enemy more than once. Orb removed from pool at max level.
-- **Stagger Shot** (1 level): on hit, briefly knocks back the enemy. Affects Small, Medium, and Heavy only — does NOT affect Large, Elite, or Mini-Boss. Applies even to enemies occupying boundary slots. Orb removed from pool at max level.
+- **Stagger Shot** (1 level): on hit, instantly displaces the enemy rightward by up to 12 px. Affects Small, Medium, and Heavy only — does NOT affect Large, Elite, or Mini-Boss. Applies **at most once per enemy** (subsequent hits do not knockback). Displacement is clamped by the nearest enemy to the right in the same y-band (zero movement if already touching). Orb removed from pool at max level.
 
 **Pool rules:**
 - Orb types at max level are excluded from the spawn pool automatically.

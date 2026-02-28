@@ -148,8 +148,7 @@ pub const MAX_PIERCE_LEVEL: usize = 3;
 pub const BURST_DAMAGE_MULTIPLIER: i32 = 2;
 
 pub const MAX_STAGGER_LEVEL: usize = 1;
-pub const STAGGER_DURATIONS: [f32; 1] = [0.3];
-pub const STAGGER_KNOCKBACK_SPEED: f32 = 40.0;
+pub const STAGGER_KNOCKBACK_PX: f32 = 12.0;
 
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides

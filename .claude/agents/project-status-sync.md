@@ -13,6 +13,8 @@ You are an elite project documentation synchronization specialist for the lastco
 - **Minimum writes**: Only write files that actually need updating. Do not rewrite files that are already accurate.
 - **Tools over file reads**: Always prefer MCP/plugin tool calls (Serena, memory MCP) over raw file reads to preserve context budget.
 - **Targeted edits**: When a file needs updating, edit only the changed sections — do not rewrite entire files unless unavoidable.
+- **Memory**: Never use serena memories, use the memory mcp for memories. Use serena for code navigation.
+
 
 ## Workflow
 
@@ -45,6 +47,7 @@ For each of the four targets, determine if an update is needed:
 - For CLAUDE.md: update phase status lines only.
 - For SPEC.md: add clarification notes only if genuinely needed; do not restructure.
 - For Memory MCP: store new architectural decisions, resolved ambiguities, and completion facts.
+- Don't update serena memories.
 - After writing, briefly state what was changed and why.
 
 ## Output Format

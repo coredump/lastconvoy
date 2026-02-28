@@ -14,8 +14,8 @@ use crate::config::{
     MAX_FIRE_RATE_LEVEL, MAX_PIERCE_LEVEL, MAX_STAGGER_LEVEL, MEDIUM_INTRO_TIME, ORB_H, ORB_W,
     PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, PROJECTILE_W, SCREEN_W,
     SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
-    SPAWN_TICK_INTERVAL, STAGGER_DURATIONS, STAGGER_KNOCKBACK_SPEED, TOP_BORDER_BOTTOM,
-    TOP_BORDER_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
+    SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
+    UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
 use crate::drone::Drone;
 use crate::elite::EliteEvent;
@@ -280,6 +280,8 @@ impl GameState {
 
         // Projectile-enemy collision (player projectiles only; drone shots never hit enemies per spec)
         let mut kill_logs: Vec<String> = Vec::new();
+        // Indices of enemies that should receive stagger knockback this frame.
+        let mut stagger_targets: Vec<usize> = Vec::new();
         let base_dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
         for p in &mut self.projectiles {
             if !p.alive || p.source != ProjectileSource::Player {
@@ -290,7 +292,7 @@ impl GameState {
             } else {
                 base_dmg
             };
-            for e in &mut self.enemies {
+            for (ei, e) in self.enemies.iter_mut().enumerate() {
                 if e.is_dead() || p.hit_enemies.contains(&e.id) {
                     continue;
                 }
@@ -307,15 +309,15 @@ impl GameState {
                     p.hit_enemies.push(e.id);
                     e.take_damage(player_dmg);
                     if !e.is_dead()
+                        && !e.stagger_immune
                         && self.stagger_level > 0
                         && matches!(
                             e.kind,
                             EnemyKind::Small | EnemyKind::Medium | EnemyKind::Heavy
                         )
+                        && !(e.kind == EnemyKind::Small && e.hp <= 3 * player_dmg)
                     {
-                        let duration =
-                            STAGGER_DURATIONS[self.stagger_level.min(MAX_STAGGER_LEVEL) - 1];
-                        e.apply_knockback(duration);
+                        stagger_targets.push(ei);
                     }
                     if e.is_dead() {
                         let dps = if e.shots_taken > 0 {
@@ -339,6 +341,59 @@ impl GameState {
         }
         for msg in kill_logs {
             self.dlog(&msg);
+        }
+
+        // Apply deferred stagger: always push full STAGGER_KNOCKBACK_PX, then forward-cascade
+        // any enemies that now overlap the displaced enemy (chain push).
+        // Marks stagger_immune so the effect only applies once per enemy.
+        for idx in &stagger_targets {
+            let idx = *idx;
+            if self.enemies[idx].stagger_immune {
+                continue;
+            }
+            self.enemies[idx].stagger_immune = true;
+            self.enemies[idx].x += STAGGER_KNOCKBACK_PX;
+            self.enemies[idx].at_boundary = false;
+            if let Some(slot) = self.enemies[idx].slot_id.take() {
+                self.boundary.release_slot(slot);
+            }
+            // Clamp to screen right edge.
+            if self.enemies[idx].x + self.enemies[idx].width > SCREEN_W as f32 {
+                self.enemies[idx].x = SCREEN_W as f32 - self.enemies[idx].width;
+            }
+        }
+        // Forward cascade pass: resolve overlaps created by the stagger pushes.
+        // Sort enemies by x ascending so each left enemy can push the one to its right.
+        if !stagger_targets.is_empty() {
+            let n = self.enemies.len();
+            let mut order: Vec<usize> = (0..n).collect();
+            order.sort_by(|&a, &b| self.enemies[a].x.partial_cmp(&self.enemies[b].x).unwrap());
+            for ii in 0..order.len() {
+                let left_idx = order[ii];
+                let left_right = self.enemies[left_idx].x + self.enemies[left_idx].width;
+                let left_y = self.enemies[left_idx].y;
+                let left_h = self.enemies[left_idx].height;
+                for &right_idx in &order[ii + 1..] {
+                    let (re_y, re_h, re_x) = {
+                        let re = &self.enemies[right_idx];
+                        (re.y, re.height, re.x)
+                    };
+                    // Only push if they vertically overlap.
+                    if re_y >= left_y + left_h || re_y + re_h <= left_y {
+                        continue;
+                    }
+                    if re_x < left_right {
+                        self.enemies[right_idx].x = left_right;
+                        // Clamp to screen right edge.
+                        if self.enemies[right_idx].x + self.enemies[right_idx].width
+                            > SCREEN_W as f32
+                        {
+                            self.enemies[right_idx].x =
+                                SCREEN_W as f32 - self.enemies[right_idx].width;
+                        }
+                    }
+                }
+            }
         }
 
         self.projectiles.retain(|p| !p.should_remove());
@@ -388,9 +443,9 @@ impl GameState {
         let mut boundary_logs: Vec<String> = Vec::new();
 
         for e in &mut self.enemies {
-            e.update(dt, STAGGER_KNOCKBACK_SPEED);
+            e.update(dt);
 
-            if !e.at_boundary && e.knockback_timer <= 0.0 && e.x <= BOUNDARY_X {
+            if !e.at_boundary && e.x <= BOUNDARY_X {
                 match e.kind {
                     EnemyKind::Small => {
                         // 1 damage event then despawn.

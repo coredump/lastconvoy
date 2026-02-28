@@ -34,7 +34,8 @@ pub struct Enemy {
     pub shake: ShakeEffect,
     pub shots_taken: i32,
     pub damage_taken: i32,
-    pub knockback_timer: f32,
+    /// True once this enemy has been knocked back; prevents repeated knockback.
+    pub stagger_immune: bool,
 }
 
 impl Enemy {
@@ -65,26 +66,15 @@ impl Enemy {
             shake: ShakeEffect::new(),
             shots_taken: 0,
             damage_taken: 0,
-            knockback_timer: 0.0,
+            stagger_immune: false,
         }
     }
 
-    pub fn update(&mut self, dt: f32, knockback_speed: f32) {
-        if self.knockback_timer > 0.0 {
-            self.x += knockback_speed * dt;
-            self.knockback_timer -= dt;
-            if self.knockback_timer < 0.0 {
-                self.knockback_timer = 0.0;
-            }
-        } else if !self.at_boundary {
+    pub fn update(&mut self, dt: f32) {
+        if !self.at_boundary {
             self.x -= self.speed * dt;
         }
         self.shake.update(dt);
-    }
-
-    pub fn apply_knockback(&mut self, duration: f32) {
-        self.knockback_timer = duration;
-        self.at_boundary = false;
     }
 
     pub fn take_damage(&mut self, amount: i32) {
