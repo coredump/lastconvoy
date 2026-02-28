@@ -574,7 +574,7 @@ impl GameState {
             if self.orbs.len() < self.config.max_active_orbs {
                 let lane_mid = (UPGRADE_LANE_TOP + UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0;
                 let y = lane_mid - ORB_H / 2.0;
-                // Build weighted pool; gate Defense if shields are full.
+                // Build weighted pool; gate Shield if shields are full.
                 let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
                 let mut pool: Vec<OrbType> = Vec::with_capacity(5);
                 if self.burst_level < MAX_BURST_LEVEL {

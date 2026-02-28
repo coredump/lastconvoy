@@ -136,8 +136,8 @@ If anything conflicts:
 - **Implementation status**: Orb struct with OrbPhase::Inactive/Active; take_hit() logic correct; spawning, movement, collision, Active-only collection all implemented. Needs gameplay verification.
 
 ### P1.9 Upgrade tracks ✓ MOSTLY DONE (Drone effect + Explosive Shield pending)
-Implemented OrbTypes: Defense, Damage, FireRate, Burst, Pierce, Stagger, Drone.
-- **Defense**: +1 shield per collection (up to cap 3). Skipped from pool when full. ✓
+Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
+- **Shield**: +1 shield per collection (up to cap 3). Skipped from pool when full. ✓
 - **Damage** (3 levels): flat damage per shot scales with level. ✓
 - **FireRate** (3 levels): shot interval decreases per level. ✓
 - **Burst** (3 levels): periodic double-damage shot on separate cooldown. ✓
@@ -154,7 +154,7 @@ Implemented OrbTypes: Defense, Damage, FireRate, Burst, Pierce, Stagger, Drone.
   - Non-elite enemies not pushed back.
   - No effect on upgrade lane.
 - Upgrade unavailable if player has 0 segments or an explosive segment already exists.
-- Requires separate OrbType or a modifier flag on the Defense orb (design TBD).
+- Requires separate OrbType or a modifier flag on the Shield orb (design TBD).
 
 ### P1.10 Drone system ⚠ STUB ONLY
 - Attached drones: persist for the run, positioned relative to player.

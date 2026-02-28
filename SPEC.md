@@ -88,7 +88,7 @@ Enemy classes:
 
 ### Shields
 - Shields are multi-segment: each segment = 1 hit absorbed.
-- Defense upgrade orbs grant +1 segment per collection (cap: 3).
+- Shield upgrade orbs grant +1 segment per collection (cap: 3).
 - Each damage event removes one segment. When 0 segments remain, the next hit = death.
 - HUD shows current segment count as small icons in the top-left corner.
 - `player_starting_shields` in config.toml overrides the starting count (debug use).
@@ -175,8 +175,8 @@ At HP = 0, orb becomes **activated** (clear visual state).
 
 Upgrades are collected by physically touching an activated orb. Each OrbType is a discrete track.
 
-### (A) Defense
-- **Defense (+1 Shield Segment)**: adds one shield segment per collection. Skipped from the orb pool when shields are already at cap (3 segments). Up to 3 collections.
+### (A) Shield
+- **Shield (+1 Shield Segment)**: adds one shield segment per collection. Skipped from the orb pool when shields are already at cap (3 segments). Up to 3 collections.
 - **Explosive Shield** *(planned, not yet implemented)*: converts one normal segment to an explosive segment. See §6 for behavior rules.
 
 ### (B) Drones
@@ -194,7 +194,7 @@ All shot modifiers apply to player shots only at present; drone interaction is t
 
 **Pool rules:**
 - Orb types at max level are excluded from the spawn pool automatically.
-- Defense is excluded when shields are at cap.
+- Shield is excluded when shields are at cap.
 - No projectile size scaling.
 
 ## 11. Spawning & scaling (time-based only)

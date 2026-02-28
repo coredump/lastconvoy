@@ -80,7 +80,7 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - No tests in Phase 1. Tests allowed Phase 2+.
 
 ## Phase 1 status
-P1.0–P1.7 COMPLETE. P1.6 shields fully implemented (Vec<ShieldSegment> done). P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, needs gameplay verification. P1.9 PARTIAL (Defense orb grants shields on collection; other tracks not yet applied). HP scaling bug fixed (`.ceil()` → `.round().max(1.0)`). Next priorities: (1) Verify P1.8 orbs work in practice; (2) Implement remaining P1.9 upgrade effects (Speed, Offense, Drone); (3) Implement P1.10 drone firing. See `TASKS.md` for details.
+P1.0–P1.7 COMPLETE. P1.6 shields fully implemented (Vec<ShieldSegment> done). P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, needs gameplay verification. P1.9 PARTIAL (Shield orb grants shields on collection; other tracks not yet applied). HP scaling bug fixed (`.ceil()` → `.round().max(1.0)`). Next priorities: (1) Verify P1.8 orbs work in practice; (2) Implement remaining P1.9 upgrade effects (Speed, Offense, Drone); (3) Implement P1.10 drone firing. See `TASKS.md` for details.
 
 ## Before writing code
 1. Check **memory** for prior decisions and context on this area.
