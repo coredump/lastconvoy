@@ -36,9 +36,9 @@ If anything conflicts:
   - orb caps, orb HP curve
   - elite interval + random offset range
 - Implement **runtime config file** loading (see SPEC §17):
-  - Choose a format (RON, TOML, or JSON) and add the serde + format crate dependency.
+  - Use TOML format with serde crate dependency.
   - Define a serializable `RuntimeConfig` struct covering key tuning values.
-  - On startup: attempt to load from `config.ron` (or `.toml`/`.json`) next to the binary.
+  - On startup: attempt to load from `config.toml` next to the binary.
   - If missing or malformed: fall back to compile-time defaults, log a warning, continue.
   - Write a default config file on first run if none exists (so users have a template to edit).
 - Set up `main.rs` to create a macroquad window, load config, instantiate game state, run the loop.
@@ -98,15 +98,16 @@ If anything conflicts:
   - No shield regen.
   - Frequency increases slowly over time (config curve).
 
-### P1.6 Shields & death
+### P1.6 Shields & death ✓ DONE
 - Player has N shield segments (starting count from config).
 - Each damage event removes exactly 1 segment.
 - 0 segments + damage event → player death.
 - Shield loss: visual feedback (flash, segment disappears).
 - On death: immediately reset game state and restart (no game-over screen yet).
 - Losing shields never removes drones or reduces offense.
+- **NOTE**: Vec<ShieldSegment> conversion complete. ShieldSystem in shield.rs used throughout.
 
-### P1.7 Boundary slots & jam
+### P1.7 Boundary slots & jam ✓ DONE
 - Define a fixed number of boundary slots (from config).
 - When a Medium/Heavy/Large/Elite reaches the left boundary:
   - If a slot is free: occupy it, begin damage ticking.
@@ -114,7 +115,7 @@ If anything conflicts:
 - When a slotted enemy is destroyed: free its slot; nearest queued enemy (if any) advances to fill it.
 - No overlap, no pushing physics.
 
-### P1.8 Upgrade orbs (two-phase)
+### P1.8 Upgrade orbs (two-phase) ✓ STRUCTURALLY COMPLETE
 - Orb entity: position, HP, activated flag, current upgrade type, kind.
 - Continuous timed spawning in upgrade lane (rate increases with time, from config).
 - Max active orb cap enforced; if at cap, delay next spawn.
@@ -132,32 +133,35 @@ If anything conflicts:
   - Player hitbox overlaps orb → collect, apply selected upgrade.
 - Orbs that exit left edge despawn.
 - Orb spawning continues during elite events.
+- **Implementation status**: Orb struct with OrbPhase::Inactive/Active; take_hit() logic correct; spawning, movement, collision, Active-only collection all implemented. Needs gameplay verification.
 
-### P1.9 Upgrade tracks (minimal but real)
+### P1.9 Upgrade tracks (minimal but real) ⚠ NOT STARTED
 Implement three tracks with small initial pools:
-- **Defense:** +1 shield segment.
+- **Defense:** +1 shield segment (Defense skipped in cycling when shields at cap 3); Explosive Shield modifier (see SPEC §6, §10).
 - **Drones:** add one attached drone (fires in same lane as player, moves with player).
-- **Shot type:** one simple modifier (e.g., piercing — projectiles pass through enemies).
-- Cycling order: Defense → Drones → Shot Type → Defense → …
+- **Shot type:** Stagger Shot (does NOT affect Large/Elite/Mini-Boss; no stagger for boundary-slot enemies).
+- Cycling order: Defense → Drones → ShotType → Defense → … (Defense skipped when at cap).
 - Modifiers apply to all shooters (player + drones).
+- **Status**: Orb cycling (OrbType enum) exists; skip_defense flag wired in orb.rs + game.rs. Upgrade APPLICATION not implemented (player collection sets collected=true but doesn't apply the upgrade effect).
 
-### P1.10 Drone system
+### P1.10 Drone system ⚠ STUB ONLY
 - Attached drones: persist for the run, positioned relative to player.
 - Each drone auto-fires on same timer as player.
 - Drone projectiles tagged `source: Drone` — they damage enemies but do NOT interact with orbs.
 - (Detached / cross-lane drones deferred to later upgrade pool expansion.)
+- **Status**: Drone struct exists with x/y/fire_timer/attached/ttl. GameState has drones: Vec<Drone> but drones are never updated, fired, or positioned in game loop.
 
-### P1.11 Time-based scaling baseline
+### P1.11 Time-based scaling baseline ⚠ PARTIAL
 - All scaling curves defined in `config.rs`.
 - Time-only ramps (no kill-count or player-power triggers):
-  - Enemy spawn interval decreases (more enemies over time).
-  - Medium / Heavy / Large introduction times.
-  - Enemy HP slow ramp for Medium+ tiers.
-  - Shielded enemy frequency ramp.
-  - Orb spawn interval decreases (more orbs over time).
+  - Enemy spawn interval decreases (more enemies over time). ✓ IMPLEMENTED
+  - Medium / Heavy / Large introduction times. ⚠ NEEDS VERIFICATION
+  - Enemy HP slow ramp for Medium+ tiers. ⚠ NEEDS VERIFICATION
+  - Shielded enemy frequency ramp. ✓ IMPLEMENTED (enemy.rs spawn_enemy checks SHIELDED_FREQ_SCALE * run_time)
+  - Orb spawn interval decreases (more orbs over time). ⚠ NEEDS VERIFICATION
 - Tuneable: keep readability-first, avoid bullet-sponge slog or exponential blowup.
 
-### P1.12 Elite events
+### P1.12 Elite events ⚠ NOT STARTED
 - Elite event system with its own timer (interval + random offset, from config).
 - On elite trigger:
   - Pause normal enemy spawning.
@@ -169,8 +173,9 @@ Implement three tracks with small initial pools:
   - Resume normal enemy spawning.
   - Apply a small global scaling bump (config-defined).
 - `EnemyElite1` is never added to the regular continuous spawn pool.
+- **Status**: EliteEvent struct exists with active/variant/timer fields. Elite spawning can happen via pick_enemy_kind (debug mode only). No timer countdown, no pause/resume logic implemented.
 
-### P1.13 Mini-Boss events
+### P1.13 Mini-Boss events ⚠ NOT STARTED
 - Separate timer from elites (interval + random offset, from config).
 - On trigger:
   - Pause normal enemy spawning.
@@ -178,25 +183,26 @@ Implement three tracks with small initial pools:
   - Orb spawning continues.
 - Boundary behavior: occupy slot + tick damage (like Large/Heavy).
 - On death: resume spawning, apply small scaling bump.
+- **Status**: miniboss_timer exists in GameState but no spawn or event logic implemented.
 
-### P1.14 MVP polish (still Phase 1)
+### P1.14 MVP polish (still Phase 1) ⚠ PARTIAL
 - Visual feedback for:
-  - Shield loss (segment flash/pop).
-  - Orb activation state change (color/glow shift).
-  - Elite/Mini-Boss arrival (subtle screen cue, no stage screen).
-  - Enemy destruction (small particle burst or flash).
-- Object pooling for projectiles and enemies if needed for performance.
-- Frame-rate independence: all movement/timers use `get_frame_time()` delta.
+  - Shield loss (segment flash/pop). ⚠ Needs Vec<ShieldSegment> implementation
+  - Orb activation state change (color/glow shift). ✓ Color tint changes per phase in draw_orbs()
+  - Elite/Mini-Boss arrival (subtle screen cue, no stage screen). ⚠ Not yet (no events)
+  - Enemy destruction (small particle burst or flash). ⚠ Not visible
+- Object pooling for projectiles and enemies if needed for performance. ✓ Using Vec<T> with retain()
+- Frame-rate independence: all movement/timers use `get_frame_time()` delta. ✓ Implemented throughout
 
 **Phase 1 DoD (Definition of Done)**
-- Playable loop: start instantly → survive → die → restart.
-- Touch input works (at least in WASM build).
-- Orbs work exactly as specified (activate then cycle then collect).
-- Elites and Mini-Bosses work with enemy spawn pause (orbs continue).
-- Boundary slots and jam work.
-- No menus required.
-- No tests required.
-- Runs natively for dev; builds to WASM for browser.
+- Playable loop: start instantly → survive → die → restart. ✓ WORKING
+- Touch input works (at least in WASM build). ⚠ Touch stub only
+- Orbs work exactly as specified (activate then cycle then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
+- Elites and Mini-Bosses work with enemy spawn pause (orbs continue). ⚠ NOT STARTED (no event pause logic)
+- Boundary slots and jam work. ✓ COMPLETE
+- No menus required. ✓
+- No tests required. ✓
+- Runs natively for dev; builds to WASM for browser. ✓ WASM build exists
 
 ---
 

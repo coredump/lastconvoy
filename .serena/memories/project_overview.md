@@ -8,7 +8,7 @@ Continuous run, ends only on death. Typical run: 12–18 minutes.
 ## Tech Stack
 - **Language:** Rust (stable, edition 2024)
 - **Build tool:** Cargo
-- **Key crates:** macroquad ~0.4 (rendering/input/window), serde 1 + ron 0.8 (config)
+- **Key crates:** macroquad ~0.4 (rendering/input/window), serde 1 + toml 0.8 (config)
 - **Dev target:** native (`cargo run`)
 - **Release target:** WASM (`cargo build --target wasm32-unknown-unknown --release`)
 
@@ -36,7 +36,7 @@ Continuous run, ends only on death. Typical run: 12–18 minutes.
 - Internal resolution: **320×180** always. Integer scaling only (×2–×6). Letterbox.
 - Render pipeline: draw to 320×180 RenderTarget, blit to screen.
 - Entity pools: Vec<T> with retain() or swap-remove.
-- Config: compile-time defaults in config.rs; runtime overrides via config.ron (RON format).
+- Config: compile-time defaults in config.rs; runtime overrides via config.toml (TOML format).
 - `#![allow(dead_code)]` at crate root during Phase 1 (stubs are intentionally incomplete).
 
 ## Gameplay Constraints (non-negotiable)
@@ -55,4 +55,4 @@ Commit messages: `P1.X: brief description`
 One concern per module. Keep main.rs thin. No `unsafe` unless unavoidable.
 
 ## Current Phase
-Phase 1 MVP in progress. P1.0 through P1.5b complete. Next: P1.6. No tests required until Phase 2.
+Phase 1 MVP. P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE. P1.9–P1.14 partially implemented. Next: Verify P1.8, fix P1.6 shields model, implement P1.9+ upgrades and events. No tests required until Phase 2.

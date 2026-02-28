@@ -10,7 +10,7 @@
 
 ### Plugins (auto-loaded via claude-plugins-official)
 - **Serena** — code navigation via sub-agent. Use for: finding definitions, references, file structure, symbol lookups. Do NOT memorize project structure; query Serena instead.
-- **Context7** — library docs via sub-agent. Use for: macroquad API, serde, RON, any crate docs. Do NOT guess at APIs; query Context7 instead.
+- **Context7** — library docs via sub-agent. Use for: macroquad API, serde, TOML, any crate docs. Do NOT guess at APIs; query Context7 instead.
 - **feature-dev** — structured 7-phase dev workflow. Use `/feature-dev` when starting a new task from TASKS.md. Spawns sub-agents for exploration, design, and review — keeps main context lean.
 - **security-guidance** — passive hook on PreToolUse. Blocks dangerous commands automatically. No action needed.
 
@@ -55,8 +55,8 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 
 ## Config (two layers)
 - Compile-time defaults: `src/config.rs`.
-- Runtime overrides: `config.ron` at project root (serde + RON). Silent fallback if missing/malformed.
-- Settings screen (Phase 2) writes back to `config.ron`.
+- Runtime overrides: `config.toml` at project root (serde + TOML). Silent fallback if missing/malformed.
+- Settings screen (Phase 2) writes back to `config.toml`.
 
 ## Conventions
 - One concern per module. Keep `main.rs` thin.
@@ -66,7 +66,7 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - No tests in Phase 1. Tests allowed Phase 2+.
 
 ## Phase 1 status
-P1.0–P1.5b COMPLETE. Next: P1.6. See `TASKS.md`.
+P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, needs gameplay verification. P1.9–P1.14 partially implemented. Next priorities: (1) Verify P1.8 orbs work in practice; (2) Fix P1.6 shields to use Vec<ShieldSegment>; (3) Implement P1.9 upgrade application; (4) Implement P1.10 drone firing. See `TASKS.md` for details.
 
 ## Before writing code
 1. Check **memory** for prior decisions and context on this area.

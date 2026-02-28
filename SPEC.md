@@ -19,7 +19,7 @@ If anything in the repo conflicts with this document regarding gameplay rules, *
 - Canonical world orientation: **landscape**.
 - World/camera never rotates.
 - If viewport is portrait: keep gameplay landscape, center canvas, letterbox; **do not pause** and **do not rotate gameplay**.
-- Scaling: Integer only (×2, ×3, ×4, ×5, ×6). No fractional scaling.
+- Scaling: Integer only (×1, ×2, ×3, ×4, ×5, ×6). No fractional scaling.
 
 ## 3. Lanes
 Two horizontal lanes (always):
@@ -84,17 +84,31 @@ Enemy classes:
 
 ## 6. Damage, shields, death
 - No instant death on contact.
-- Player survivability is discrete **shield segments**.
+- Player starts each run with **0 shield segments**.
 
 ### Shields
-- Shields are external armor plates embedded into the ship sprite.
-- No numeric shield counter; segments are purely visual and discrete.
-- Each segment = 1 shield layer.
+- Shields are multi-segment: each segment = 1 hit absorbed.
+- Defense upgrade orbs grant +1 segment per collection (cap: 3).
+- Each damage event removes one segment. When 0 segments remain, the next hit = death.
+- HUD shows current segment count as small icons in the top-left corner.
+- `player_starting_shields` in config.toml overrides the starting count (debug use).
+- **No shield regen, durability, or damage reduction mechanics.**
+
+### Explosive Shield
+- The Explosive Shield upgrade converts one normal shield segment into an explosive segment.
+- Only one explosive segment can exist at a time.
+- The explosive segment always breaks **last** — normal segments are consumed first.
+- When the explosive segment breaks: an explosion occurs 40 px forward from the barrier, spanning the full enemy lane height.
+- Explosion effect on enemies:
+  - Elite and Mini-Boss are pushed back 24 px (unless they currently occupy a boundary slot).
+  - Non-elite enemies are **not** pushed back by the explosion.
+  - Explosion does **not** affect the upgrade lane.
+- The Explosive Shield upgrade is a modifier, not additive: unavailable if the player has 0 segments or if an explosive segment already exists.
 
 ### Damage events
 On a damage tick:
-- If player has ≥1 shield segment: remove exactly one segment.
-- If player has 0 shields: player dies.
+- If player has shield: remove the outermost normal segment (explosive segment breaks last).
+- If player has no shield: player dies.
 
 Damage sources:
 - Small enemy boundary arrival: 1 damage event then despawn.
@@ -112,8 +126,9 @@ Drone types:
 
 Shot-type modifiers apply to **all** shooting entities (player + drones).
 
-Critical orb-interaction rule:
+Critical orb-interaction rules:
 - **Drone shots do not affect upgrade orbs in any way** (no activation HP damage, no cycling).
+- Upgrade-lane drones (cross-lane) despawn immediately on any orb activation event; they do not interact with orbs.
 
 ## 8. Boundary slots & lane jam
 - Left boundary has a finite number of occupancy slots.
@@ -160,16 +175,20 @@ At HP = 0, orb becomes **activated** (clear visual state).
 Upgrades are in 3 categories:
 
 ### (A) Defense
-- Adds shields (armor segments).
+- **+1 Shield Segment**: adds one shield segment (skipped from cycling pool when already at cap 3).
+- **Explosive Shield** (modifier): converts one normal segment to an explosive segment. Unavailable if the player has 0 segments or if an explosive segment already exists. See §6 for explosive behavior.
 
 ### (B) Drones
 - Adds/improves drones:
   - Attached drone count/cap
   - Temporary detached/cross-lane drones (duration-based)
+- Upgrade-lane drones spawn only in the upgrade lane and despawn immediately on orb activation; they do not interact with orbs.
 
 ### (C) Shot types
 - Modifies projectile behavior (applies to player + drones).
-- Examples: piercing, spread, fire-rate changes, damage changes.
+- **Stagger Shot** (standalone upgrade): on hit, briefly staggers the enemy. Does NOT affect Large, Elite, or Mini-Boss. Does NOT push enemies that occupy boundary slots.
+- **Charge Burst** (standalone upgrade): periodic empowered shot on a separate cooldown.
+- **No projectile size scaling in game.**
 - Keep combinations readable; avoid early combinatorial explosion.
 
 ## 11. Spawning & scaling (time-based only)
@@ -214,6 +233,7 @@ On elite trigger:
 - If not killed before boundary:
   - Occupies boundary slot and deals repeated damage ticks (like large/medium).
 - Elite scaling is time-only.
+- Can be pushed back 24 px by an explosive shield detonation, **unless** currently occupying a boundary slot.
 
 After elite death:
 - Resume normal enemy spawning.
@@ -236,6 +256,7 @@ Purpose: rare punctuation events distinct from Elite events.
 - If not killed before boundary: occupies a boundary slot and deals repeated
   damage ticks (like Large/Heavy).
 - Mini-Boss HP scales with time (time-based only, no rubber-banding).
+- Can be pushed back 24 px by an explosive shield detonation, **unless** currently occupying a boundary slot.
 
 ### After Mini-Boss death
 - Resume normal enemy spawning.
@@ -268,7 +289,7 @@ Purpose: rare punctuation events distinct from Elite events.
 ### Runtime config file
 - The game must load tuning values from an **external config file** at startup.
 - The file must be human-readable and editable with a text editor — no rebuild required to change values.
-- Format: RON, TOML, or JSON (pick one and stay consistent).
+- Format: TOML (human-readable, supports comments, stable parsing).
 - If the file is missing or malformed, fall back to compile-time defaults silently (no crash).
 - The file should cover at least: player speed, fire rate, enemy speeds/HP, spawn intervals, scaling curves, boundary slot count, orb caps/HP, elite/mini-boss intervals, shield starting count.
 - Changes to the file take effect on next game launch (hot-reload is not required).
