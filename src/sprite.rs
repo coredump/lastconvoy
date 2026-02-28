@@ -31,6 +31,11 @@ impl ShakeEffect {
         self.timer = (self.timer - dt).max(0.0);
     }
 
+    /// Returns true while the shake is still playing.
+    pub fn is_active(&self) -> bool {
+        self.timer > 0.0
+    }
+
     /// Returns a horizontal pixel offset for the current frame. 0.0 when inactive.
     pub fn offset_x(&self) -> f32 {
         if self.timer <= 0.0 {
@@ -169,8 +174,11 @@ impl Sprite {
         }
     }
 
-    /// Switch to animation by index. Resets frame and pingpong state.
+    /// Switch to animation by index. Resets frame and pingpong state only if the animation changed.
     pub fn set_animation(&mut self, index: usize) {
+        if self.anim.current_animation() == index {
+            return;
+        }
         self.anim.set_animation(index);
         self.anim.set_frame(0);
         self.current_frame = 0;
