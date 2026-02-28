@@ -10,7 +10,7 @@ use crate::config::{
     ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
     ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
     ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
-    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME,
+    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_DAMAGE_LEVEL,
     MEDIUM_INTRO_TIME, ORB_H, ORB_W,
     PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, PROJECTILE_W, SCREEN_W,
     SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
@@ -31,6 +31,7 @@ pub struct SpawnController {
     pub tick_accum: f32,
     pub cursor: usize,
     pub inject_timer: f32,
+    pub ramp_log_timer: f32,
 }
 
 impl SpawnController {
@@ -39,6 +40,7 @@ impl SpawnController {
             tick_accum: 0.0,
             cursor: 0,
             inject_timer: BIG_INJECT_BASE_INTERVAL,
+            ramp_log_timer: 0.0,
         }
     }
 
@@ -46,6 +48,7 @@ impl SpawnController {
         self.tick_accum = 0.0;
         self.cursor = 0;
         self.inject_timer = BIG_INJECT_BASE_INTERVAL;
+        self.ramp_log_timer = 0.0;
     }
 }
 
@@ -63,7 +66,11 @@ pub struct GameState {
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
     pub orbs: Vec<Orb>,
-    pub orb_sprite: Sprite,
+    pub orb_sprite_damage: Sprite,
+    pub orb_sprite_defense: Sprite,
+    pub orb_sprite_drone: Sprite,
+    pub orb_sprite_shot_type: Sprite,
+    pub damage_level: usize,
     pub drones: Vec<Drone>,
     pub boundary: Boundary,
     pub elite_event: EliteEvent,
@@ -74,6 +81,7 @@ pub struct GameState {
     pub miniboss_timer: f32,
     pub run_time: f32,
     pub game_over: bool,
+    pub debug_log: Option<crate::debug_log::DebugLog>,
 }
 
 impl GameState {
@@ -87,7 +95,10 @@ impl GameState {
         enemy_large_sprite: Sprite,
         enemy_elite_sprite: Sprite,
         boundary_shield_sprite: Sprite,
-        orb_sprite: Sprite,
+        orb_sprite_damage: Sprite,
+        orb_sprite_defense: Sprite,
+        orb_sprite_drone: Sprite,
+        orb_sprite_shot_type: Sprite,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
         let player = Player::new(
@@ -114,7 +125,11 @@ impl GameState {
             enemies: Vec::new(),
             projectiles: Vec::new(),
             orbs: Vec::new(),
-            orb_sprite,
+            orb_sprite_damage,
+            orb_sprite_defense,
+            orb_sprite_drone,
+            orb_sprite_shot_type,
+            damage_level: 0,
             drones: Vec::new(),
             boundary,
             elite_event: EliteEvent::new(),
@@ -125,6 +140,11 @@ impl GameState {
             miniboss_timer: config.miniboss_interval,
             run_time: 0.0,
             game_over: false,
+            debug_log: if config.debug_log_gameplay {
+                Some(crate::debug_log::DebugLog::new(&config.debug_log_file.clone()))
+            } else {
+                None
+            },
             config,
         }
     }
@@ -146,6 +166,7 @@ impl GameState {
         self.projectiles.clear();
         self.orbs.clear();
         self.drones.clear();
+        self.damage_level = 0;
         self.elite_event = EliteEvent::new();
         self.spawn_ctrl.reset();
         self.orb_spawn_timer = 0.0;
@@ -155,12 +176,20 @@ impl GameState {
         self.game_over = false;
     }
 
+    fn dlog(&mut self, msg: &str) {
+        if let Some(log) = &mut self.debug_log {
+            log.log(self.run_time, msg);
+        }
+    }
+
     /// Deal one damage event to the player: consume one shield segment, or die if none remain.
     fn take_player_damage(&mut self) {
         self.player.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
         if !self.shields.take_hit() {
             self.game_over = true;
         }
+        let remaining = self.shields.count();
+        self.dlog(&format!("PLAYER_DMG count=1 shields_remaining={}", remaining));
     }
 
     pub fn update(&mut self, dt: f32) {
@@ -200,6 +229,8 @@ impl GameState {
         }
 
         // Projectile-enemy collision (player projectiles only; drone shots never hit enemies per spec)
+        let mut kill_logs: Vec<String> = Vec::new();
+        let player_dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
         for p in &mut self.projectiles {
             if !p.alive || p.source != ProjectileSource::Player {
                 continue;
@@ -218,11 +249,26 @@ impl GameState {
                     e.width,
                     e.height,
                 ) {
-                    e.take_damage(1);
+                    e.take_damage(player_dmg);
                     p.alive = false;
+                    if e.is_dead() {
+                        let dps = if e.shots_taken > 0 {
+                            e.damage_taken as f32 / e.shots_taken as f32
+                        } else {
+                            0.0
+                        };
+                        kill_logs.push(format!(
+                            "KILL {:?} hp_max={} speed={:.1} shielded={} shield_hp={} dmg_total={} shots={} dmg_per_shot={:.2}",
+                            e.kind, e.max_hp, e.speed, e.shielded, e.shield_hp.max(0),
+                            e.damage_taken, e.shots_taken, dps
+                        ));
+                    }
                     break;
                 }
             }
+        }
+        for msg in kill_logs {
+            self.dlog(&msg);
         }
 
         self.projectiles.retain(|p| !p.should_remove());
@@ -257,7 +303,7 @@ impl GameState {
             }
         }
 
-        self.enemies.retain(|e| !e.is_dead());
+        self.enemies.retain(|e| !e.is_dead() || e.shake.is_active());
 
         // Coverage-based enemy spawning
         self.spawn_ctrl.tick_accum += dt;
@@ -269,6 +315,7 @@ impl GameState {
         // Update enemies and handle boundary arrival/damage.
         // Collect damage events first to avoid borrow conflict with take_player_damage.
         let mut damage_events: u32 = 0;
+        let mut boundary_logs: Vec<String> = Vec::new();
 
         for e in &mut self.enemies {
             e.update(dt);
@@ -279,6 +326,7 @@ impl GameState {
                         // 1 damage event then despawn.
                         damage_events += 1;
                         e.hp = 0;
+                        boundary_logs.push("BREACH Small".to_string());
                     }
                     _ => {
                         e.at_boundary = true;
@@ -298,8 +346,15 @@ impl GameState {
                 if e.damage_timer >= self.config.boundary_damage_tick {
                     e.damage_timer = 0.0;
                     damage_events += 1;
+                    boundary_logs.push(format!(
+                        "BOUNDARY_DMG {:?} hp={}",
+                        e.kind, e.hp
+                    ));
                 }
             }
+        }
+        for msg in boundary_logs {
+            self.dlog(&msg);
         }
 
         // Apply collected damage events.
@@ -310,7 +365,8 @@ impl GameState {
             }
         }
 
-        self.enemies.retain(|e| !e.is_off_screen() && !e.is_dead());
+        self.enemies
+            .retain(|e| !e.is_off_screen() && (!e.is_dead() || e.shake.is_active()));
 
         // Resolve enemy stacking: sort stably by x ascending, then for each enemy find
         // the nearest blocker ahead of it in the same y-band and clamp behind it.
@@ -340,7 +396,10 @@ impl GameState {
                 let y = lane_mid - ORB_H / 2.0;
                 // Build weighted pool; gate Defense if shields are full.
                 let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
-                let mut pool: Vec<OrbType> = Vec::with_capacity(3);
+                let mut pool: Vec<OrbType> = Vec::with_capacity(4);
+                if self.damage_level < MAX_DAMAGE_LEVEL {
+                    pool.push(OrbType::Damage);
+                }
                 if !shields_full {
                     pool.push(OrbType::Defense);
                 }
@@ -393,6 +452,7 @@ impl GameState {
 
         // Player-orb collection (active orbs only)
         let mut shield_grants = 0u32;
+        let mut damage_collected = 0u32;
         for o in &mut self.orbs {
             if o.phase == OrbPhase::Active
                 && aabb_overlap(
@@ -407,13 +467,25 @@ impl GameState {
                 )
             {
                 o.collected = true;
-                if o.orb_type == OrbType::Defense {
-                    shield_grants += 1;
+                match o.orb_type {
+                    OrbType::Defense => {
+                        shield_grants += 1;
+                    }
+                    OrbType::Damage => {
+                        damage_collected += 1;
+                    }
+                    _ => {}
                 }
             }
         }
         if shield_grants > 0 {
             self.shields.add_segments(shield_grants);
+        }
+        for _ in 0..damage_collected {
+            if self.damage_level < MAX_DAMAGE_LEVEL {
+                self.damage_level += 1;
+            }
+            self.dlog(&format!("ORB_COLLECT Damage level={}", self.damage_level));
         }
 
         let player_cx = self.player.x + self.player.width / 2.0;
@@ -423,7 +495,10 @@ impl GameState {
         });
 
         // Advance sprite animations
-        self.orb_sprite.update(dt);
+        self.orb_sprite_damage.update(dt);
+        self.orb_sprite_defense.update(dt);
+        self.orb_sprite_drone.update(dt);
+        self.orb_sprite_shot_type.update(dt);
         self.player_sprite.update(dt);
         self.enemy_small_sprite.update(dt);
         self.enemy_medium_sprite.update(dt);
@@ -468,51 +543,31 @@ impl GameState {
     }
 
     fn draw_orbs(&mut self) {
-        // Collect draw info first to avoid simultaneous borrows of self.orbs and self.orb_sprite.
-        // Tag indices in upgrades.json: 7=shield, 5=extradrone, 4=stagger
-        let draw_list: Vec<(f32, f32, usize, Color)> = self
+        // Each OrbType has a dedicated Sprite pre-locked to its animation tag,
+        // so we never call set_animation() here.
+        // Tag indices in upgrades.json: 0=damage, 7=shield, 5=extradrone, 4=stagger
+        let draw_list: Vec<(f32, f32, OrbType, Color)> = self
             .orbs
             .iter()
             .map(|o| {
-                let sx = o.x;
-                let (anim_index, tint) = match o.orb_type {
-                    OrbType::Defense => {
-                        let tint = if o.phase == OrbPhase::Inactive {
-                            let p = o.activation_progress;
-                            let v = (100.0 + 155.0 * p) as u8;
-                            Color::from_rgba(v, v, v, v)
-                        } else {
-                            WHITE
-                        };
-                        (7usize, tint)
-                    }
-                    OrbType::Drone => {
-                        let tint = if o.phase == OrbPhase::Inactive {
-                            let p = o.activation_progress;
-                            let v = (100.0 + 155.0 * p) as u8;
-                            Color::from_rgba(v, v, v, v)
-                        } else {
-                            WHITE
-                        };
-                        (5usize, tint)
-                    }
-                    OrbType::ShotType => {
-                        let tint = if o.phase == OrbPhase::Inactive {
-                            let p = o.activation_progress;
-                            let v = (100.0 + 155.0 * p) as u8;
-                            Color::from_rgba(v, v, v, v)
-                        } else {
-                            WHITE
-                        };
-                        (4usize, tint)
-                    }
+                let tint = if o.phase == OrbPhase::Inactive {
+                    let p = o.activation_progress;
+                    let v = (100.0 + 155.0 * p) as u8;
+                    Color::from_rgba(v, v, v, v)
+                } else {
+                    WHITE
                 };
-                (sx, o.y, anim_index, tint)
+                (o.x, o.y, o.orb_type, tint)
             })
             .collect();
-        for (sx, sy, anim_index, tint) in draw_list {
-            self.orb_sprite.set_animation(anim_index);
-            self.orb_sprite.draw_tinted(sx, sy, tint);
+        for (sx, sy, orb_type, tint) in draw_list {
+            let sprite = match orb_type {
+                OrbType::Damage => &mut self.orb_sprite_damage,
+                OrbType::Defense => &mut self.orb_sprite_defense,
+                OrbType::Drone => &mut self.orb_sprite_drone,
+                OrbType::ShotType => &mut self.orb_sprite_shot_type,
+            };
+            sprite.draw_tinted(sx, sy, tint);
         }
     }
 
@@ -539,8 +594,31 @@ impl GameState {
 
     fn tick_spawn(&mut self) {
         self.spawn_ctrl.inject_timer -= SPAWN_TICK_INTERVAL;
+
+        // Ramp debug logging: emit a line every ramp_duration/2 seconds while ramping.
+        let ramp_dur = self.config.spawn_ramp_duration;
+        if ramp_dur > 0.0 && self.run_time < ramp_dur {
+            self.spawn_ctrl.ramp_log_timer -= SPAWN_TICK_INTERVAL;
+            if self.spawn_ctrl.ramp_log_timer <= 0.0 {
+                self.spawn_ctrl.ramp_log_timer = ramp_dur / 2.0;
+                let ramp_factor = (self.run_time / ramp_dur).clamp(0.0, 1.0);
+                let coverage = compute_coverage(&self.enemies);
+                let target = coverage_target(self.run_time, &self.config);
+                if let Some(log) = &mut self.debug_log {
+                    log.log(
+                        self.run_time,
+                        &format!(
+                            "spawn ramp: {:.0}% of ramp_duration, target={:.2}, coverage={:.2}",
+                            ramp_factor * 100.0,
+                            target,
+                            coverage,
+                        ),
+                    );
+                }
+            }
+        }
         let coverage = compute_coverage(&self.enemies);
-        let target = coverage_target(self.run_time);
+        let target = coverage_target(self.run_time, &self.config);
 
         if self.spawn_ctrl.inject_timer <= 0.0 && coverage < target {
             // Inject a big enemy based on run time
@@ -598,6 +676,15 @@ impl GameState {
             ),
         };
 
+        // HP scaling: heavier kinds scale faster
+        let kind_weight = match kind {
+            EnemyKind::Heavy => self.config.hp_scale_heavy_mult,
+            EnemyKind::Large => self.config.hp_scale_large_mult,
+            _ => 1.0,
+        };
+        let hp_mult = 1.0 + self.config.enemy_hp_scale * self.run_time * kind_weight;
+        let hp = ((hp as f32) * hp_mult).round().max(1.0) as i32;
+
         let y_min = ENEMY_LANE_TOP as f32;
         let y_max = (ENEMY_LANE_BOTTOM as f32 - h).max(y_min);
 
@@ -615,9 +702,11 @@ impl GameState {
             let jitter_y = rand::gen_range(-2.0_f32, 2.0);
             let y = (base_y + jitter_y).clamp(y_min, y_max);
 
-            // Speed with ±3% variation
-            let speed_scale = rand::gen_range(0.97_f32, 1.03);
-            let speed = base_speed * speed_scale;
+            // Speed: ±3% jitter + time-based scaling
+            let speed_jitter = rand::gen_range(0.97_f32, 1.03);
+            let speed_mult = (1.0 + self.config.speed_scale_per_sec * self.run_time)
+                .min(self.config.speed_scale_cap);
+            let speed = base_speed * speed_mult * speed_jitter;
 
             // AABB overlap check vs enemies within 64px in x
             let overlap = self.enemies.iter().any(|e| {
@@ -634,7 +723,12 @@ impl GameState {
                 enemy.shielded = true;
                 enemy.shield_hp = 1;
             }
+            let spawn_msg = format!(
+                "SPAWN {:?} hp={} speed={:.1} shielded={} x={:.1} y={:.1}",
+                enemy.kind, enemy.hp, enemy.speed, enemy.shielded, enemy.x, enemy.y
+            );
             self.enemies.push(enemy);
+            self.dlog(&spawn_msg);
             return;
         }
         // All retries failed — skip this spawn tick
@@ -724,22 +818,17 @@ fn compute_coverage(enemies: &[Enemy]) -> f32 {
         }
     }
     merged_len += cur_right - cur_left;
-
     merged_len / COVERAGE_ZONE_WIDTH
 }
 
-fn coverage_target(run_time: f32) -> f32 {
-    if run_time < 60.0 {
-        0.72
-    } else if run_time < 240.0 {
-        0.78
-    } else if run_time < 480.0 {
-        0.84
-    } else if run_time < 720.0 {
-        0.88
-    } else {
-        0.90
+fn coverage_target(run_time: f32, cfg: &Config) -> f32 {
+    let t = (run_time / 720.0).min(1.0);
+    let full_target = 0.72 + t * 0.18; // 0.72 → 0.90 over 12 minutes
+    if cfg.spawn_ramp_duration <= 0.0 {
+        return full_target;
     }
+    let ramp = (run_time / cfg.spawn_ramp_duration).clamp(0.0, 1.0);
+    cfg.spawn_ramp_start_coverage + (full_target - cfg.spawn_ramp_start_coverage) * ramp
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -112,11 +112,30 @@ pub const BIG_INJECT_BASE_INTERVAL: f32 = 2.2;
 // Scaling rates (fractional increase per second)
 pub const ENEMY_HP_SCALE: f32 = 0.001;
 pub const SHIELDED_FREQ_SCALE: f32 = 0.001;
+pub const SPEED_SCALE_PER_SEC: f32 = 0.0003; // +0.03%/s → 1.18× at 10min
+pub const SPEED_SCALE_CAP: f32 = 1.5;         // speed never exceeds 1.5× base
+pub const HP_SCALE_HEAVY_MULT: f32 = 1.5;     // heavy enemies scale HP 1.5× faster
+pub const HP_SCALE_LARGE_MULT: f32 = 2.0;     // large enemies scale HP 2× faster
 
 // Medium/Large introduction times (seconds into run)
 pub const MEDIUM_INTRO_TIME: f32 = 30.0;
 pub const HEAVY_INTRO_TIME: f32 = 90.0;
 pub const LARGE_INTRO_TIME: f32 = 150.0;
+
+// Spawn ramp-up: ease into full density over the first few seconds
+pub const SPAWN_RAMP_DURATION: f32 = 8.0;       // seconds to reach full coverage target
+pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15; // initial coverage target at t=0
+
+// ---------------------------------------------------------------------------
+// Debug
+// ---------------------------------------------------------------------------
+
+pub const DEBUG_LOG_GAMEPLAY: bool = false;
+pub const DEBUG_LOG_FILE: &str = "";
+
+pub const DAMAGE_LEVELS: [i32; 3] = [1, 2, 3];
+pub const MAX_DAMAGE_LEVEL: usize = 3;
+pub const DAMAGE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides
@@ -156,18 +175,30 @@ pub struct RuntimeConfig {
 
     pub enemy_hp_scale: Option<f32>,
     pub shielded_freq_scale: Option<f32>,
+    pub speed_scale_per_sec: Option<f32>,
+    pub speed_scale_cap: Option<f32>,
+    pub hp_scale_heavy_mult: Option<f32>,
+    pub hp_scale_large_mult: Option<f32>,
 
     pub medium_intro_time: Option<f32>,
     pub heavy_intro_time: Option<f32>,
     pub large_intro_time: Option<f32>,
+
+    pub spawn_ramp_duration: Option<f32>,
+    pub spawn_ramp_start_coverage: Option<f32>,
 
     pub rotate_input: Option<bool>,
     pub analog_deadzone: Option<f32>,
 
     pub projectile_speed: Option<f32>,
 
+    pub damage_levels: Option<Vec<i32>>,
+    pub damage_upgrade_applies_to_drones: Option<bool>,
+
     // Debug flags
     pub debug_all_enemies: Option<bool>,
+    pub debug_log_gameplay: Option<bool>,
+    pub debug_log_file: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -208,18 +239,30 @@ pub struct Config {
 
     pub enemy_hp_scale: f32,
     pub shielded_freq_scale: f32,
+    pub speed_scale_per_sec: f32,
+    pub speed_scale_cap: f32,
+    pub hp_scale_heavy_mult: f32,
+    pub hp_scale_large_mult: f32,
 
     pub medium_intro_time: f32,
     pub heavy_intro_time: f32,
     pub large_intro_time: f32,
+
+    pub spawn_ramp_duration: f32,
+    pub spawn_ramp_start_coverage: f32,
 
     pub rotate_input: bool,
     pub analog_deadzone: f32,
 
     pub projectile_speed: f32,
 
+    pub damage_levels: [i32; 3],
+    pub damage_upgrade_applies_to_drones: bool,
+
     /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
     pub debug_all_enemies: bool,
+    pub debug_log_gameplay: bool,
+    pub debug_log_file: String,
 }
 
 impl Config {
@@ -261,17 +304,42 @@ impl Config {
 
             enemy_hp_scale: rt.enemy_hp_scale.unwrap_or(ENEMY_HP_SCALE),
             shielded_freq_scale: rt.shielded_freq_scale.unwrap_or(SHIELDED_FREQ_SCALE),
+            speed_scale_per_sec: rt.speed_scale_per_sec.unwrap_or(SPEED_SCALE_PER_SEC),
+            speed_scale_cap: rt.speed_scale_cap.unwrap_or(SPEED_SCALE_CAP),
+            hp_scale_heavy_mult: rt.hp_scale_heavy_mult.unwrap_or(HP_SCALE_HEAVY_MULT),
+            hp_scale_large_mult: rt.hp_scale_large_mult.unwrap_or(HP_SCALE_LARGE_MULT),
 
             medium_intro_time: rt.medium_intro_time.unwrap_or(MEDIUM_INTRO_TIME),
             heavy_intro_time: rt.heavy_intro_time.unwrap_or(HEAVY_INTRO_TIME),
             large_intro_time: rt.large_intro_time.unwrap_or(LARGE_INTRO_TIME),
+
+            spawn_ramp_duration: rt.spawn_ramp_duration.unwrap_or(SPAWN_RAMP_DURATION),
+            spawn_ramp_start_coverage: rt
+                .spawn_ramp_start_coverage
+                .unwrap_or(SPAWN_RAMP_START_COVERAGE),
 
             rotate_input: rt.rotate_input.unwrap_or(ROTATE_INPUT),
             analog_deadzone: rt.analog_deadzone.unwrap_or(ANALOG_DEADZONE),
 
             projectile_speed: rt.projectile_speed.unwrap_or(PROJECTILE_SPEED),
 
+            damage_levels: {
+                let v = rt.damage_levels.unwrap_or_default();
+                if v.len() == 3 {
+                    [v[0], v[1], v[2]]
+                } else {
+                    DAMAGE_LEVELS
+                }
+            },
+            damage_upgrade_applies_to_drones: rt
+                .damage_upgrade_applies_to_drones
+                .unwrap_or(DAMAGE_UPGRADE_APPLIES_TO_DRONES),
+
             debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
+            debug_log_gameplay: rt.debug_log_gameplay.unwrap_or(DEBUG_LOG_GAMEPLAY),
+            debug_log_file: rt
+                .debug_log_file
+                .unwrap_or_else(|| DEBUG_LOG_FILE.to_string()),
         }
     }
 }
@@ -284,10 +352,7 @@ pub fn load_runtime_config() -> RuntimeConfig {
     match fs::read_to_string("config.toml") {
         Ok(text) => match toml::from_str::<RuntimeConfig>(&text) {
             Ok(cfg) => cfg,
-            Err(e) => {
-                eprintln!("[config] Failed to parse config.toml: {e}. Using defaults.");
-                RuntimeConfig::default()
-            }
+            Err(e) => panic!("[config] Failed to parse config.toml: {e}\nFix the file or delete it to regenerate defaults."),
         },
         Err(_) => RuntimeConfig::default(),
     }

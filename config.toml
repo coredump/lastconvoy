@@ -1,56 +1,219 @@
-# lastconvoy runtime config
-# All values are set to compile-time defaults. Uncomment and change to override.
+# lastconvoy — runtime configuration
+#
+# All values shown here are the compile-time defaults from src/config.rs.
+# You only need to include keys you want to override; the game silently
+# falls back to compiled defaults for any key that is missing or if this
+# file cannot be parsed at all.
+#
+# Section headers are commented out — TOML [sections] create nested tables
+# which serde cannot map to the flat RuntimeConfig struct. Use # [...] labels
+# for readability only; all keys must remain at the top level.
+#
+# [FIXED] labels mark values derived from hard layout constants defined in
+# CLAUDE.md. Change them at your own risk; the game may break visually or
+# mechanically.
 
-# Player
-player_speed = 100.0
+# ---------------------------------------------------------------------------
+# [player]
+# ---------------------------------------------------------------------------
+
+# Movement speed in pixels per second. Higher = more responsive but harder
+# to make precise vertical adjustments.
+player_speed = 90.0
+
+# Minimum seconds between player shots. Lower = faster fire rate.
+# Range: > 0.0 (practical minimum ~0.05 to avoid bullet spam).
 player_fire_rate = 0.18
+
+# Number of shield segments the player starts each run with.
+# Range: 0 or above (values above the segment cap are clamped at runtime).
 player_starting_shields = 0
 
-# Enemy speeds (px/s)
-enemy_small_speed = 35.0
+# ---------------------------------------------------------------------------
+# [projectile]
+# ---------------------------------------------------------------------------
+
+# Speed of player projectiles in pixels per second.
+# Higher values make shots feel snappier and reduce travel time across the
+# 320-pixel-wide play field.
+projectile_speed = 200.0
+
+# ---------------------------------------------------------------------------
+# [enemies]
+# ---------------------------------------------------------------------------
+# Compile-time-only constants (not runtime-configurable, listed for reference):
+#   ENEMY_SMALL_W/H  = 16x16   ENEMY_MEDIUM_W/H = 24x24
+#   ENEMY_HEAVY_W/H  = 32x24   ENEMY_LARGE_W/H  = 40x32
+#   ENEMY_ELITE_W/H  = 48x40   (EnemyElite1 and MiniBoss are event-only)
+
+# --- Base movement speeds (pixels per second, moving left) ---
+# Higher values give enemies a more threatening, aggressive feel.
+
+enemy_small_speed = 40.0
 enemy_medium_speed = 30.0
 enemy_heavy_speed = 25.0
 enemy_large_speed = 20.0
 
-# Enemy HP
+# --- Base hit points ---
+# Increasing these makes the early game harder; decreasing them speeds up
+# combat and lets the player clear lanes more freely.
+
 enemy_small_hp = 1
 enemy_medium_hp = 4
 enemy_heavy_hp = 7
 enemy_large_hp = 14
 
-# Orbs
-orb_spawn_interval = 5.0
-max_active_orbs = 1
-orb_speed = 25.0
+# --- Enemy introduction times (seconds into the run) ---
+# Before its intro time, an enemy type will not appear in the spawn pool.
+# Set to 0.0 to have all types appear from the start (or use debug_all_enemies).
 
-# Boundary
-boundary_slot_count = 3
-boundary_damage_tick = 2.0
-
-# Elite / MiniBoss
-elite_interval = 60.0
-elite_interval_jitter = 10.0
-elite_hp = 20
-elite_speed = 18.0
-miniboss_interval = 180.0
-miniboss_interval_jitter = 20.0
-miniboss_hp = 30
-
-# Scaling
-enemy_hp_scale = 0.001
-shielded_freq_scale = 0.001
-
-# Enemy introduction times (seconds into run)
 medium_intro_time = 30.0
 heavy_intro_time = 90.0
 large_intro_time = 150.0
 
-# Input
+# ---------------------------------------------------------------------------
+# [scaling]
+# ---------------------------------------------------------------------------
+# All scaling values are fractional multipliers applied per second of play
+# time. They create a gradual difficulty ramp rather than discrete jumps.
+
+# Fractional HP increase applied to all enemies per second (base rate).
+# e.g. 0.001 = +0.1% per second, roughly 1.06x at 60s and 1.6x at 10 min.
+enemy_hp_scale = 0.001
+
+# Rate at which shielded-enemy spawn frequency grows, per second.
+shielded_freq_scale = 0.001
+
+# Fractional speed increase per second for all enemies.
+# 0.0003 = +0.03%/s, approximately 1.18x at 10 minutes.
+speed_scale_per_sec = 0.0003
+
+# Hard cap on the speed multiplier; enemies will never exceed this multiple
+# of their base speed regardless of how long the run goes on.
+speed_scale_cap = 1.5
+
+# HP scaling multiplier applied on top of enemy_hp_scale for heavy enemies.
+# Heavy enemies scale 1.5x faster than the base rate.
+hp_scale_heavy_mult = 1.5
+
+# HP scaling multiplier applied on top of enemy_hp_scale for large enemies.
+# Large enemies scale 2x faster than the base rate.
+hp_scale_large_mult = 2.0
+
+# ---------------------------------------------------------------------------
+# [spawn]
+# ---------------------------------------------------------------------------
+
+# How long (in seconds) the spawn system takes to ramp from the starting
+# coverage fraction up to the full configured coverage target after a run
+# begins. Set to 0.0 to start at full density immediately.
+spawn_ramp_duration = 8.0
+
+# Coverage fraction (0.0-1.0) used as the spawn density target at the very
+# start of a run (t = 0). The system linearly interpolates toward the full
+# target over spawn_ramp_duration seconds. 0.15 means 15% of the enemy zone
+# is occupied at the moment the run starts. Must be <= the full target.
+spawn_ramp_start_coverage = 0.15
+
+# ---------------------------------------------------------------------------
+# [damage_upgrade]
+# ---------------------------------------------------------------------------
+# The Damage orb increases player projectile damage by upgrading through
+# levels. Collect up to 3 times; the orb stops spawning once max level is
+# reached. Each entry is the flat damage dealt per hit at that level.
+damage_levels = [1, 2, 3]
+
+# When true, the damage upgrade also applies to drone projectiles.
+damage_upgrade_applies_to_drones = true
+
+# ---------------------------------------------------------------------------
+# [orbs]
+# ---------------------------------------------------------------------------
+# Orbs follow a strict two-phase rule: they are first activated by player
+# hits, and then cycled by subsequent hits. Activation hits do NOT count
+# as cycle hits. Drone shots never interact with orbs.
+
+# Seconds between successive orb spawns in the upgrade lane.
+orb_spawn_interval = 5.0
+
+# Maximum number of orbs that can be present on screen simultaneously.
+max_active_orbs = 1
+
+# Speed of a moving orb across the upgrade lane in pixels per second.
+orb_speed = 25.0
+
+# ---------------------------------------------------------------------------
+# [boundary]
+# ---------------------------------------------------------------------------
+# The boundary is the set of finite slots directly in front of the player
+# where enemies queue up. When all slots are full the lane jams and enemies
+# stack behind the slowest or stopped one without overlapping.
+# [FIXED] BOUNDARY_X = 36.0 (derived from PLAYER_X 8.0 + PLAYER_WIDTH 24.0 + 4.0 gap).
+# Do not change BOUNDARY_X here; edit src/config.rs constants instead.
+
+# Number of slots at the boundary. Fewer slots = lane jams faster (harder);
+# more slots = player has more time to clear enemies before the jam penalty.
+boundary_slot_count = 3
+
+# Seconds between damage ticks while an enemy occupies a boundary slot.
+# Lower values drain player health faster when the lane is jammed.
+boundary_damage_tick = 2.0
+
+# ---------------------------------------------------------------------------
+# [elite_events]
+# ---------------------------------------------------------------------------
+# EnemyElite1 and MiniBoss are event-only enemies — they never appear in the
+# regular spawn pool. These settings control how often their events fire.
+
+# Mean seconds between EnemyElite1 event triggers.
+elite_interval = 60.0
+
+# Random +/- seconds added to elite_interval each time, so events do not
+# feel perfectly predictable. Range: 0.0 (no jitter) to elite_interval.
+elite_interval_jitter = 10.0
+
+# Hit points for EnemyElite1 (event-only enemy).
+elite_hp = 20
+
+# Movement speed for EnemyElite1 in pixels per second.
+elite_speed = 18.0
+
+# Mean seconds between MiniBoss event triggers.
+miniboss_interval = 180.0
+
+# Random +/- seconds added to miniboss_interval each time.
+miniboss_interval_jitter = 20.0
+
+# Hit points for MiniBoss (event-only enemy).
+miniboss_hp = 30
+
+# NOTE: MiniBoss movement speed (MINIBOSS_SPEED = 14.0) is compile-time only
+# and is not exposed here. Edit src/config.rs directly to change it.
+
+# ---------------------------------------------------------------------------
+# [input]
+# ---------------------------------------------------------------------------
+
+# When true, the game treats the device as rotated 90 degrees (portrait
+# physical orientation, landscape logical). Intended for mobile/tablet builds.
 rotate_input = false
+
+# Dead zone radius for analogue stick input (0.0-1.0). Stick deflections
+# smaller than this value are ignored to prevent drift on worn controllers.
 analog_deadzone = 0.2
 
-# Projectile
-projectile_speed = 200.0
+# ---------------------------------------------------------------------------
+# [debug]
+# ---------------------------------------------------------------------------
 
-# Debug
+# When true, all enemy types spawn from the very start of the run, bypassing
+# their normal introduction timers (medium_intro_time, heavy_intro_time, etc.).
 debug_all_enemies = false
+
+# When true, detailed gameplay events are logged to stderr (or to the file
+# specified by debug_log_file). Minor performance impact; keep false for play.
+debug_log_gameplay = true
+
+# Path to write gameplay debug logs. Empty string means stderr.
+# Example: debug_log_file = "/tmp/lastconvoy.log"
+debug_log_file = ""

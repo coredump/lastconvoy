@@ -14,6 +14,7 @@ pub struct Enemy {
     pub x: f32,
     pub y: f32,
     pub hp: i32,
+    pub max_hp: i32,
     pub kind: EnemyKind,
     pub speed: f32,
     pub width: f32,
@@ -26,6 +27,8 @@ pub struct Enemy {
     /// Index of the boundary slot this enemy occupies, or None if queued/not at boundary.
     pub slot_id: Option<usize>,
     pub shake: ShakeEffect,
+    pub shots_taken: i32,
+    pub damage_taken: i32,
 }
 
 impl Enemy {
@@ -42,6 +45,7 @@ impl Enemy {
             x,
             y,
             hp,
+            max_hp: hp,
             kind,
             speed,
             width,
@@ -52,6 +56,8 @@ impl Enemy {
             shield_hp: 0,
             slot_id: None,
             shake: ShakeEffect::new(),
+            shots_taken: 0,
+            damage_taken: 0,
         }
     }
 
@@ -63,6 +69,8 @@ impl Enemy {
     }
 
     pub fn take_damage(&mut self, amount: i32) {
+        self.shots_taken += 1;
+        self.damage_taken += amount;
         if self.shielded && self.shield_hp > 0 {
             self.shield_hp -= amount;
             if self.shield_hp <= 0 {
@@ -71,7 +79,9 @@ impl Enemy {
         } else {
             self.hp -= amount;
         }
-        self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
+        if self.kind != EnemyKind::Small {
+            self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
+        }
     }
 
     pub fn is_dead(&self) -> bool {

@@ -5,6 +5,7 @@ use macroquad::prelude::*;
 
 mod boundary;
 mod config;
+mod debug_log;
 mod drone;
 mod elite;
 mod enemy;
@@ -62,9 +63,28 @@ async fn main() {
     let boundary_shield_sprite = Sprite::from_json("assets/sprites/objects/boundary_shield.json")
         .await
         .expect("Failed to load boundary_shield sprite");
-    let orb_sprite = Sprite::from_json("assets/sprites/objects/upgrades.json")
+
+    // Load one Sprite per OrbType, each pre-locked to its animation tag index.
+    // Tag indices in upgrades.json: 0=damage, 4=stagger, 5=extradrone, 7=shield
+    let mut orb_sprite_damage = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
-        .expect("Failed to load orb sprite");
+        .expect("Failed to load orb sprite (damage)");
+    orb_sprite_damage.set_animation(0);
+
+    let mut orb_sprite_defense = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite (defense)");
+    orb_sprite_defense.set_animation(7);
+
+    let mut orb_sprite_drone = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite (drone)");
+    orb_sprite_drone.set_animation(5);
+
+    let mut orb_sprite_shot_type = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite (shot_type)");
+    orb_sprite_shot_type.set_animation(4);
 
     let mut state = GameState::new(
         config,
@@ -75,7 +95,10 @@ async fn main() {
         enemy_large_sprite,
         enemy_elite_sprite,
         boundary_shield_sprite,
-        orb_sprite,
+        orb_sprite_damage,
+        orb_sprite_defense,
+        orb_sprite_drone,
+        orb_sprite_shot_type,
     );
     let pipeline = RenderPipeline::new();
 

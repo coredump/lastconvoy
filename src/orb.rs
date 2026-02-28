@@ -2,6 +2,7 @@ use crate::config::{ORB_ACTIVATION_DECAY_PER_SEC, ORB_ACTIVATION_HIT_COUNT};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OrbType {
+    Damage,
     Defense,
     Drone,
     ShotType,
