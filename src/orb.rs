@@ -8,6 +8,7 @@ pub enum OrbType {
     Drone,
     FireRate,
     Pierce,
+    Stagger,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

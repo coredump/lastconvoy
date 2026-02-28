@@ -1,5 +1,9 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::config::{SHAKE_DURATION, SHAKE_INTENSITY};
 use crate::sprite::ShakeEffect;
+
+static NEXT_ENEMY_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
@@ -11,6 +15,7 @@ pub enum EnemyKind {
 }
 
 pub struct Enemy {
+    pub id: u64,
     pub x: f32,
     pub y: f32,
     pub hp: i32,
@@ -29,6 +34,7 @@ pub struct Enemy {
     pub shake: ShakeEffect,
     pub shots_taken: i32,
     pub damage_taken: i32,
+    pub knockback_timer: f32,
 }
 
 impl Enemy {
@@ -42,6 +48,7 @@ impl Enemy {
         height: f32,
     ) -> Self {
         Self {
+            id: NEXT_ENEMY_ID.fetch_add(1, Ordering::Relaxed),
             x,
             y,
             hp,
@@ -58,14 +65,26 @@ impl Enemy {
             shake: ShakeEffect::new(),
             shots_taken: 0,
             damage_taken: 0,
+            knockback_timer: 0.0,
         }
     }
 
-    pub fn update(&mut self, dt: f32) {
-        if !self.at_boundary {
+    pub fn update(&mut self, dt: f32, knockback_speed: f32) {
+        if self.knockback_timer > 0.0 {
+            self.x += knockback_speed * dt;
+            self.knockback_timer -= dt;
+            if self.knockback_timer < 0.0 {
+                self.knockback_timer = 0.0;
+            }
+        } else if !self.at_boundary {
             self.x -= self.speed * dt;
         }
         self.shake.update(dt);
+    }
+
+    pub fn apply_knockback(&mut self, duration: f32) {
+        self.knockback_timer = duration;
+        self.at_boundary = false;
     }
 
     pub fn take_damage(&mut self, amount: i32) {

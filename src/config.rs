@@ -1,3 +1,4 @@
+use crate::orb::OrbType;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -146,6 +147,10 @@ pub const MAX_BURST_LEVEL: usize = 3;
 pub const MAX_PIERCE_LEVEL: usize = 3;
 pub const BURST_DAMAGE_MULTIPLIER: i32 = 2;
 
+pub const MAX_STAGGER_LEVEL: usize = 1;
+pub const STAGGER_DURATIONS: [f32; 1] = [0.3];
+pub const STAGGER_KNOCKBACK_SPEED: f32 = 40.0;
+
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides
 // ---------------------------------------------------------------------------
@@ -214,6 +219,7 @@ pub struct RuntimeConfig {
     pub debug_all_enemies: Option<bool>,
     pub debug_log_gameplay: Option<bool>,
     pub debug_log_file: Option<String>,
+    pub debug_force_orb: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +290,8 @@ pub struct Config {
     pub debug_all_enemies: bool,
     pub debug_log_gameplay: bool,
     pub debug_log_file: String,
+    /// Debug: if Some, only this orb type spawns (bypasses level gates).
+    pub debug_force_orb: Option<OrbType>,
 }
 
 impl Config {
@@ -385,6 +393,18 @@ impl Config {
             debug_log_file: rt
                 .debug_log_file
                 .unwrap_or_else(|| DEBUG_LOG_FILE.to_string()),
+            debug_force_orb: rt.debug_force_orb.as_deref().and_then(|s| {
+                match s.to_lowercase().as_str() {
+                    "burst" => Some(OrbType::Burst),
+                    "damage" => Some(OrbType::Damage),
+                    "defense" => Some(OrbType::Defense),
+                    "drone" => Some(OrbType::Drone),
+                    "firerate" => Some(OrbType::FireRate),
+                    "pierce" => Some(OrbType::Pierce),
+                    "stagger" => Some(OrbType::Stagger),
+                    _ => None,
+                }
+            }),
         }
     }
 }

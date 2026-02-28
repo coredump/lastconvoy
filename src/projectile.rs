@@ -16,6 +16,7 @@ pub struct Projectile {
     pub alive: bool,
     pub is_burst: bool,
     pub pierce_remaining: i32,
+    pub hit_enemies: Vec<u64>,
 }
 
 impl Projectile {
@@ -35,6 +36,7 @@ impl Projectile {
             alive: true,
             is_burst,
             pierce_remaining,
+            hit_enemies: Vec::new(),
         }
     }
 
