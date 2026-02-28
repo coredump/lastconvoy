@@ -1,0 +1,35 @@
+[tools]
+rust = "1.93.1"
+"cargo:cargo-watch" = "latest"
+node = "lts"
+
+[tasks.build_wasm]
+description = "Build a wasm browser version"
+run = """
+  rm -rf deploy
+  cargo build --release --target wasm32-unknown-unknown &&
+  mkdir deploy
+  cp ./target/wasm32-unknown-unknown/release/lastconvoy.wasm ./deploy/
+  cp ./assets/web/* ./deploy/
+  """
+
+[tasks.watch]
+description = "Watch Rust sources and rebuild WASM on changes"
+run = """
+  cargo watch -w src -s \
+    "cargo build --release --target wasm32-unknown-unknown && \
+     cp ./target/wasm32-unknown-unknown/release/lastconvoy.wasm ./deploy/"
+  """
+
+[tasks.serve]
+description = "Serve deploy/ via Vite with live reload"
+run = "npm run dev"
+
+[tasks.dev]
+description = "Build WASM, watch for Rust changes, and serve with hot reload"
+run = """
+  mise run build_wasm
+  trap 'kill $(jobs -p) 2>/dev/null' EXIT INT TERM
+  mise run watch &
+  npm run dev
+  """

@@ -1,0 +1,86 @@
+GIMP Palette
+# LCDshootsystem Palette v5 — 6 Levels + Outline
+#
+
+# Space
+ 10  14  22  Space Very Dark
+ 16  20  30  Space Dark
+ 28  35  51  Space Mid
+ 43  53  80  Space Light
+ 60  75 110  Space Near Light
+ 85 105 155  Space Near White
+
+# Steel (Industrial)
+ 18  22  32  Steel Very Dark
+ 30  38  51  Steel Dark
+ 58  70  90  Steel Mid
+ 92 106 130  Steel Light
+120 140 165  Steel Near Light
+165 185 210  Steel Near White
+
+# Player Cyan
+  0  50  60  Player Cyan Very Dark
+  0  92 112  Player Cyan Dark
+  0 151 184  Player Cyan Mid
+ 63 213 240  Player Cyan Light
+110 235 250  Player Cyan Near Light
+170 250 255  Player Cyan Near White
+
+# Upgrade Teal
+  0  50  44  Upgrade Teal Very Dark
+  0  95  82  Upgrade Teal Dark
+  0 169 143  Upgrade Teal Mid
+ 79 217 195  Upgrade Teal Light
+130 235 215  Upgrade Teal Near Light
+185 250 235  Upgrade Teal Near White
+
+# Infection Magenta
+ 55  15  45  Infection Very Dark
+ 90  17  74  Infection Dark
+184  31 151  Infection Mid
+255  77 214  Infection Light
+255 140 230  Infection Near Light
+255 200 245  Infection Near White
+
+# Glass
+ 16  28  36  Glass Very Dark
+ 18  48  66  Glass Dark
+ 44 110 145  Glass Mid
+123 196 232  Glass Light
+170 220 245  Glass Near Light
+210 240 255  Glass Near White
+
+# Decal Orange
+ 70  25   0  Decal Orange Very Dark
+107  43   0  Decal Orange Dark
+192  79   0  Decal Orange Mid
+227 122  31  Decal Orange Light
+245 160  70  Decal Orange Near Light
+255 210 160  Decal Orange Near White
+
+# Decal Yellow
+ 80  50   0  Decal Yellow Very Dark
+122  90   0  Decal Yellow Dark
+201 154   0  Decal Yellow Mid
+230 195  58  Decal Yellow Light
+245 220 120  Decal Yellow Near Light
+255 240 185  Decal Yellow Near White
+
+# Damage Red
+ 70  18  22  Damage Red Very Dark
+ 92  15  20  Damage Red Dark
+180  32  40  Damage Red Mid
+227  74  82  Damage Red Light
+245 130 135  Damage Red Near Light
+255 190 195  Damage Red Near White
+
+# Warp Cyan
+  0  40  65  Warp Cyan Very Dark
+  0 122 156  Warp Cyan Dark
+  0 200 255  Warp Cyan Mid
+127 231 255  Warp Cyan Light
+180 245 255  Warp Cyan Near Light
+220 252 255  Warp Cyan Near White
+
+# Outline
+  0   0   0  Outline
