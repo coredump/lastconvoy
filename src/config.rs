@@ -406,7 +406,7 @@ impl Config {
                 match s.to_lowercase().as_str() {
                     "burst" => Some(OrbType::Burst),
                     "damage" => Some(OrbType::Damage),
-                    "defense" => Some(OrbType::Defense),
+                    "shield" => Some(OrbType::Shield),
                     "drone" => Some(OrbType::Drone),
                     "firerate" => Some(OrbType::FireRate),
                     "pierce" => Some(OrbType::Pierce),

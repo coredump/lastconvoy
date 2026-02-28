@@ -71,10 +71,10 @@ async fn main() {
         .expect("Failed to load orb sprite (damage)");
     orb_sprite_damage.set_animation(0);
 
-    let mut orb_sprite_defense = Sprite::from_json("assets/sprites/objects/upgrades.json")
+    let mut orb_sprite_shield = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
-        .expect("Failed to load orb sprite (defense)");
-    orb_sprite_defense.set_animation(7);
+        .expect("Failed to load orb sprite (shield)");
+    orb_sprite_shield.set_animation(7);
 
     let mut orb_sprite_drone = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
@@ -116,7 +116,7 @@ async fn main() {
         enemy_elite_sprite,
         boundary_shield_sprite,
         orb_sprite_damage,
-        orb_sprite_defense,
+        orb_sprite_shield,
         orb_sprite_drone,
         orb_sprite_explosive,
         orb_sprite_fire_rate,

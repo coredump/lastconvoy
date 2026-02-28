@@ -68,7 +68,7 @@ pub struct GameState {
     pub projectiles: Vec<Projectile>,
     pub orbs: Vec<Orb>,
     pub orb_sprite_damage: Sprite,
-    pub orb_sprite_defense: Sprite,
+    pub orb_sprite_shield: Sprite,
     pub orb_sprite_drone: Sprite,
     pub orb_sprite_explosive: Sprite,
     pub orb_sprite_fire_rate: Sprite,
@@ -107,7 +107,7 @@ impl GameState {
         enemy_elite_sprite: Sprite,
         boundary_shield_sprite: Sprite,
         orb_sprite_damage: Sprite,
-        orb_sprite_defense: Sprite,
+        orb_sprite_shield: Sprite,
         orb_sprite_drone: Sprite,
         orb_sprite_explosive: Sprite,
         orb_sprite_fire_rate: Sprite,
@@ -141,7 +141,7 @@ impl GameState {
             projectiles: Vec::new(),
             orbs: Vec::new(),
             orb_sprite_damage,
-            orb_sprite_defense,
+            orb_sprite_shield,
             orb_sprite_drone,
             orb_sprite_explosive,
             orb_sprite_fire_rate,
@@ -584,7 +584,7 @@ impl GameState {
                     pool.push(OrbType::Damage);
                 }
                 if !shields_full {
-                    pool.push(OrbType::Defense);
+                    pool.push(OrbType::Shield);
                 }
                 pool.push(OrbType::Drone);
                 if self.fire_rate_level < MAX_FIRE_RATE_LEVEL {
@@ -673,7 +673,7 @@ impl GameState {
                     OrbType::Burst => {
                         burst_collected += 1;
                     }
-                    OrbType::Defense => {
+                    OrbType::Shield => {
                         shield_grants += 1;
                     }
                     OrbType::Damage => {
@@ -749,7 +749,7 @@ impl GameState {
 
         // Advance sprite animations
         self.orb_sprite_damage.update(dt);
-        self.orb_sprite_defense.update(dt);
+        self.orb_sprite_shield.update(dt);
         self.orb_sprite_drone.update(dt);
         self.orb_sprite_explosive.update(dt);
         self.orb_sprite_fire_rate.update(dt);
@@ -827,7 +827,7 @@ impl GameState {
             let sprite = match orb_type {
                 OrbType::Burst => &mut self.orb_sprite_burst,
                 OrbType::Damage => &mut self.orb_sprite_damage,
-                OrbType::Defense => &mut self.orb_sprite_defense,
+                OrbType::Shield => &mut self.orb_sprite_shield,
                 OrbType::Drone => &mut self.orb_sprite_drone,
                 OrbType::Explosive => &mut self.orb_sprite_explosive,
                 OrbType::FireRate => &mut self.orb_sprite_fire_rate,

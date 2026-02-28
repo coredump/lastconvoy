@@ -4,7 +4,7 @@ use crate::config::{ORB_ACTIVATION_DECAY_PER_SEC, ORB_ACTIVATION_HIT_COUNT};
 pub enum OrbType {
     Burst,
     Damage,
-    Defense,
+    Shield,
     Drone,
     Explosive,
     FireRate,

@@ -28,7 +28,7 @@
 - **Always update CLAUDE.md** when user states a new preference, rule, or workflow for tool usage — so it persists across sessions.
 
 ### MCP usage — detailed rules
-- **Priority order:** (1) Serena + ripgrep for code/files, (2) Context7 for API docs, (3) memory MCP for decisions/state, (4) Bash only as last resort.
+- **Priority order:** (1) Serena + ripgrep for code/files, (2) Context7 for API docs, (3) memory MCP for decisions/state, (4) filesystem MCP for file reads/writes/directory ops, (5) Bash only as last resort.
 - **Serena** — code navigation only. Use `find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`. Do NOT use Serena `write_memory`/`read_memory` — use memory MCP instead.
 - **memory MCP** — primary persistent store. Call `read_graph` at session start. MEMORY.md is a concise index only; details live in the graph. Always store architecture decisions, resolved ambiguities, and key findings here.
 - **Context7** — always call `resolve-library-id` first, then `query-docs`. Never skip for macroquad/crate API questions.
