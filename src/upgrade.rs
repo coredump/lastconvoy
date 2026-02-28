@@ -2,5 +2,4 @@
 pub enum UpgradeTrack {
     Defense,
     Drones,
-    ShotType,
 }

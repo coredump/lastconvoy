@@ -5,7 +5,7 @@ pub enum OrbType {
     Damage,
     Defense,
     Drone,
-    ShotType,
+    FireRate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

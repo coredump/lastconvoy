@@ -137,6 +137,10 @@ pub const DAMAGE_LEVELS: [i32; 3] = [1, 2, 3];
 pub const MAX_DAMAGE_LEVEL: usize = 3;
 pub const DAMAGE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
+pub const FIRE_RATE_LEVELS: [f32; 3] = [0.18, 0.14, 0.10];
+pub const MAX_FIRE_RATE_LEVEL: usize = 3;
+pub const FIRE_RATE_UPGRADE_APPLIES_TO_DRONES: bool = true;
+
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides
 // ---------------------------------------------------------------------------
@@ -194,6 +198,9 @@ pub struct RuntimeConfig {
 
     pub damage_levels: Option<Vec<i32>>,
     pub damage_upgrade_applies_to_drones: Option<bool>,
+
+    pub fire_rate_levels: Option<Vec<f32>>,
+    pub fire_rate_upgrade_applies_to_drones: Option<bool>,
 
     // Debug flags
     pub debug_all_enemies: Option<bool>,
@@ -258,6 +265,9 @@ pub struct Config {
 
     pub damage_levels: [i32; 3],
     pub damage_upgrade_applies_to_drones: bool,
+
+    pub fire_rate_levels: [f32; 3],
+    pub fire_rate_upgrade_applies_to_drones: bool,
 
     /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
     pub debug_all_enemies: bool,
@@ -334,6 +344,18 @@ impl Config {
             damage_upgrade_applies_to_drones: rt
                 .damage_upgrade_applies_to_drones
                 .unwrap_or(DAMAGE_UPGRADE_APPLIES_TO_DRONES),
+
+            fire_rate_levels: {
+                let v = rt.fire_rate_levels.unwrap_or_default();
+                if v.len() == 3 {
+                    [v[0], v[1], v[2]]
+                } else {
+                    FIRE_RATE_LEVELS
+                }
+            },
+            fire_rate_upgrade_applies_to_drones: rt
+                .fire_rate_upgrade_applies_to_drones
+                .unwrap_or(FIRE_RATE_UPGRADE_APPLIES_TO_DRONES),
 
             debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
             debug_log_gameplay: rt.debug_log_gameplay.unwrap_or(DEBUG_LOG_GAMEPLAY),

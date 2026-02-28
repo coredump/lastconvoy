@@ -127,6 +127,17 @@ damage_levels = [1, 2, 3]
 damage_upgrade_applies_to_drones = true
 
 # ---------------------------------------------------------------------------
+# [fire_rate_upgrade]
+# ---------------------------------------------------------------------------
+# The FireRate orb decreases the player's shot interval (seconds between shots).
+# Collect up to 3 times; the orb stops spawning once max level is reached.
+# Each entry is the fire interval at that level (lower = faster firing).
+fire_rate_levels = [0.18, 0.14, 0.10]
+
+# When true, the fire rate upgrade also applies to drone projectiles.
+fire_rate_upgrade_applies_to_drones = true
+
+# ---------------------------------------------------------------------------
 # [orbs]
 # ---------------------------------------------------------------------------
 # Orbs follow a strict two-phase rule: they are first activated by player
