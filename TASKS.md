@@ -135,7 +135,7 @@ If anything conflicts:
 - Orb spawning continues during elite events.
 - **Implementation status**: Orb struct with OrbPhase::Inactive/Active; take_hit() logic correct; spawning, movement, collision, Active-only collection all implemented. Needs gameplay verification.
 
-### P1.9 Upgrade tracks (minimal but real) ⚠ NOT STARTED
+### P1.9 Upgrade tracks (minimal but real) ⚠ PARTIAL
 Implement three tracks with small initial pools:
 - **Defense:** +1 shield segment (Defense skipped in cycling when shields at cap 3); Explosive Shield modifier (see SPEC §6, §10).
 - **Drones:** add one attached drone (fires in same lane as player, moves with player).
