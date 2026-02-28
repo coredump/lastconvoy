@@ -142,6 +142,8 @@ pub const FIRE_RATE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
 pub const BURST_INTERVALS: [f32; 3] = [5.0, 3.5, 2.0];
 pub const MAX_BURST_LEVEL: usize = 3;
+
+pub const MAX_PIERCE_LEVEL: usize = 3;
 pub const BURST_DAMAGE_MULTIPLIER: i32 = 2;
 
 // ---------------------------------------------------------------------------

@@ -15,10 +15,18 @@ pub struct Projectile {
     pub source: ProjectileSource,
     pub alive: bool,
     pub is_burst: bool,
+    pub pierce_remaining: i32,
 }
 
 impl Projectile {
-    pub fn new(x: f32, y: f32, speed: f32, source: ProjectileSource, is_burst: bool) -> Self {
+    pub fn new(
+        x: f32,
+        y: f32,
+        speed: f32,
+        source: ProjectileSource,
+        is_burst: bool,
+        pierce_remaining: i32,
+    ) -> Self {
         Self {
             x,
             y,
@@ -26,6 +34,7 @@ impl Projectile {
             source,
             alive: true,
             is_burst,
+            pierce_remaining,
         }
     }
 

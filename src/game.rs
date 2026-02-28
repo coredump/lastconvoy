@@ -11,10 +11,10 @@ use crate::config::{
     ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
     ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
     ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_BURST_LEVEL, MAX_DAMAGE_LEVEL,
-    MAX_FIRE_RATE_LEVEL, MEDIUM_INTRO_TIME, ORB_H, ORB_W, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X,
-    PROJECTILE_H, PROJECTILE_W, SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES,
-    SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH, SPAWN_TICK_INTERVAL, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
-    UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
+    MAX_FIRE_RATE_LEVEL, MAX_PIERCE_LEVEL, MEDIUM_INTRO_TIME, ORB_H, ORB_W, PLAYER_HEIGHT,
+    PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, PROJECTILE_W, SCREEN_W, SHIELDED_FREQ_SCALE,
+    SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH, SPAWN_TICK_INTERVAL,
+    TOP_BORDER_BOTTOM, TOP_BORDER_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
 use crate::drone::Drone;
 use crate::elite::EliteEvent;
@@ -71,9 +71,11 @@ pub struct GameState {
     pub orb_sprite_drone: Sprite,
     pub orb_sprite_fire_rate: Sprite,
     pub orb_sprite_burst: Sprite,
+    pub orb_sprite_pierce: Sprite,
     pub damage_level: usize,
     pub fire_rate_level: usize,
     pub burst_level: usize,
+    pub pierce_level: usize,
     pub burst_timer: f32,
     pub burst_ready: bool,
     pub drones: Vec<Drone>,
@@ -105,6 +107,7 @@ impl GameState {
         orb_sprite_drone: Sprite,
         orb_sprite_fire_rate: Sprite,
         orb_sprite_burst: Sprite,
+        orb_sprite_pierce: Sprite,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
         let player = Player::new(
@@ -136,9 +139,11 @@ impl GameState {
             orb_sprite_drone,
             orb_sprite_fire_rate,
             orb_sprite_burst,
+            orb_sprite_pierce,
             damage_level: 0,
             fire_rate_level: 0,
             burst_level: 0,
+            pierce_level: 0,
             burst_timer: 0.0,
             burst_ready: false,
             drones: Vec::new(),
@@ -183,6 +188,7 @@ impl GameState {
         self.fire_rate_level = 0;
         self.player.fire_rate = self.config.fire_rate_levels[0];
         self.burst_level = 0;
+        self.pierce_level = 0;
         self.burst_timer = 0.0;
         self.burst_ready = false;
         self.elite_event = EliteEvent::new();
@@ -256,6 +262,7 @@ impl GameState {
                 self.config.projectile_speed,
                 ProjectileSource::Player,
                 is_burst,
+                self.pierce_level as i32,
             ));
         }
 
@@ -291,7 +298,6 @@ impl GameState {
                     e.height,
                 ) {
                     e.take_damage(player_dmg);
-                    p.alive = false;
                     if e.is_dead() {
                         let dps = if e.shots_taken > 0 {
                             e.damage_taken as f32 / e.shots_taken as f32
@@ -304,7 +310,11 @@ impl GameState {
                             e.damage_taken, e.shots_taken, dps
                         ));
                     }
-                    break;
+                    if p.pierce_remaining <= 0 {
+                        p.alive = false;
+                        break;
+                    }
+                    p.pierce_remaining -= 1;
                 }
             }
         }
@@ -448,6 +458,9 @@ impl GameState {
                 if self.fire_rate_level < MAX_FIRE_RATE_LEVEL {
                     pool.push(OrbType::FireRate);
                 }
+                if self.pierce_level < MAX_PIERCE_LEVEL {
+                    pool.push(OrbType::Pierce);
+                }
                 if !pool.is_empty() {
                     let idx = rand::gen_range(0usize, pool.len());
                     let orb_type = pool[idx];
@@ -498,6 +511,7 @@ impl GameState {
         let mut damage_collected = 0u32;
         let mut fire_rate_collected = 0u32;
         let mut burst_collected = 0u32;
+        let mut pierce_collected = 0u32;
         for o in &mut self.orbs {
             if o.phase == OrbPhase::Active
                 && aabb_overlap(
@@ -525,7 +539,10 @@ impl GameState {
                     OrbType::FireRate => {
                         fire_rate_collected += 1;
                     }
-                    _ => {}
+                    OrbType::Pierce => {
+                        pierce_collected += 1;
+                    }
+                    OrbType::Drone => {}
                 }
             }
         }
@@ -558,6 +575,12 @@ impl GameState {
                 self.config.burst_intervals[self.burst_level.min(MAX_BURST_LEVEL) - 1];
             self.dlog(&format!("ORB_COLLECT Burst level={}", self.burst_level));
         }
+        for _ in 0..pierce_collected {
+            if self.pierce_level < MAX_PIERCE_LEVEL {
+                self.pierce_level += 1;
+            }
+            self.dlog(&format!("ORB_COLLECT Pierce level={}", self.pierce_level));
+        }
 
         let player_cx = self.player.x + self.player.width / 2.0;
         self.orbs.retain(|o| {
@@ -571,6 +594,7 @@ impl GameState {
         self.orb_sprite_drone.update(dt);
         self.orb_sprite_fire_rate.update(dt);
         self.orb_sprite_burst.update(dt);
+        self.orb_sprite_pierce.update(dt);
         self.player_sprite.update(dt);
         self.enemy_small_sprite.update(dt);
         self.enemy_medium_sprite.update(dt);
@@ -639,6 +663,7 @@ impl GameState {
                 OrbType::Defense => &mut self.orb_sprite_defense,
                 OrbType::Drone => &mut self.orb_sprite_drone,
                 OrbType::FireRate => &mut self.orb_sprite_fire_rate,
+                OrbType::Pierce => &mut self.orb_sprite_pierce,
             };
             sprite.draw_tinted(sx, sy, tint);
         }
