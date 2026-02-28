@@ -1,9 +1,13 @@
+use crate::config::{SHAKE_DURATION, SHAKE_INTENSITY};
+use crate::sprite::ShakeEffect;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     Small,
     Medium,
     Heavy,
     Large,
+    Elite,
 }
 
 pub struct Enemy {
@@ -14,11 +18,14 @@ pub struct Enemy {
     pub speed: f32,
     pub width: f32,
     pub height: f32,
-    /// True when the enemy has reached the boundary and occupies a slot.
+    /// True when the enemy has stopped at the boundary (may or may not hold a slot).
     pub at_boundary: bool,
     pub damage_timer: f32,
     pub shielded: bool,
     pub shield_hp: i32,
+    /// Index of the boundary slot this enemy occupies, or None if queued/not at boundary.
+    pub slot_id: Option<usize>,
+    pub shake: ShakeEffect,
 }
 
 impl Enemy {
@@ -43,6 +50,8 @@ impl Enemy {
             damage_timer: 0.0,
             shielded: false,
             shield_hp: 0,
+            slot_id: None,
+            shake: ShakeEffect::new(),
         }
     }
 
@@ -50,6 +59,7 @@ impl Enemy {
         if !self.at_boundary {
             self.x -= self.speed * dt;
         }
+        self.shake.update(dt);
     }
 
     pub fn take_damage(&mut self, amount: i32) {
@@ -61,6 +71,7 @@ impl Enemy {
         } else {
             self.hp -= amount;
         }
+        self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
     }
 
     pub fn is_dead(&self) -> bool {

@@ -1,57 +1,93 @@
 use macroquad::prelude::*;
 
 use crate::boundary::Boundary;
+use crate::config::SHAKE_DURATION;
+use crate::config::SHAKE_INTENSITY;
 use crate::config::{
-    BOTTOM_BORDER_BOTTOM, BOTTOM_BORDER_TOP, BOUNDARY_X, Config, DIVIDER_BOTTOM, DIVIDER_TOP,
-    ENEMY_HEAVY_H, ENEMY_HEAVY_HP, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM,
-    ENEMY_LANE_TOP, ENEMY_LARGE_H, ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W,
-    ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H,
-    ENEMY_SMALL_HP, ENEMY_SMALL_SPEED, ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME,
-    MEDIUM_INTRO_TIME, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, PROJECTILE_W, SCREEN_W,
-    SHIELDED_FREQ_SCALE, SPAWN_RATE_SCALE, TOP_BORDER_BOTTOM, TOP_BORDER_TOP, UPGRADE_LANE_BOTTOM,
-    UPGRADE_LANE_TOP,
+    BIG_INJECT_BASE_INTERVAL, BOTTOM_BORDER_BOTTOM, BOTTOM_BORDER_TOP, BOUNDARY_X,
+    COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH, Config,
+    DIVIDER_BOTTOM, DIVIDER_TOP, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP,
+    ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
+    ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
+    ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
+    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME,
+    MEDIUM_INTRO_TIME, ORB_H, ORB_W,
+    PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, PROJECTILE_W, SCREEN_W,
+    SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
+    SPAWN_TICK_INTERVAL, TOP_BORDER_BOTTOM, TOP_BORDER_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
 use crate::drone::Drone;
 use crate::elite::EliteEvent;
 use crate::enemy::{Enemy, EnemyKind};
 use crate::input::InputState;
 use crate::orb::Orb;
+use crate::orb::{OrbPhase, OrbType};
 use crate::player::Player;
 use crate::projectile::{Projectile, ProjectileSource};
-use crate::shield::ShieldSegment;
-use crate::sprite::SpriteSheet;
+use crate::shield::ShieldSystem;
+use crate::sprite::Sprite;
+
+pub struct SpawnController {
+    pub tick_accum: f32,
+    pub cursor: usize,
+    pub inject_timer: f32,
+}
+
+impl SpawnController {
+    fn new() -> Self {
+        Self {
+            tick_accum: 0.0,
+            cursor: 0,
+            inject_timer: BIG_INJECT_BASE_INTERVAL,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.tick_accum = 0.0;
+        self.cursor = 0;
+        self.inject_timer = BIG_INJECT_BASE_INTERVAL;
+    }
+}
 
 pub struct GameState {
     pub config: Config,
     pub player: Player,
-    pub player_sprite: SpriteSheet,
-    pub enemy_small_sprite: SpriteSheet,
-    pub enemy_medium_sprite: SpriteSheet,
-    pub enemy_heavy_sprite: SpriteSheet,
-    pub enemy_large_sprite: SpriteSheet,
-    pub shields: Vec<ShieldSegment>,
+    pub player_sprite: Sprite,
+    pub enemy_small_sprite: Sprite,
+    pub enemy_medium_sprite: Sprite,
+    pub enemy_heavy_sprite: Sprite,
+    pub enemy_large_sprite: Sprite,
+    pub enemy_elite_sprite: Sprite,
+    pub boundary_shield_sprite: Sprite,
+    pub shields: ShieldSystem,
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
     pub orbs: Vec<Orb>,
+    pub orb_sprite: Sprite,
     pub drones: Vec<Drone>,
     pub boundary: Boundary,
     pub elite_event: EliteEvent,
     pub input: InputState,
-    pub enemy_spawn_timer: f32,
+    pub spawn_ctrl: SpawnController,
     pub orb_spawn_timer: f32,
     pub elite_timer: f32,
     pub miniboss_timer: f32,
     pub run_time: f32,
+    pub game_over: bool,
 }
 
 impl GameState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: Config,
-        player_sprite: SpriteSheet,
-        enemy_small_sprite: SpriteSheet,
-        enemy_medium_sprite: SpriteSheet,
-        enemy_heavy_sprite: SpriteSheet,
-        enemy_large_sprite: SpriteSheet,
+        player_sprite: Sprite,
+        enemy_small_sprite: Sprite,
+        enemy_medium_sprite: Sprite,
+        enemy_heavy_sprite: Sprite,
+        enemy_large_sprite: Sprite,
+        enemy_elite_sprite: Sprite,
+        boundary_shield_sprite: Sprite,
+        orb_sprite: Sprite,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
         let player = Player::new(
@@ -63,10 +99,6 @@ impl GameState {
             config.player_fire_rate,
         );
 
-        let shields = (0..config.player_starting_shields)
-            .map(|_| ShieldSegment::new(true))
-            .collect();
-
         let boundary = Boundary::new(config.boundary_slot_count);
 
         Self {
@@ -76,24 +108,73 @@ impl GameState {
             enemy_medium_sprite,
             enemy_heavy_sprite,
             enemy_large_sprite,
-            shields,
+            enemy_elite_sprite,
+            boundary_shield_sprite,
+            shields: ShieldSystem::new(config.player_starting_shields),
             enemies: Vec::new(),
             projectiles: Vec::new(),
             orbs: Vec::new(),
+            orb_sprite,
             drones: Vec::new(),
             boundary,
             elite_event: EliteEvent::new(),
             input: InputState::new(),
-            enemy_spawn_timer: 0.0,
+            spawn_ctrl: SpawnController::new(),
             orb_spawn_timer: 0.0,
             elite_timer: config.elite_interval,
             miniboss_timer: config.miniboss_interval,
             run_time: 0.0,
+            game_over: false,
             config,
         }
     }
 
+    /// Reset all mutable game state for a new run (keeps config and sprites).
+    pub fn reset(&mut self) {
+        let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
+        self.player = Player::new(
+            PLAYER_X,
+            player_y,
+            PLAYER_WIDTH,
+            PLAYER_HEIGHT,
+            self.config.player_speed,
+            self.config.player_fire_rate,
+        );
+        self.shields = ShieldSystem::new(self.config.player_starting_shields);
+        self.boundary = Boundary::new(self.config.boundary_slot_count);
+        self.enemies.clear();
+        self.projectiles.clear();
+        self.orbs.clear();
+        self.drones.clear();
+        self.elite_event = EliteEvent::new();
+        self.spawn_ctrl.reset();
+        self.orb_spawn_timer = 0.0;
+        self.elite_timer = self.config.elite_interval;
+        self.miniboss_timer = self.config.miniboss_interval;
+        self.run_time = 0.0;
+        self.game_over = false;
+    }
+
+    /// Deal one damage event to the player: consume one shield segment, or die if none remain.
+    fn take_player_damage(&mut self) {
+        self.player.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
+        if !self.shields.take_hit() {
+            self.game_over = true;
+        }
+    }
+
     pub fn update(&mut self, dt: f32) {
+        // On death: wait for any key then restart.
+        if self.game_over {
+            if is_key_pressed(KeyCode::Space)
+                || is_key_pressed(KeyCode::Enter)
+                || is_key_pressed(KeyCode::R)
+            {
+                self.reset();
+            }
+            return;
+        }
+
         self.run_time += dt;
         self.input.update(&self.config);
 
@@ -145,34 +226,90 @@ impl GameState {
         }
 
         self.projectiles.retain(|p| !p.should_remove());
-        self.enemies.retain(|e| !e.is_dead());
 
-        // Enemy spawning
-        let effective_interval =
-            self.config.enemy_spawn_interval / (1.0 + SPAWN_RATE_SCALE * self.run_time);
-        self.enemy_spawn_timer -= dt;
-        if self.enemy_spawn_timer <= 0.0 {
-            self.enemy_spawn_timer = effective_interval;
-            self.spawn_enemy();
+        // Release boundary slots for dead enemies before clearing them.
+        for e in &self.enemies {
+            if e.is_dead()
+                && let Some(slot) = e.slot_id
+            {
+                self.boundary.release_slot(slot);
+            }
         }
 
-        // Update enemies
+        // Promote queued enemies (at boundary, no slot) to any newly freed slots.
+        // Nearest to the boundary (smallest x) gets priority.
+        if self.boundary.has_free_slot() {
+            let mut queued: Vec<usize> = self
+                .enemies
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| e.at_boundary && e.slot_id.is_none() && !e.is_dead())
+                .map(|(i, _)| i)
+                .collect();
+            queued.sort_by(|&a, &b| self.enemies[a].x.partial_cmp(&self.enemies[b].x).unwrap());
+            for idx in queued {
+                if let Some(slot) = self.boundary.occupy_slot() {
+                    self.enemies[idx].slot_id = Some(slot);
+                    self.enemies[idx].x = BOUNDARY_X;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        self.enemies.retain(|e| !e.is_dead());
+
+        // Coverage-based enemy spawning
+        self.spawn_ctrl.tick_accum += dt;
+        while self.spawn_ctrl.tick_accum >= SPAWN_TICK_INTERVAL {
+            self.spawn_ctrl.tick_accum -= SPAWN_TICK_INTERVAL;
+            self.tick_spawn();
+        }
+
+        // Update enemies and handle boundary arrival/damage.
+        // Collect damage events first to avoid borrow conflict with take_player_damage.
+        let mut damage_events: u32 = 0;
+
         for e in &mut self.enemies {
             e.update(dt);
-            // Boundary arrival
+
             if !e.at_boundary && e.x <= BOUNDARY_X {
                 match e.kind {
                     EnemyKind::Small => {
-                        // Small enemies despawn on boundary arrival (damage handled in P1.6)
+                        // 1 damage event then despawn.
+                        damage_events += 1;
                         e.hp = 0;
                     }
                     _ => {
                         e.at_boundary = true;
                         e.x = BOUNDARY_X;
+                        // Try to occupy a boundary slot.
+                        if let Some(slot) = self.boundary.occupy_slot() {
+                            e.slot_id = Some(slot);
+                        }
+                        // If no slot: enemy is queued — stops in place, no damage tick.
                     }
                 }
             }
+
+            // Slotted enemies tick damage.
+            if e.at_boundary && e.slot_id.is_some() {
+                e.damage_timer += dt;
+                if e.damage_timer >= self.config.boundary_damage_tick {
+                    e.damage_timer = 0.0;
+                    damage_events += 1;
+                }
+            }
         }
+
+        // Apply collected damage events.
+        for _ in 0..damage_events {
+            self.take_player_damage();
+            if self.game_over {
+                break;
+            }
+        }
+
         self.enemies.retain(|e| !e.is_off_screen() && !e.is_dead());
 
         // Resolve enemy stacking: sort stably by x ascending, then for each enemy find
@@ -181,7 +318,6 @@ impl GameState {
         for i in 1..self.enemies.len() {
             let (front, back) = self.enemies.split_at_mut(i);
             let follower = &mut back[0];
-            // Scan right-to-left through all enemies ahead to find the nearest y-overlapping one.
             for blocker in front.iter().rev() {
                 let v_overlap = follower.y < blocker.y + blocker.height
                     && follower.y + follower.height > blocker.y;
@@ -190,22 +326,124 @@ impl GameState {
                     if follower.x < right_edge {
                         follower.x = right_edge;
                     }
-                    break; // list is sorted; first vertical-overlap match from the right is the blocker
+                    break;
                 }
             }
         }
 
+        // Orb spawning
+        self.orb_spawn_timer -= dt;
+        if self.orb_spawn_timer <= 0.0 {
+            self.orb_spawn_timer = self.config.orb_spawn_interval;
+            if self.orbs.len() < self.config.max_active_orbs {
+                let lane_mid = (UPGRADE_LANE_TOP + UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0;
+                let y = lane_mid - ORB_H / 2.0;
+                // Build weighted pool; gate Defense if shields are full.
+                let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
+                let mut pool: Vec<OrbType> = Vec::with_capacity(3);
+                if !shields_full {
+                    pool.push(OrbType::Defense);
+                }
+                pool.push(OrbType::Drone);
+                pool.push(OrbType::ShotType);
+                if !pool.is_empty() {
+                    let idx = rand::gen_range(0usize, pool.len());
+                    let orb_type = pool[idx];
+                    self.orbs.push(Orb::new(
+                        SCREEN_W as f32,
+                        y,
+                        ORB_W,
+                        ORB_H,
+                        self.config.orb_speed,
+                        orb_type,
+                    ));
+                }
+            }
+        }
+
+        // Projectile-orb collision (player only; drone shots skip)
+        for p in &mut self.projectiles {
+            if !p.alive || p.source != ProjectileSource::Player {
+                continue;
+            }
+            for o in &mut self.orbs {
+                if o.phase == OrbPhase::Inactive
+                    && aabb_overlap(
+                        p.x,
+                        p.y,
+                        PROJECTILE_W,
+                        PROJECTILE_H,
+                        o.x,
+                        o.y,
+                        o.width,
+                        o.height,
+                    )
+                {
+                    o.hit_this_frame = true;
+                    p.alive = false;
+                    break;
+                }
+            }
+        }
+
+        // Orb movement
+        for o in &mut self.orbs {
+            o.update(dt);
+        }
+
+        // Player-orb collection (active orbs only)
+        let mut shield_grants = 0u32;
+        for o in &mut self.orbs {
+            if o.phase == OrbPhase::Active
+                && aabb_overlap(
+                    self.player.x,
+                    self.player.y,
+                    self.player.width,
+                    self.player.height,
+                    o.x,
+                    o.y,
+                    o.width,
+                    o.height,
+                )
+            {
+                o.collected = true;
+                if o.orb_type == OrbType::Defense {
+                    shield_grants += 1;
+                }
+            }
+        }
+        if shield_grants > 0 {
+            self.shields.add_segments(shield_grants);
+        }
+
+        let player_cx = self.player.x + self.player.width / 2.0;
+        self.orbs.retain(|o| {
+            let orb_cx = o.x + o.width / 2.0;
+            orb_cx >= player_cx && !o.is_collected()
+        });
+
         // Advance sprite animations
+        self.orb_sprite.update(dt);
         self.player_sprite.update(dt);
         self.enemy_small_sprite.update(dt);
         self.enemy_medium_sprite.update(dt);
         self.enemy_heavy_sprite.update(dt);
         self.enemy_large_sprite.update(dt);
+        self.enemy_elite_sprite.update(dt);
+        self.boundary_shield_sprite.update(dt);
+        self.shields.update(dt);
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&mut self) {
         self.draw_background();
-        self.player_sprite.draw(self.player.x, self.player.y);
+        if self.shields.count() > 0 {
+            self.boundary_shield_sprite.draw(
+                BOUNDARY_X + self.shields.shake.offset_x(),
+                ENEMY_LANE_TOP as f32,
+            );
+        }
+        self.player_sprite
+            .draw(self.player.x + self.player.shake.offset_x(), self.player.y);
         for p in &self.projectiles {
             p.draw();
         }
@@ -215,14 +453,119 @@ impl GameState {
                 EnemyKind::Medium => &self.enemy_medium_sprite,
                 EnemyKind::Heavy => &self.enemy_heavy_sprite,
                 EnemyKind::Large => &self.enemy_large_sprite,
+                EnemyKind::Elite => &self.enemy_elite_sprite,
             };
-            sprite.draw(e.x, e.y);
+            sprite.draw(e.x + e.shake.offset_x(), e.y);
+        }
+
+        self.draw_orbs();
+
+        self.draw_shield_hud();
+
+        if self.game_over {
+            self.draw_game_over();
         }
     }
 
-    fn spawn_enemy(&mut self) {
-        let kind = self.pick_enemy_kind();
-        let (w, h, hp, speed) = match kind {
+    fn draw_orbs(&mut self) {
+        // Collect draw info first to avoid simultaneous borrows of self.orbs and self.orb_sprite.
+        // Tag indices in upgrades.json: 7=shield, 5=extradrone, 4=stagger
+        let draw_list: Vec<(f32, f32, usize, Color)> = self
+            .orbs
+            .iter()
+            .map(|o| {
+                let sx = o.x;
+                let (anim_index, tint) = match o.orb_type {
+                    OrbType::Defense => {
+                        let tint = if o.phase == OrbPhase::Inactive {
+                            let p = o.activation_progress;
+                            let v = (100.0 + 155.0 * p) as u8;
+                            Color::from_rgba(v, v, v, v)
+                        } else {
+                            WHITE
+                        };
+                        (7usize, tint)
+                    }
+                    OrbType::Drone => {
+                        let tint = if o.phase == OrbPhase::Inactive {
+                            let p = o.activation_progress;
+                            let v = (100.0 + 155.0 * p) as u8;
+                            Color::from_rgba(v, v, v, v)
+                        } else {
+                            WHITE
+                        };
+                        (5usize, tint)
+                    }
+                    OrbType::ShotType => {
+                        let tint = if o.phase == OrbPhase::Inactive {
+                            let p = o.activation_progress;
+                            let v = (100.0 + 155.0 * p) as u8;
+                            Color::from_rgba(v, v, v, v)
+                        } else {
+                            WHITE
+                        };
+                        (4usize, tint)
+                    }
+                };
+                (sx, o.y, anim_index, tint)
+            })
+            .collect();
+        for (sx, sy, anim_index, tint) in draw_list {
+            self.orb_sprite.set_animation(anim_index);
+            self.orb_sprite.draw_tinted(sx, sy, tint);
+        }
+    }
+
+    fn draw_game_over(&self) {
+        // Simple overlay — dim the screen and prompt restart.
+        let overlay = Color::from_rgba(0, 0, 0, 160);
+        draw_rectangle(0.0, 0.0, SCREEN_W as f32, 180.0, overlay);
+        // No text rendering in Phase 1 (no font loaded) — the blank screen + shield HUD
+        // at 0 segments is sufficient feedback. Restart on Space/Enter/R.
+    }
+
+    /// Draw shield segment count in the top-left corner as small green squares.
+    fn draw_shield_hud(&self) {
+        let count = self.shields.count();
+        let size = 4.0_f32;
+        let gap = 2.0_f32;
+        let start_x = 2.0_f32;
+        let y = 2.0_f32;
+        for i in 0..count {
+            let x = start_x + i as f32 * (size + gap);
+            draw_rectangle(x, y, size, size, Color::from_rgba(0, 200, 80, 255));
+        }
+    }
+
+    fn tick_spawn(&mut self) {
+        self.spawn_ctrl.inject_timer -= SPAWN_TICK_INTERVAL;
+        let coverage = compute_coverage(&self.enemies);
+        let target = coverage_target(self.run_time);
+
+        if self.spawn_ctrl.inject_timer <= 0.0 && coverage < target {
+            // Inject a big enemy based on run time
+            let kind = if self.config.debug_all_enemies || self.run_time >= LARGE_INTRO_TIME {
+                let r = rand::gen_range(0usize, 3);
+                [EnemyKind::Medium, EnemyKind::Heavy, EnemyKind::Large][r]
+            } else if self.run_time >= HEAVY_INTRO_TIME {
+                let r = rand::gen_range(0usize, 2);
+                [EnemyKind::Medium, EnemyKind::Heavy][r]
+            } else if self.run_time >= MEDIUM_INTRO_TIME {
+                EnemyKind::Medium
+            } else {
+                EnemyKind::Small
+            };
+            // Reset timer with small jitter
+            let jitter = rand::gen_range(-0.3_f32, 0.3);
+            self.spawn_ctrl.inject_timer = BIG_INJECT_BASE_INTERVAL + jitter;
+            self.try_place_enemy(kind);
+        } else if coverage < target - COVERAGE_HYSTERESIS {
+            self.try_place_enemy(EnemyKind::Small);
+        }
+    }
+
+    fn try_place_enemy(&mut self, kind: EnemyKind) {
+        let (w, h, hp, base_speed) = match kind {
             EnemyKind::Small => (
                 ENEMY_SMALL_W,
                 ENEMY_SMALL_H,
@@ -247,38 +590,54 @@ impl GameState {
                 ENEMY_LARGE_HP,
                 ENEMY_LARGE_SPEED,
             ),
+            EnemyKind::Elite => (
+                ENEMY_ELITE_W,
+                ENEMY_ELITE_H,
+                self.config.elite_hp,
+                self.config.elite_speed,
+            ),
         };
+
         let y_min = ENEMY_LANE_TOP as f32;
         let y_max = (ENEMY_LANE_BOTTOM as f32 - h).max(y_min);
-        let y = y_min + rand::gen_range(0.0_f32, 1.0) * (y_max - y_min);
-        let mut enemy = Enemy::new(SCREEN_W as f32, y, kind, hp, speed, w, h);
 
-        // Shielded chance increases with run time, capped at 50%
-        let shield_chance = (SHIELDED_FREQ_SCALE * self.run_time).min(0.5);
-        if rand::gen_range(0.0_f32, 1.0) < shield_chance {
-            enemy.shielded = true;
-            enemy.shield_hp = 1;
+        for _ in 0..SPAWN_MAX_RETRIES {
+            // Advance cursor by 1–2 slots
+            let advance = rand::gen_range(1usize, 3);
+            self.spawn_ctrl.cursor = (self.spawn_ctrl.cursor + advance) % SPAWN_SLOT_COUNT;
+
+            // X: just off the right edge with slot phase drift
+            let phase_drift = self.spawn_ctrl.cursor as f32 * SPAWN_SLOT_WIDTH;
+            let x = SCREEN_W as f32 + SPAWN_LEAD_PX + phase_drift;
+
+            // Y: lane random with ±2px jitter, clamped
+            let base_y = y_min + rand::gen_range(0.0_f32, 1.0) * (y_max - y_min);
+            let jitter_y = rand::gen_range(-2.0_f32, 2.0);
+            let y = (base_y + jitter_y).clamp(y_min, y_max);
+
+            // Speed with ±3% variation
+            let speed_scale = rand::gen_range(0.97_f32, 1.03);
+            let speed = base_speed * speed_scale;
+
+            // AABB overlap check vs enemies within 64px in x
+            let overlap = self.enemies.iter().any(|e| {
+                (e.x - x).abs() < 64.0 && aabb_overlap(x, y, w, h, e.x, e.y, e.width, e.height)
+            });
+            if overlap {
+                continue;
+            }
+
+            // Place enemy
+            let mut enemy = Enemy::new(x, y, kind, hp, speed, w, h);
+            let shield_chance = (SHIELDED_FREQ_SCALE * self.run_time).min(0.5);
+            if rand::gen_range(0.0_f32, 1.0) < shield_chance {
+                enemy.shielded = true;
+                enemy.shield_hp = 1;
+            }
+            self.enemies.push(enemy);
+            return;
         }
-
-        self.enemies.push(enemy);
-    }
-
-    fn pick_enemy_kind(&self) -> EnemyKind {
-        let mut pool: &[EnemyKind] = &[EnemyKind::Small];
-        if self.run_time >= LARGE_INTRO_TIME {
-            pool = &[
-                EnemyKind::Small,
-                EnemyKind::Medium,
-                EnemyKind::Heavy,
-                EnemyKind::Large,
-            ];
-        } else if self.run_time >= HEAVY_INTRO_TIME {
-            pool = &[EnemyKind::Small, EnemyKind::Medium, EnemyKind::Heavy];
-        } else if self.run_time >= MEDIUM_INTRO_TIME {
-            pool = &[EnemyKind::Small, EnemyKind::Medium];
-        }
-        let idx = rand::gen_range(0, pool.len());
-        pool[idx]
+        // All retries failed — skip this spawn tick
     }
 
     fn draw_background(&self) {
@@ -328,6 +687,58 @@ impl GameState {
         let bb_h = (BOTTOM_BORDER_BOTTOM - BOTTOM_BORDER_TOP + 1) as f32;
         draw_rectangle(0.0, bb_y, w, bb_h, steel_dark);
         draw_rectangle(0.0, bb_y, w, 1.0, steel_mid);
+    }
+}
+
+fn compute_coverage(enemies: &[Enemy]) -> f32 {
+    // Collect x-intervals clamped to the coverage zone [96, 320]
+    let mut intervals: Vec<(f32, f32)> = enemies
+        .iter()
+        .filter_map(|e| {
+            let left = e.x.max(COVERAGE_ZONE_LEFT);
+            let right = (e.x + e.width).min(COVERAGE_ZONE_RIGHT);
+            if right > left {
+                Some((left, right))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if intervals.is_empty() {
+        return 0.0;
+    }
+
+    // Sort by left edge and merge overlapping intervals
+    intervals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    let mut merged_len = 0.0_f32;
+    let mut cur_left = intervals[0].0;
+    let mut cur_right = intervals[0].1;
+    for (l, r) in intervals.iter().skip(1) {
+        if *l <= cur_right {
+            cur_right = cur_right.max(*r);
+        } else {
+            merged_len += cur_right - cur_left;
+            cur_left = *l;
+            cur_right = *r;
+        }
+    }
+    merged_len += cur_right - cur_left;
+
+    merged_len / COVERAGE_ZONE_WIDTH
+}
+
+fn coverage_target(run_time: f32) -> f32 {
+    if run_time < 60.0 {
+        0.72
+    } else if run_time < 240.0 {
+        0.78
+    } else if run_time < 480.0 {
+        0.84
+    } else if run_time < 720.0 {
+        0.88
+    } else {
+        0.90
     }
 }
 

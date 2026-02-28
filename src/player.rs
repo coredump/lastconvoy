@@ -1,4 +1,5 @@
 use crate::config::{BOTTOM_BORDER_TOP, ENEMY_LANE_TOP, PLAYER_HEIGHT};
+use crate::sprite::ShakeEffect;
 
 pub struct Player {
     pub x: f32,
@@ -8,6 +9,7 @@ pub struct Player {
     pub speed: f32,
     pub fire_timer: f32,
     pub fire_rate: f32,
+    pub shake: ShakeEffect,
 }
 
 impl Player {
@@ -20,6 +22,7 @@ impl Player {
             speed,
             fire_timer: 0.0,
             fire_rate,
+            shake: ShakeEffect::new(),
         }
     }
 
@@ -30,6 +33,7 @@ impl Player {
         self.y = self.y.clamp(y_min, y_max);
 
         self.fire_timer -= dt;
+        self.shake.update(dt);
     }
 
     pub fn should_fire(&mut self) -> bool {

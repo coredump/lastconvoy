@@ -23,7 +23,7 @@ use config::{
 };
 use game::GameState;
 use render::RenderPipeline;
-use sprite::{AnimMode, SpriteSheet};
+use sprite::Sprite;
 
 fn window_conf() -> Conf {
     Conf {
@@ -41,32 +41,30 @@ async fn main() {
     let runtime_cfg = load_runtime_config();
     let config = Config::from_runtime(runtime_cfg);
 
-    let player_tex = load_texture("assets/sprites/player/player_sprite_sheet.png")
+    let player_sprite = Sprite::from_json("assets/sprites/player/player.json")
         .await
-        .expect("Failed to load player sprite sheet");
-    let player_sprite = SpriteSheet::new(player_tex, 24.0, 16.0, 5, 0.1, AnimMode::Forward);
-
-    let enemy_small_tex = load_texture("assets/sprites/enemies/enemy_small_sprite_sheet.png")
+        .expect("Failed to load player sprite");
+    let enemy_small_sprite = Sprite::from_json("assets/sprites/enemies/small.json")
         .await
-        .expect("Failed to load enemy_small sprite sheet");
-    let enemy_medium_tex = load_texture("assets/sprites/enemies/enemy_medium_sprite_sheet.png")
+        .expect("Failed to load enemy_small sprite");
+    let enemy_medium_sprite = Sprite::from_json("assets/sprites/enemies/medium.json")
         .await
-        .expect("Failed to load enemy_medium sprite sheet");
-    let enemy_heavy_tex = load_texture("assets/sprites/enemies/enemy_heavy_sprite_sheet.png")
+        .expect("Failed to load enemy_medium sprite");
+    let enemy_heavy_sprite = Sprite::from_json("assets/sprites/enemies/heavy.json")
         .await
-        .expect("Failed to load enemy_heavy sprite sheet");
-    let enemy_large_tex = load_texture("assets/sprites/enemies/enemy_large_sprite_sheet.png")
+        .expect("Failed to load enemy_heavy sprite");
+    let enemy_large_sprite = Sprite::from_json("assets/sprites/enemies/large.json")
         .await
-        .expect("Failed to load enemy_large sprite sheet");
-
-    let enemy_small_sprite =
-        SpriteSheet::new(enemy_small_tex, 16.0, 16.0, 5, 0.2, AnimMode::PingPong);
-    let enemy_medium_sprite =
-        SpriteSheet::new(enemy_medium_tex, 24.0, 24.0, 6, 0.35, AnimMode::Forward);
-    let enemy_heavy_sprite =
-        SpriteSheet::new(enemy_heavy_tex, 32.0, 24.0, 9, 0.1, AnimMode::Forward);
-    let enemy_large_sprite =
-        SpriteSheet::new(enemy_large_tex, 40.0, 32.0, 6, 0.2, AnimMode::PingPong);
+        .expect("Failed to load enemy_large sprite");
+    let enemy_elite_sprite = Sprite::from_json("assets/sprites/enemies/elite.json")
+        .await
+        .expect("Failed to load enemy_elite sprite");
+    let boundary_shield_sprite = Sprite::from_json("assets/sprites/objects/boundary_shield.json")
+        .await
+        .expect("Failed to load boundary_shield sprite");
+    let orb_sprite = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite");
 
     let mut state = GameState::new(
         config,
@@ -75,6 +73,9 @@ async fn main() {
         enemy_medium_sprite,
         enemy_heavy_sprite,
         enemy_large_sprite,
+        enemy_elite_sprite,
+        boundary_shield_sprite,
+        orb_sprite,
     );
     let pipeline = RenderPipeline::new();
 
