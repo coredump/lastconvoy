@@ -14,16 +14,18 @@ pub struct Projectile {
     pub speed: f32,
     pub source: ProjectileSource,
     pub alive: bool,
+    pub is_burst: bool,
 }
 
 impl Projectile {
-    pub fn new(x: f32, y: f32, speed: f32, source: ProjectileSource) -> Self {
+    pub fn new(x: f32, y: f32, speed: f32, source: ProjectileSource, is_burst: bool) -> Self {
         Self {
             x,
             y,
             speed,
             source,
             alive: true,
+            is_burst,
         }
     }
 
@@ -40,6 +42,7 @@ impl Projectile {
     }
 
     pub fn draw(&self) {
-        draw_rectangle(self.x, self.y, PROJECTILE_W, PROJECTILE_H, YELLOW);
+        let color = if self.is_burst { RED } else { YELLOW };
+        draw_rectangle(self.x, self.y, PROJECTILE_W, PROJECTILE_H, color);
     }
 }

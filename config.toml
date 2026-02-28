@@ -138,6 +138,17 @@ fire_rate_levels = [0.18, 0.14, 0.10]
 fire_rate_upgrade_applies_to_drones = true
 
 # ---------------------------------------------------------------------------
+# [burst_upgrade]
+# ---------------------------------------------------------------------------
+# The Burst orb periodically makes the next player shot deal double damage.
+# Collect up to 3 times; the orb stops spawning once max level is reached.
+# Each entry is the interval (seconds) between burst shots at that level.
+burst_intervals = [5.0, 3.5, 2.0]
+
+# Damage multiplier applied to burst shots.
+burst_damage_multiplier = 2
+
+# ---------------------------------------------------------------------------
 # [orbs]
 # ---------------------------------------------------------------------------
 # Orbs follow a strict two-phase rule: they are first activated by player

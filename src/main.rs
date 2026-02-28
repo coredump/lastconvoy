@@ -86,6 +86,11 @@ async fn main() {
         .expect("Failed to load orb sprite (fire_rate)");
     orb_sprite_fire_rate.set_animation(1);
 
+    let mut orb_sprite_burst = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite (burst)");
+    orb_sprite_burst.set_animation(2);
+
     let mut state = GameState::new(
         config,
         player_sprite,
@@ -99,6 +104,7 @@ async fn main() {
         orb_sprite_defense,
         orb_sprite_drone,
         orb_sprite_fire_rate,
+        orb_sprite_burst,
     );
     let pipeline = RenderPipeline::new();
 

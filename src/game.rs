@@ -10,11 +10,11 @@ use crate::config::{
     ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
     ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
     ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
-    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_DAMAGE_LEVEL, MAX_FIRE_RATE_LEVEL,
-    MEDIUM_INTRO_TIME, ORB_H, ORB_W,
-    PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, PROJECTILE_W, SCREEN_W,
-    SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
-    SPAWN_TICK_INTERVAL, TOP_BORDER_BOTTOM, TOP_BORDER_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
+    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_BURST_LEVEL, MAX_DAMAGE_LEVEL,
+    MAX_FIRE_RATE_LEVEL, MEDIUM_INTRO_TIME, ORB_H, ORB_W, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X,
+    PROJECTILE_H, PROJECTILE_W, SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES,
+    SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH, SPAWN_TICK_INTERVAL, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
+    UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
 use crate::drone::Drone;
 use crate::elite::EliteEvent;
@@ -70,8 +70,12 @@ pub struct GameState {
     pub orb_sprite_defense: Sprite,
     pub orb_sprite_drone: Sprite,
     pub orb_sprite_fire_rate: Sprite,
+    pub orb_sprite_burst: Sprite,
     pub damage_level: usize,
     pub fire_rate_level: usize,
+    pub burst_level: usize,
+    pub burst_timer: f32,
+    pub burst_ready: bool,
     pub drones: Vec<Drone>,
     pub boundary: Boundary,
     pub elite_event: EliteEvent,
@@ -100,6 +104,7 @@ impl GameState {
         orb_sprite_defense: Sprite,
         orb_sprite_drone: Sprite,
         orb_sprite_fire_rate: Sprite,
+        orb_sprite_burst: Sprite,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
         let player = Player::new(
@@ -130,8 +135,12 @@ impl GameState {
             orb_sprite_defense,
             orb_sprite_drone,
             orb_sprite_fire_rate,
+            orb_sprite_burst,
             damage_level: 0,
             fire_rate_level: 0,
+            burst_level: 0,
+            burst_timer: 0.0,
+            burst_ready: false,
             drones: Vec::new(),
             boundary,
             elite_event: EliteEvent::new(),
@@ -143,7 +152,9 @@ impl GameState {
             run_time: 0.0,
             game_over: false,
             debug_log: if config.debug_log_gameplay {
-                Some(crate::debug_log::DebugLog::new(&config.debug_log_file.clone()))
+                Some(crate::debug_log::DebugLog::new(
+                    &config.debug_log_file.clone(),
+                ))
             } else {
                 None
             },
@@ -171,6 +182,9 @@ impl GameState {
         self.damage_level = 0;
         self.fire_rate_level = 0;
         self.player.fire_rate = self.config.fire_rate_levels[0];
+        self.burst_level = 0;
+        self.burst_timer = 0.0;
+        self.burst_ready = false;
         self.elite_event = EliteEvent::new();
         self.spawn_ctrl.reset();
         self.orb_spawn_timer = 0.0;
@@ -193,7 +207,10 @@ impl GameState {
             self.game_over = true;
         }
         let remaining = self.shields.count();
-        self.dlog(&format!("PLAYER_DMG count=1 shields_remaining={}", remaining));
+        self.dlog(&format!(
+            "PLAYER_DMG count=1 shields_remaining={}",
+            remaining
+        ));
     }
 
     pub fn update(&mut self, dt: f32) {
@@ -215,15 +232,30 @@ impl GameState {
         let axis = self.input.axis;
         self.player.update(axis, dt);
 
+        // Burst timer
+        if self.burst_level > 0 {
+            self.burst_timer -= dt;
+            if self.burst_timer <= 0.0 {
+                self.burst_ready = true;
+                self.burst_timer =
+                    self.config.burst_intervals[self.burst_level.min(MAX_BURST_LEVEL) - 1];
+            }
+        }
+
         // Auto-fire
         if self.player.should_fire() {
             let proj_x = self.player.x + self.player.width;
             let proj_y = self.player.y + (self.player.height - PROJECTILE_H) / 2.0;
+            let is_burst = self.burst_ready;
+            if is_burst {
+                self.burst_ready = false;
+            }
             self.projectiles.push(Projectile::new(
                 proj_x,
                 proj_y,
                 self.config.projectile_speed,
                 ProjectileSource::Player,
+                is_burst,
             ));
         }
 
@@ -234,11 +266,16 @@ impl GameState {
 
         // Projectile-enemy collision (player projectiles only; drone shots never hit enemies per spec)
         let mut kill_logs: Vec<String> = Vec::new();
-        let player_dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
+        let base_dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
         for p in &mut self.projectiles {
             if !p.alive || p.source != ProjectileSource::Player {
                 continue;
             }
+            let player_dmg = if p.is_burst {
+                base_dmg * self.config.burst_damage_multiplier
+            } else {
+                base_dmg
+            };
             for e in &mut self.enemies {
                 if e.is_dead() {
                     continue;
@@ -350,10 +387,7 @@ impl GameState {
                 if e.damage_timer >= self.config.boundary_damage_tick {
                     e.damage_timer = 0.0;
                     damage_events += 1;
-                    boundary_logs.push(format!(
-                        "BOUNDARY_DMG {:?} hp={}",
-                        e.kind, e.hp
-                    ));
+                    boundary_logs.push(format!("BOUNDARY_DMG {:?} hp={}", e.kind, e.hp));
                 }
             }
         }
@@ -400,7 +434,10 @@ impl GameState {
                 let y = lane_mid - ORB_H / 2.0;
                 // Build weighted pool; gate Defense if shields are full.
                 let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
-                let mut pool: Vec<OrbType> = Vec::with_capacity(4);
+                let mut pool: Vec<OrbType> = Vec::with_capacity(5);
+                if self.burst_level < MAX_BURST_LEVEL {
+                    pool.push(OrbType::Burst);
+                }
                 if self.damage_level < MAX_DAMAGE_LEVEL {
                     pool.push(OrbType::Damage);
                 }
@@ -460,6 +497,7 @@ impl GameState {
         let mut shield_grants = 0u32;
         let mut damage_collected = 0u32;
         let mut fire_rate_collected = 0u32;
+        let mut burst_collected = 0u32;
         for o in &mut self.orbs {
             if o.phase == OrbPhase::Active
                 && aabb_overlap(
@@ -475,6 +513,9 @@ impl GameState {
             {
                 o.collected = true;
                 match o.orb_type {
+                    OrbType::Burst => {
+                        burst_collected += 1;
+                    }
                     OrbType::Defense => {
                         shield_grants += 1;
                     }
@@ -501,12 +542,21 @@ impl GameState {
             if self.fire_rate_level < MAX_FIRE_RATE_LEVEL {
                 self.fire_rate_level += 1;
             }
-            let new_rate = self.config.fire_rate_levels[self.fire_rate_level.min(MAX_FIRE_RATE_LEVEL - 1)];
+            let new_rate =
+                self.config.fire_rate_levels[self.fire_rate_level.min(MAX_FIRE_RATE_LEVEL - 1)];
             self.player.fire_rate = new_rate;
             self.dlog(&format!(
                 "ORB_COLLECT FireRate level={} fire_rate={:.3}",
                 self.fire_rate_level, new_rate
             ));
+        }
+        for _ in 0..burst_collected {
+            if self.burst_level < MAX_BURST_LEVEL {
+                self.burst_level += 1;
+            }
+            self.burst_timer =
+                self.config.burst_intervals[self.burst_level.min(MAX_BURST_LEVEL) - 1];
+            self.dlog(&format!("ORB_COLLECT Burst level={}", self.burst_level));
         }
 
         let player_cx = self.player.x + self.player.width / 2.0;
@@ -520,6 +570,7 @@ impl GameState {
         self.orb_sprite_defense.update(dt);
         self.orb_sprite_drone.update(dt);
         self.orb_sprite_fire_rate.update(dt);
+        self.orb_sprite_burst.update(dt);
         self.player_sprite.update(dt);
         self.enemy_small_sprite.update(dt);
         self.enemy_medium_sprite.update(dt);
@@ -583,6 +634,7 @@ impl GameState {
             .collect();
         for (sx, sy, orb_type, tint) in draw_list {
             let sprite = match orb_type {
+                OrbType::Burst => &mut self.orb_sprite_burst,
                 OrbType::Damage => &mut self.orb_sprite_damage,
                 OrbType::Defense => &mut self.orb_sprite_defense,
                 OrbType::Drone => &mut self.orb_sprite_drone,

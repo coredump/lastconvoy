@@ -96,7 +96,6 @@ pub const MINIBOSS_HP: i32 = 30;
 pub const ELITE_SPEED: f32 = 18.0;
 pub const MINIBOSS_SPEED: f32 = 14.0;
 
-
 // Coverage-based spawn system
 pub const COVERAGE_ZONE_LEFT: f32 = 96.0;
 pub const COVERAGE_ZONE_RIGHT: f32 = 320.0;
@@ -113,9 +112,9 @@ pub const BIG_INJECT_BASE_INTERVAL: f32 = 2.2;
 pub const ENEMY_HP_SCALE: f32 = 0.001;
 pub const SHIELDED_FREQ_SCALE: f32 = 0.001;
 pub const SPEED_SCALE_PER_SEC: f32 = 0.0003; // +0.03%/s → 1.18× at 10min
-pub const SPEED_SCALE_CAP: f32 = 1.5;         // speed never exceeds 1.5× base
-pub const HP_SCALE_HEAVY_MULT: f32 = 1.5;     // heavy enemies scale HP 1.5× faster
-pub const HP_SCALE_LARGE_MULT: f32 = 2.0;     // large enemies scale HP 2× faster
+pub const SPEED_SCALE_CAP: f32 = 1.5; // speed never exceeds 1.5× base
+pub const HP_SCALE_HEAVY_MULT: f32 = 1.5; // heavy enemies scale HP 1.5× faster
+pub const HP_SCALE_LARGE_MULT: f32 = 2.0; // large enemies scale HP 2× faster
 
 // Medium/Large introduction times (seconds into run)
 pub const MEDIUM_INTRO_TIME: f32 = 30.0;
@@ -123,7 +122,7 @@ pub const HEAVY_INTRO_TIME: f32 = 90.0;
 pub const LARGE_INTRO_TIME: f32 = 150.0;
 
 // Spawn ramp-up: ease into full density over the first few seconds
-pub const SPAWN_RAMP_DURATION: f32 = 8.0;       // seconds to reach full coverage target
+pub const SPAWN_RAMP_DURATION: f32 = 8.0; // seconds to reach full coverage target
 pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15; // initial coverage target at t=0
 
 // ---------------------------------------------------------------------------
@@ -140,6 +139,10 @@ pub const DAMAGE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 pub const FIRE_RATE_LEVELS: [f32; 3] = [0.18, 0.14, 0.10];
 pub const MAX_FIRE_RATE_LEVEL: usize = 3;
 pub const FIRE_RATE_UPGRADE_APPLIES_TO_DRONES: bool = true;
+
+pub const BURST_INTERVALS: [f32; 3] = [5.0, 3.5, 2.0];
+pub const MAX_BURST_LEVEL: usize = 3;
+pub const BURST_DAMAGE_MULTIPLIER: i32 = 2;
 
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides
@@ -201,6 +204,9 @@ pub struct RuntimeConfig {
 
     pub fire_rate_levels: Option<Vec<f32>>,
     pub fire_rate_upgrade_applies_to_drones: Option<bool>,
+
+    pub burst_intervals: Option<Vec<f32>>,
+    pub burst_damage_multiplier: Option<i32>,
 
     // Debug flags
     pub debug_all_enemies: Option<bool>,
@@ -268,6 +274,9 @@ pub struct Config {
 
     pub fire_rate_levels: [f32; 3],
     pub fire_rate_upgrade_applies_to_drones: bool,
+
+    pub burst_intervals: [f32; 3],
+    pub burst_damage_multiplier: i32,
 
     /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
     pub debug_all_enemies: bool,
@@ -357,6 +366,18 @@ impl Config {
                 .fire_rate_upgrade_applies_to_drones
                 .unwrap_or(FIRE_RATE_UPGRADE_APPLIES_TO_DRONES),
 
+            burst_intervals: {
+                let v = rt.burst_intervals.unwrap_or_default();
+                if v.len() == 3 {
+                    [v[0], v[1], v[2]]
+                } else {
+                    BURST_INTERVALS
+                }
+            },
+            burst_damage_multiplier: rt
+                .burst_damage_multiplier
+                .unwrap_or(BURST_DAMAGE_MULTIPLIER),
+
             debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
             debug_log_gameplay: rt.debug_log_gameplay.unwrap_or(DEBUG_LOG_GAMEPLAY),
             debug_log_file: rt
@@ -374,7 +395,9 @@ pub fn load_runtime_config() -> RuntimeConfig {
     match fs::read_to_string("config.toml") {
         Ok(text) => match toml::from_str::<RuntimeConfig>(&text) {
             Ok(cfg) => cfg,
-            Err(e) => panic!("[config] Failed to parse config.toml: {e}\nFix the file or delete it to regenerate defaults."),
+            Err(e) => panic!(
+                "[config] Failed to parse config.toml: {e}\nFix the file or delete it to regenerate defaults."
+            ),
         },
         Err(_) => RuntimeConfig::default(),
     }
