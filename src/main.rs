@@ -101,6 +101,11 @@ async fn main() {
         .expect("Failed to load orb sprite (stagger)");
     orb_sprite_stagger.set_animation(4);
 
+    let mut orb_sprite_explosive = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite (explosive)");
+    orb_sprite_explosive.set_animation(8);
+
     let mut state = GameState::new(
         config,
         player_sprite,
@@ -113,6 +118,7 @@ async fn main() {
         orb_sprite_damage,
         orb_sprite_defense,
         orb_sprite_drone,
+        orb_sprite_explosive,
         orb_sprite_fire_rate,
         orb_sprite_burst,
         orb_sprite_pierce,

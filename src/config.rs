@@ -150,6 +150,8 @@ pub const BURST_DAMAGE_MULTIPLIER: i32 = 2;
 pub const MAX_STAGGER_LEVEL: usize = 1;
 pub const STAGGER_KNOCKBACK_PX: f32 = 12.0;
 
+pub const EXPLOSIVE_SHIELD_CLEAR_DISTANCE: f32 = 80.0;
+
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides
 // ---------------------------------------------------------------------------
@@ -215,6 +217,8 @@ pub struct RuntimeConfig {
     pub burst_damage_multiplier: Option<i32>,
 
     // Debug flags
+    pub explosive_shield_clear_distance: Option<f32>,
+
     pub debug_all_enemies: Option<bool>,
     pub debug_log_gameplay: Option<bool>,
     pub debug_log_file: Option<String>,
@@ -289,6 +293,8 @@ pub struct Config {
     pub debug_all_enemies: bool,
     pub debug_log_gameplay: bool,
     pub debug_log_file: String,
+    pub explosive_shield_clear_distance: f32,
+
     /// Debug: if Some, only this orb type spawns (bypasses level gates).
     pub debug_force_orb: Option<OrbType>,
 }
@@ -387,6 +393,10 @@ impl Config {
                 .burst_damage_multiplier
                 .unwrap_or(BURST_DAMAGE_MULTIPLIER),
 
+            explosive_shield_clear_distance: rt
+                .explosive_shield_clear_distance
+                .unwrap_or(EXPLOSIVE_SHIELD_CLEAR_DISTANCE),
+
             debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
             debug_log_gameplay: rt.debug_log_gameplay.unwrap_or(DEBUG_LOG_GAMEPLAY),
             debug_log_file: rt
@@ -401,6 +411,7 @@ impl Config {
                     "firerate" => Some(OrbType::FireRate),
                     "pierce" => Some(OrbType::Pierce),
                     "stagger" => Some(OrbType::Stagger),
+                    "explosive" => Some(OrbType::Explosive),
                     _ => None,
                 }
             }),

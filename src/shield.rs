@@ -8,6 +8,8 @@ pub struct ShieldSegment {
     pub active: bool,
     /// Counts down after loss for a brief visual flash (seconds).
     pub flash_timer: f32,
+    /// When true, this segment breaks last and triggers an explosion on break.
+    pub explosive: bool,
 }
 
 impl ShieldSegment {
@@ -15,6 +17,15 @@ impl ShieldSegment {
         Self {
             active,
             flash_timer: 0.0,
+            explosive: false,
+        }
+    }
+
+    pub fn new_explosive() -> Self {
+        Self {
+            active: true,
+            flash_timer: 0.0,
+            explosive: true,
         }
     }
 
@@ -27,6 +38,16 @@ impl ShieldSegment {
     pub fn is_flashing(&self) -> bool {
         self.flash_timer > 0.0
     }
+}
+
+/// Result of absorbing one hit.
+pub enum ShieldHitResult {
+    /// No segments — player should die.
+    NoShield,
+    /// A normal segment was consumed.
+    NormalAbsorbed,
+    /// The explosive segment was consumed — trigger explosion.
+    ExplosiveBreak,
 }
 
 /// Manages the player's shield layers.
@@ -46,7 +67,7 @@ impl ShieldSystem {
         }
     }
 
-    /// Add `count` new active segments, capped at `MAX_SHIELD_SEGMENTS`.
+    /// Add `count` new normal active segments, capped at `MAX_SHIELD_SEGMENTS`.
     pub fn add_segments(&mut self, count: u32) {
         let space = MAX_SHIELD_SEGMENTS.saturating_sub(self.segments.len());
         let to_add = (count as usize).min(space);
@@ -55,15 +76,44 @@ impl ShieldSystem {
         }
     }
 
-    /// Absorb one hit. Returns `true` if a segment was consumed (player survives),
-    /// `false` if there were no segments (player dies).
-    pub fn take_hit(&mut self) -> bool {
-        if let Some(seg) = self.segments.pop() {
-            let _ = seg;
-            self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
-            true
+    /// Convert the last non-explosive segment to explosive.
+    /// If no normal segments exist and there is space, grant a new explosive segment.
+    /// Has no effect if already at max segments and all are explosive.
+    pub fn convert_to_explosive(&mut self) {
+        // Find a non-explosive segment (search from end) and convert it.
+        if let Some(seg) = self.segments.iter_mut().rev().find(|s| !s.explosive) {
+            seg.explosive = true;
+        } else if self.segments.len() < MAX_SHIELD_SEGMENTS {
+            // No normal segments exist; grant a fresh explosive segment.
+            self.segments.push(ShieldSegment::new_explosive());
+        }
+    }
+
+    /// Returns true if any segment is explosive.
+    pub fn has_explosive(&self) -> bool {
+        self.segments.iter().any(|s| s.explosive)
+    }
+
+    /// Absorb one hit. Normal segments break first; the explosive segment breaks last.
+    /// Returns a `ShieldHitResult` indicating what happened.
+    pub fn take_hit(&mut self) -> ShieldHitResult {
+        if self.segments.is_empty() {
+            return ShieldHitResult::NoShield;
+        }
+        // Find the last non-explosive segment to remove first.
+        let idx = self
+            .segments
+            .iter()
+            .rposition(|s| !s.explosive)
+            .unwrap_or(self.segments.len() - 1); // fall back to the explosive segment
+
+        let seg = self.segments.remove(idx);
+        self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
+
+        if seg.explosive {
+            ShieldHitResult::ExplosiveBreak
         } else {
-            false
+            ShieldHitResult::NormalAbsorbed
         }
     }
 

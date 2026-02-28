@@ -25,7 +25,7 @@ use crate::orb::Orb;
 use crate::orb::{OrbPhase, OrbType};
 use crate::player::Player;
 use crate::projectile::{Projectile, ProjectileSource};
-use crate::shield::ShieldSystem;
+use crate::shield::{ShieldHitResult, ShieldSystem};
 use crate::sprite::Sprite;
 
 pub struct SpawnController {
@@ -70,6 +70,7 @@ pub struct GameState {
     pub orb_sprite_damage: Sprite,
     pub orb_sprite_defense: Sprite,
     pub orb_sprite_drone: Sprite,
+    pub orb_sprite_explosive: Sprite,
     pub orb_sprite_fire_rate: Sprite,
     pub orb_sprite_burst: Sprite,
     pub orb_sprite_pierce: Sprite,
@@ -108,6 +109,7 @@ impl GameState {
         orb_sprite_damage: Sprite,
         orb_sprite_defense: Sprite,
         orb_sprite_drone: Sprite,
+        orb_sprite_explosive: Sprite,
         orb_sprite_fire_rate: Sprite,
         orb_sprite_burst: Sprite,
         orb_sprite_pierce: Sprite,
@@ -141,6 +143,7 @@ impl GameState {
             orb_sprite_damage,
             orb_sprite_defense,
             orb_sprite_drone,
+            orb_sprite_explosive,
             orb_sprite_fire_rate,
             orb_sprite_burst,
             orb_sprite_pierce,
@@ -216,13 +219,68 @@ impl GameState {
     /// Deal one damage event to the player: consume one shield segment, or die if none remain.
     fn take_player_damage(&mut self) {
         self.player.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
-        if !self.shields.take_hit() {
-            self.game_over = true;
+        match self.shields.take_hit() {
+            ShieldHitResult::NoShield => {
+                self.game_over = true;
+            }
+            ShieldHitResult::ExplosiveBreak => {
+                self.trigger_explosive_shield();
+            }
+            ShieldHitResult::NormalAbsorbed => {}
         }
         let remaining = self.shields.count();
         self.dlog(&format!(
             "PLAYER_DMG count=1 shields_remaining={}",
             remaining
+        ));
+    }
+
+    /// Explosive shield segment broke: kill enemies in the clear zone, push Large/Elite back.
+    fn trigger_explosive_shield(&mut self) {
+        let clear_distance = self.config.explosive_shield_clear_distance;
+        let zone_right = BOUNDARY_X + clear_distance;
+        let lane_top = ENEMY_LANE_TOP as f32;
+        let lane_bottom = ENEMY_LANE_BOTTOM as f32;
+
+        let mut stagger_targets: Vec<usize> = Vec::new();
+        for (i, e) in self.enemies.iter_mut().enumerate() {
+            // Enemy overlaps explosion zone horizontally and vertically.
+            if e.x < zone_right
+                && e.x + e.width > BOUNDARY_X
+                && e.y + e.height > lane_top
+                && e.y < lane_bottom
+            {
+                match e.kind {
+                    EnemyKind::Large | EnemyKind::Elite => {
+                        stagger_targets.push(i);
+                    }
+                    _ => {
+                        // Kill immediately; slot release handled in the dead-enemy pass.
+                        e.hp = 0;
+                    }
+                }
+            }
+        }
+
+        // Push Large/Elite enemies back using the same stagger logic.
+        for idx in stagger_targets {
+            if self.enemies[idx].stagger_immune {
+                continue;
+            }
+            self.enemies[idx].stagger_immune = true;
+            self.enemies[idx].x += STAGGER_KNOCKBACK_PX;
+            self.enemies[idx].at_boundary = false;
+            if let Some(slot) = self.enemies[idx].slot_id.take() {
+                self.boundary.release_slot(slot);
+            }
+            if self.enemies[idx].x + self.enemies[idx].width > SCREEN_W as f32 {
+                self.enemies[idx].x = SCREEN_W as f32 - self.enemies[idx].width;
+            }
+        }
+
+        self.dlog(&format!(
+            "EXPLOSIVE_SHIELD zone=[{:.0}..{:.0}] lane=[{}..{}]",
+            BOUNDARY_X, zone_right, ENEMY_LANE_TOP, ENEMY_LANE_BOTTOM
         ));
     }
 
@@ -538,6 +596,9 @@ impl GameState {
                 if self.stagger_level < MAX_STAGGER_LEVEL {
                     pool.push(OrbType::Stagger);
                 }
+                if !self.shields.has_explosive() {
+                    pool.push(OrbType::Explosive);
+                }
                 if let Some(forced) = self.config.debug_force_orb {
                     pool = vec![forced];
                 }
@@ -593,6 +654,7 @@ impl GameState {
         let mut burst_collected = 0u32;
         let mut pierce_collected = 0u32;
         let mut stagger_collected = 0u32;
+        let mut explosive_collected = 0u32;
         for o in &mut self.orbs {
             if o.phase == OrbPhase::Active
                 && aabb_overlap(
@@ -627,6 +689,9 @@ impl GameState {
                         stagger_collected += 1;
                     }
                     OrbType::Drone => {}
+                    OrbType::Explosive => {
+                        explosive_collected += 1;
+                    }
                 }
             }
         }
@@ -671,6 +736,10 @@ impl GameState {
             }
             self.dlog(&format!("ORB_COLLECT Stagger level={}", self.stagger_level));
         }
+        if explosive_collected > 0 {
+            self.shields.convert_to_explosive();
+            self.dlog("ORB_COLLECT Explosive");
+        }
 
         let player_cx = self.player.x + self.player.width / 2.0;
         self.orbs.retain(|o| {
@@ -682,6 +751,7 @@ impl GameState {
         self.orb_sprite_damage.update(dt);
         self.orb_sprite_defense.update(dt);
         self.orb_sprite_drone.update(dt);
+        self.orb_sprite_explosive.update(dt);
         self.orb_sprite_fire_rate.update(dt);
         self.orb_sprite_burst.update(dt);
         self.orb_sprite_pierce.update(dt);
@@ -699,9 +769,15 @@ impl GameState {
     pub fn draw(&mut self) {
         self.draw_background();
         if self.shields.count() > 0 {
-            self.boundary_shield_sprite.draw(
+            let shield_tint = if self.shields.has_explosive() {
+                Color::from_rgba(255, 140, 0, 255) // orange tint for explosive
+            } else {
+                WHITE
+            };
+            self.boundary_shield_sprite.draw_tinted(
                 BOUNDARY_X + self.shields.shake.offset_x(),
                 ENEMY_LANE_TOP as f32,
+                shield_tint,
             );
         }
         self.player_sprite
@@ -753,6 +829,7 @@ impl GameState {
                 OrbType::Damage => &mut self.orb_sprite_damage,
                 OrbType::Defense => &mut self.orb_sprite_defense,
                 OrbType::Drone => &mut self.orb_sprite_drone,
+                OrbType::Explosive => &mut self.orb_sprite_explosive,
                 OrbType::FireRate => &mut self.orb_sprite_fire_rate,
                 OrbType::Pierce => &mut self.orb_sprite_pierce,
                 OrbType::Stagger => &mut self.orb_sprite_stagger,
@@ -771,14 +848,18 @@ impl GameState {
 
     /// Draw shield segment count in the top-left corner as small green squares.
     fn draw_shield_hud(&self) {
-        let count = self.shields.count();
         let size = 4.0_f32;
         let gap = 2.0_f32;
         let start_x = 2.0_f32;
         let y = 2.0_f32;
-        for i in 0..count {
+        for (i, seg) in self.shields.segments.iter().enumerate() {
             let x = start_x + i as f32 * (size + gap);
-            draw_rectangle(x, y, size, size, Color::from_rgba(0, 200, 80, 255));
+            let color = if seg.explosive {
+                Color::from_rgba(255, 140, 0, 255) // orange for explosive
+            } else {
+                Color::from_rgba(0, 200, 80, 255) // green for normal
+            };
+            draw_rectangle(x, y, size, size, color);
         }
     }
 

@@ -240,8 +240,17 @@ debug_log_gameplay = true
 # Example: debug_log_file = "/tmp/lastconvoy.log"
 debug_log_file = ""
 
+# ---------------------------------------------------------------------------
+# [explosive_shield]
+# ---------------------------------------------------------------------------
+
+# Width of the explosion rectangle (pixels rightward from BOUNDARY_X) when
+# the explosive shield segment breaks. Kills small/medium/heavy enemies in
+# the zone; pushes Large and Elite enemies back instead.
+explosive_shield_clear_distance = 80.0
+
 # Force a specific orb type to be the only one that spawns, bypassing level
 # gates and shield-full checks. Useful for testing a specific upgrade track.
-# Valid values: "burst", "damage", "defense", "drone", "firerate", "pierce", "stagger"
+# Valid values: "burst", "damage", "defense", "drone", "explosive", "firerate", "pierce", "stagger"
 # Comment out or remove to restore normal random spawning.
-debug_force_orb = "stagger"
+debug_force_orb = "explosive"
