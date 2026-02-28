@@ -24,7 +24,7 @@
 - Use `/compact` between tasks to shed old context.
 
 ## Toolchain
-- Rust (stable), Cargo, macroquad, serde + ron, rustfmt, clippy.
+- Rust (stable), Cargo, macroquad, serde + toml, rustfmt, clippy.
 - Native builds for dev (`cargo run`), WASM for release (`cargo build --target wasm32-unknown-unknown --release`).
 
 ## Commands
