@@ -19,9 +19,23 @@
 
 ### Rules
 - Prefer plugin/MCP lookups over reading files or guessing. This saves context.
+- **Serena & ripgrep MCPs first** — always use these for code navigation, file search, and content search before Bash/shell tools.
+- **Context7 first** — always query Context7 for library docs before relying on training knowledge.
+- **commit-commands skills first** — use `/commit-commands:commit` for git commits. Commit directly to main (no PRs/branches for now).
 - Store important decisions and resolved questions in **memory** so future sessions don't re-derive them.
 - Use `/feature-dev` for any task that touches multiple files or introduces a new system.
 - Use `/compact` between tasks to shed old context.
+- **Always update CLAUDE.md** when user states a new preference, rule, or workflow for tool usage — so it persists across sessions.
+
+### MCP usage — detailed rules
+- **Priority order:** (1) Serena + ripgrep for code/files, (2) Context7 for API docs, (3) memory MCP for decisions/state, (4) Bash only as last resort.
+- **Serena** — code navigation only. Use `find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`. Do NOT use Serena `write_memory`/`read_memory` — use memory MCP instead.
+- **memory MCP** — primary persistent store. Call `read_graph` at session start. MEMORY.md is a concise index only; details live in the graph. Always store architecture decisions, resolved ambiguities, and key findings here.
+- **Context7** — always call `resolve-library-id` first, then `query-docs`. Never skip for macroquad/crate API questions.
+- **ripgrep MCP** — prefer `mcp__ripgrep__search` / `advanced-search` over `grep`/`rg` in Bash.
+- Do NOT memorize project structure across sessions — query Serena fresh each time.
+- Do NOT read files speculatively — use symbolic tools to retrieve only what's needed.
+- Do NOT re-derive decisions already in the memory graph — check it first.
 
 ## Toolchain
 - Rust (stable), Cargo, macroquad, serde + toml, rustfmt, clippy.
