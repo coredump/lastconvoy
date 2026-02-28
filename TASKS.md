@@ -135,14 +135,26 @@ If anything conflicts:
 - Orb spawning continues during elite events.
 - **Implementation status**: Orb struct with OrbPhase::Inactive/Active; take_hit() logic correct; spawning, movement, collision, Active-only collection all implemented. Needs gameplay verification.
 
-### P1.9 Upgrade tracks (minimal but real) ⚠ PARTIAL
-Implement three tracks with small initial pools:
-- **Defense:** +1 shield segment (Defense skipped in cycling when shields at cap 3); Explosive Shield modifier (see SPEC §6, §10).
-- **Drones:** add one attached drone (fires in same lane as player, moves with player).
-- **Shot type:** Stagger Shot (does NOT affect Large/Elite/Mini-Boss; no stagger for boundary-slot enemies).
-- Cycling order: Defense → Drones → ShotType → Defense → … (Defense skipped when at cap).
-- Modifiers apply to all shooters (player + drones).
-- **Status**: Orb cycling (OrbType enum) exists; skip_defense flag wired in orb.rs + game.rs. Upgrade APPLICATION not implemented (player collection sets collected=true but doesn't apply the upgrade effect).
+### P1.9 Upgrade tracks ✓ MOSTLY DONE (Drone effect + Explosive Shield pending)
+Implemented OrbTypes: Defense, Damage, FireRate, Burst, Pierce, Stagger, Drone.
+- **Defense**: +1 shield per collection (up to cap 3). Skipped from pool when full. ✓
+- **Damage** (3 levels): flat damage per shot scales with level. ✓
+- **FireRate** (3 levels): shot interval decreases per level. ✓
+- **Burst** (3 levels): periodic double-damage shot on separate cooldown. ✓
+- **Pierce** (3 levels): shot passes through N additional enemies; same-enemy double-hit bug fixed. ✓
+- **Stagger** (1 level): on hit, knocks back Small/Medium/Heavy (including slotted enemies). ✓
+- **Drone**: collection wired; drone firing not yet implemented (see P1.10). ⚠
+- **Explosive Shield**: not yet implemented (see P1.9b below). ⚠
+
+### P1.9b Explosive Shield ⚠ NOT STARTED
+- Converts one normal shield segment to an explosive segment (max one at a time).
+- Explosive segment breaks last (after all normal segments).
+- On break: explosion 40 px forward from boundary, full enemy lane height.
+  - Elite and Mini-Boss pushed back 24 px (unless occupying a boundary slot).
+  - Non-elite enemies not pushed back.
+  - No effect on upgrade lane.
+- Upgrade unavailable if player has 0 segments or an explosive segment already exists.
+- Requires separate OrbType or a modifier flag on the Defense orb (design TBD).
 
 ### P1.10 Drone system ⚠ STUB ONLY
 - Attached drones: persist for the run, positioned relative to player.

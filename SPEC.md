@@ -172,24 +172,30 @@ At HP = 0, orb becomes **activated** (clear visual state).
 - Player must physically collect orb to gain the selected upgrade.
 
 ## 10. Upgrade tracks (in-run)
-Upgrades are in 3 categories:
+
+Upgrades are collected by physically touching an activated orb. Each OrbType is a discrete track.
 
 ### (A) Defense
-- **+1 Shield Segment**: adds one shield segment (skipped from cycling pool when already at cap 3).
-- **Explosive Shield** (modifier): converts one normal segment to an explosive segment. Unavailable if the player has 0 segments or if an explosive segment already exists. See §6 for explosive behavior.
+- **Defense (+1 Shield Segment)**: adds one shield segment per collection. Skipped from the orb pool when shields are already at cap (3 segments). Up to 3 collections.
+- **Explosive Shield** *(planned, not yet implemented)*: converts one normal segment to an explosive segment. See §6 for behavior rules.
 
 ### (B) Drones
-- Adds/improves drones:
-  - Attached drone count/cap
-  - Temporary detached/cross-lane drones (duration-based)
-- Upgrade-lane drones spawn only in the upgrade lane and despawn immediately on orb activation; they do not interact with orbs.
+- **Drone**: adds one attached drone. Drone fires in the same lane as the player and moves with the player. *(Collection wired; drone firing not yet implemented.)*
+- Upgrade-lane drones (cross-lane, temporary) are deferred to a later expansion.
 
-### (C) Shot types
-- Modifies projectile behavior (applies to player + drones).
-- **Stagger Shot** (standalone upgrade): on hit, briefly staggers the enemy. Does NOT affect Large, Elite, or Mini-Boss. Does NOT push enemies that occupy boundary slots.
-- **Charge Burst** (standalone upgrade): periodic empowered shot on a separate cooldown.
-- **No projectile size scaling in game.**
-- Keep combinations readable; avoid early combinatorial explosion.
+### (C) Offense — Shot modifiers
+All shot modifiers apply to player shots only at present; drone interaction is tracked per modifier.
+
+- **Damage** (3 levels): increases flat damage per hit. Level 1 = 1, Level 2 = 2, Level 3 = 3. Orb removed from pool at max level.
+- **FireRate** (3 levels): decreases shot interval. Level 1 = 0.18 s, Level 2 = 0.14 s, Level 3 = 0.10 s. Orb removed from pool at max level.
+- **Burst / Charge Burst** (3 levels): on a separate cooldown timer, the next shot deals double damage. Cooldown interval per level: 5.0 s, 3.5 s, 2.0 s. Orb removed from pool at max level.
+- **Pierce** (3 levels): projectile passes through up to N additional enemies (level = max enemies pierced beyond the first). A shot cannot hit the same enemy more than once. Orb removed from pool at max level.
+- **Stagger Shot** (1 level): on hit, briefly knocks back the enemy. Affects Small, Medium, and Heavy only — does NOT affect Large, Elite, or Mini-Boss. Applies even to enemies occupying boundary slots. Orb removed from pool at max level.
+
+**Pool rules:**
+- Orb types at max level are excluded from the spawn pool automatically.
+- Defense is excluded when shields are at cap.
+- No projectile size scaling.
 
 ## 11. Spawning & scaling (time-based only)
 - Enemy spawns are continuous (not wave-based).
