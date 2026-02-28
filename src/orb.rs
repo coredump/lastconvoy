@@ -33,8 +33,6 @@ pub struct Orb {
     pub activation_progress: f32,
     /// Set by collision code each frame; consumed in update().
     pub hit_this_frame: bool,
-    /// Counts down after activation for brief outline flash (seconds).
-    pub flash_timer: f32,
 }
 
 impl Orb {
@@ -50,7 +48,6 @@ impl Orb {
             collected: false,
             activation_progress: 0.0,
             hit_this_frame: false,
-            flash_timer: 0.0,
         }
     }
 
@@ -66,12 +63,7 @@ impl Orb {
             self.activation_progress = self.activation_progress.clamp(0.0, 1.0);
             if self.activation_progress >= 1.0 {
                 self.phase = OrbPhase::Active;
-                self.flash_timer = 0.15;
             }
-        }
-
-        if self.flash_timer > 0.0 {
-            self.flash_timer = (self.flash_timer - dt).max(0.0);
         }
 
         self.hit_this_frame = false;
