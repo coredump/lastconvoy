@@ -1,0 +1,9 @@
+target/
+deploy/
+node_modules/
+assets/
+art/
+.git/
+.claude/
+.serena/
+Cargo.lock

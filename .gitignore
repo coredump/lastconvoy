@@ -1,10 +1,12 @@
 /target
 /node_modules
 /deploy
-package-lock.json
+config.toml
 .idea
 *.swp
 *.swo
 *~
 .DS_Store
 config.ron
+.claude/
+.serena/
