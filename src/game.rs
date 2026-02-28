@@ -809,21 +809,24 @@ impl GameState {
         // Each OrbType has a dedicated Sprite pre-locked to its animation tag,
         // so we never call set_animation() here.
         // Tag indices in upgrades.json: 0=damage, 7=shield, 5=extradrone, 4=stagger
-        let draw_list: Vec<(f32, f32, OrbType, Color)> = self
+        #[allow(clippy::type_complexity)]
+        let draw_list: Vec<(f32, f32, f32, f32, OrbType, OrbPhase, f32, f32)> = self
             .orbs
             .iter()
             .map(|o| {
-                let tint = if o.phase == OrbPhase::Inactive {
-                    let p = o.activation_progress;
-                    let v = (100.0 + 155.0 * p) as u8;
-                    Color::from_rgba(v, v, v, v)
-                } else {
-                    WHITE
-                };
-                (o.x, o.y, o.orb_type, tint)
+                (
+                    o.x,
+                    o.y,
+                    o.width,
+                    o.height,
+                    o.orb_type,
+                    o.phase,
+                    o.activation_progress,
+                    o.flash_timer,
+                )
             })
             .collect();
-        for (sx, sy, orb_type, tint) in draw_list {
+        for (sx, sy, sw, sh, orb_type, phase, progress, flash_timer) in draw_list {
             let sprite = match orb_type {
                 OrbType::Burst => &mut self.orb_sprite_burst,
                 OrbType::Damage => &mut self.orb_sprite_damage,
@@ -834,7 +837,14 @@ impl GameState {
                 OrbType::Pierce => &mut self.orb_sprite_pierce,
                 OrbType::Stagger => &mut self.orb_sprite_stagger,
             };
-            sprite.draw_tinted(sx, sy, tint);
+            sprite.draw(sx, sy);
+            if phase == OrbPhase::Inactive {
+                draw_activation_ring(sx, sy, sw, sh, progress);
+            } else if flash_timer > 0.0 {
+                let alpha = flash_timer / 0.15;
+                let c = Color::new(0.4, 1.0, 0.85, alpha);
+                draw_rectangle_lines(sx, sy, sw, sh, 1.0, c);
+            }
         }
     }
 
@@ -1108,6 +1118,43 @@ fn coverage_target(run_time: f32, cfg: &Config) -> f32 {
     }
     let ramp = (run_time / cfg.spawn_ramp_duration).clamp(0.0, 1.0);
     cfg.spawn_ramp_start_coverage + (full_target - cfg.spawn_ramp_start_coverage) * ramp
+}
+
+/// Draws a clockwise-filling 1px rectangle outline around an orb based on activation progress.
+/// Segment order: bottom (left→right), right (bottom→top), top (right→left), left (top→bottom).
+fn draw_activation_ring(x: f32, y: f32, w: f32, h: f32, progress: f32) {
+    let teal = Color::new(0.4, 1.0, 0.85, 1.0);
+    let dim = Color::new(0.15, 0.15, 0.15, 0.6);
+    // Total perimeter in pixels (integer coords).
+    let iw = w as i32;
+    let ih = h as i32;
+    let perimeter = (2 * iw + 2 * ih) as f32;
+    let filled_px = (progress * perimeter).round() as i32;
+    let mut drawn = 0i32;
+
+    // Helper: draw one pixel, lit if within filled count.
+    let mut px = |px_x: f32, px_y: f32| {
+        let c = if drawn < filled_px { teal } else { dim };
+        draw_rectangle(px_x, px_y, 1.0, 1.0, c);
+        drawn += 1;
+    };
+
+    // Bottom edge: left → right (y = y + h - 1)
+    for i in 0..iw {
+        px(x + i as f32, y + h - 1.0);
+    }
+    // Right edge: bottom → top (x = x + w - 1)
+    for i in 0..ih {
+        px(x + w - 1.0, y + h - 1.0 - i as f32);
+    }
+    // Top edge: right → left (y = y)
+    for i in 0..iw {
+        px(x + w - 1.0 - i as f32, y);
+    }
+    // Left edge: top → bottom (x = x)
+    for i in 0..ih {
+        px(x, y + i as f32);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
