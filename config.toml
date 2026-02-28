@@ -1,0 +1,56 @@
+# lastconvoy runtime config
+# All values are set to compile-time defaults. Uncomment and change to override.
+
+# Player
+player_speed = 100.0
+player_fire_rate = 0.18
+player_starting_shields = 0
+
+# Enemy speeds (px/s)
+enemy_small_speed = 35.0
+enemy_medium_speed = 30.0
+enemy_heavy_speed = 25.0
+enemy_large_speed = 20.0
+
+# Enemy HP
+enemy_small_hp = 1
+enemy_medium_hp = 4
+enemy_heavy_hp = 7
+enemy_large_hp = 14
+
+# Orbs
+orb_spawn_interval = 5.0
+max_active_orbs = 1
+orb_speed = 25.0
+
+# Boundary
+boundary_slot_count = 3
+boundary_damage_tick = 2.0
+
+# Elite / MiniBoss
+elite_interval = 60.0
+elite_interval_jitter = 10.0
+elite_hp = 20
+elite_speed = 18.0
+miniboss_interval = 180.0
+miniboss_interval_jitter = 20.0
+miniboss_hp = 30
+
+# Scaling
+enemy_hp_scale = 0.001
+shielded_freq_scale = 0.001
+
+# Enemy introduction times (seconds into run)
+medium_intro_time = 30.0
+heavy_intro_time = 90.0
+large_intro_time = 150.0
+
+# Input
+rotate_input = false
+analog_deadzone = 0.2
+
+# Projectile
+projectile_speed = 200.0
+
+# Debug
+debug_all_enemies = false

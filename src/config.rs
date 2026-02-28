@@ -41,7 +41,11 @@ pub const PLAYER_WIDTH: f32 = 24.0;
 pub const PLAYER_HEIGHT: f32 = 16.0;
 /// X coordinate where enemies stop (just in front of the player's right edge).
 pub const BOUNDARY_X: f32 = PLAYER_X + PLAYER_WIDTH + 4.0;
-pub const PLAYER_STARTING_SHIELDS: u32 = 3;
+pub const PLAYER_STARTING_SHIELDS: u32 = 0;
+
+// Hit shake
+pub const SHAKE_INTENSITY: f32 = 2.0; // max pixel offset
+pub const SHAKE_DURATION: f32 = 0.15; // seconds
 
 // Enemy sizes (w, h)
 pub const ENEMY_SMALL_W: f32 = 16.0;
@@ -52,6 +56,8 @@ pub const ENEMY_HEAVY_W: f32 = 32.0;
 pub const ENEMY_HEAVY_H: f32 = 24.0;
 pub const ENEMY_LARGE_W: f32 = 40.0;
 pub const ENEMY_LARGE_H: f32 = 32.0;
+pub const ENEMY_ELITE_W: f32 = 48.0;
+pub const ENEMY_ELITE_H: f32 = 40.0;
 
 // Enemy HP
 pub const ENEMY_SMALL_HP: i32 = 1;
@@ -66,19 +72,19 @@ pub const ENEMY_HEAVY_SPEED: f32 = 25.0;
 pub const ENEMY_LARGE_SPEED: f32 = 20.0;
 
 // Spawn intervals (seconds)
-pub const ENEMY_SPAWN_INTERVAL: f32 = 2.0;
 pub const ORB_SPAWN_INTERVAL: f32 = 5.0;
-pub const MAX_ACTIVE_ORBS: usize = 4;
+pub const MAX_ACTIVE_ORBS: usize = 1;
 
 // Boundary
 pub const BOUNDARY_SLOT_COUNT: usize = 3;
 pub const BOUNDARY_DAMAGE_TICK: f32 = 2.0; // seconds between boundary damage ticks
 
 // Orb
-pub const ORB_HP: i32 = 3;
+pub const ORB_ACTIVATION_HIT_COUNT: f32 = 5.0;
+pub const ORB_ACTIVATION_DECAY_PER_SEC: f32 = 0.35;
 pub const ORB_SPEED: f32 = 25.0;
-pub const ORB_W: f32 = 12.0;
-pub const ORB_H: f32 = 12.0;
+pub const ORB_W: f32 = 20.0;
+pub const ORB_H: f32 = 20.0;
 
 // Elite / MiniBoss
 pub const ELITE_INTERVAL: f32 = 60.0;
@@ -90,8 +96,20 @@ pub const MINIBOSS_HP: i32 = 30;
 pub const ELITE_SPEED: f32 = 18.0;
 pub const MINIBOSS_SPEED: f32 = 14.0;
 
+
+// Coverage-based spawn system
+pub const COVERAGE_ZONE_LEFT: f32 = 96.0;
+pub const COVERAGE_ZONE_RIGHT: f32 = 320.0;
+pub const COVERAGE_ZONE_WIDTH: f32 = 224.0; // COVERAGE_ZONE_RIGHT - COVERAGE_ZONE_LEFT
+pub const COVERAGE_HYSTERESIS: f32 = 0.03;
+pub const SPAWN_TICK_INTERVAL: f32 = 0.1; // 10 Hz
+pub const SPAWN_SLOT_WIDTH: f32 = 20.0;
+pub const SPAWN_SLOT_COUNT: usize = 11;
+pub const SPAWN_LEAD_PX: f32 = 12.0;
+pub const SPAWN_MAX_RETRIES: usize = 5;
+pub const BIG_INJECT_BASE_INTERVAL: f32 = 2.2;
+
 // Scaling rates (fractional increase per second)
-pub const SPAWN_RATE_SCALE: f32 = 0.002;
 pub const ENEMY_HP_SCALE: f32 = 0.001;
 pub const SHIELDED_FREQ_SCALE: f32 = 0.001;
 
@@ -101,7 +119,7 @@ pub const HEAVY_INTRO_TIME: f32 = 90.0;
 pub const LARGE_INTRO_TIME: f32 = 150.0;
 
 // ---------------------------------------------------------------------------
-// RuntimeConfig — all fields Optional; RON file only needs overrides
+// RuntimeConfig — all fields Optional; TOML file only needs overrides
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -120,14 +138,12 @@ pub struct RuntimeConfig {
     pub enemy_heavy_hp: Option<i32>,
     pub enemy_large_hp: Option<i32>,
 
-    pub enemy_spawn_interval: Option<f32>,
     pub orb_spawn_interval: Option<f32>,
     pub max_active_orbs: Option<usize>,
 
     pub boundary_slot_count: Option<usize>,
     pub boundary_damage_tick: Option<f32>,
 
-    pub orb_hp: Option<i32>,
     pub orb_speed: Option<f32>,
 
     pub elite_interval: Option<f32>,
@@ -135,9 +151,9 @@ pub struct RuntimeConfig {
     pub miniboss_interval: Option<f32>,
     pub miniboss_interval_jitter: Option<f32>,
     pub elite_hp: Option<i32>,
+    pub elite_speed: Option<f32>,
     pub miniboss_hp: Option<i32>,
 
-    pub spawn_rate_scale: Option<f32>,
     pub enemy_hp_scale: Option<f32>,
     pub shielded_freq_scale: Option<f32>,
 
@@ -149,6 +165,9 @@ pub struct RuntimeConfig {
     pub analog_deadzone: Option<f32>,
 
     pub projectile_speed: Option<f32>,
+
+    // Debug flags
+    pub debug_all_enemies: Option<bool>,
 }
 
 // ---------------------------------------------------------------------------
@@ -171,14 +190,12 @@ pub struct Config {
     pub enemy_heavy_hp: i32,
     pub enemy_large_hp: i32,
 
-    pub enemy_spawn_interval: f32,
     pub orb_spawn_interval: f32,
     pub max_active_orbs: usize,
 
     pub boundary_slot_count: usize,
     pub boundary_damage_tick: f32,
 
-    pub orb_hp: i32,
     pub orb_speed: f32,
 
     pub elite_interval: f32,
@@ -186,9 +203,9 @@ pub struct Config {
     pub miniboss_interval: f32,
     pub miniboss_interval_jitter: f32,
     pub elite_hp: i32,
+    pub elite_speed: f32,
     pub miniboss_hp: i32,
 
-    pub spawn_rate_scale: f32,
     pub enemy_hp_scale: f32,
     pub shielded_freq_scale: f32,
 
@@ -200,6 +217,9 @@ pub struct Config {
     pub analog_deadzone: f32,
 
     pub projectile_speed: f32,
+
+    /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
+    pub debug_all_enemies: bool,
 }
 
 impl Config {
@@ -221,14 +241,12 @@ impl Config {
             enemy_heavy_hp: rt.enemy_heavy_hp.unwrap_or(ENEMY_HEAVY_HP),
             enemy_large_hp: rt.enemy_large_hp.unwrap_or(ENEMY_LARGE_HP),
 
-            enemy_spawn_interval: rt.enemy_spawn_interval.unwrap_or(ENEMY_SPAWN_INTERVAL),
             orb_spawn_interval: rt.orb_spawn_interval.unwrap_or(ORB_SPAWN_INTERVAL),
             max_active_orbs: rt.max_active_orbs.unwrap_or(MAX_ACTIVE_ORBS),
 
             boundary_slot_count: rt.boundary_slot_count.unwrap_or(BOUNDARY_SLOT_COUNT),
             boundary_damage_tick: rt.boundary_damage_tick.unwrap_or(BOUNDARY_DAMAGE_TICK),
 
-            orb_hp: rt.orb_hp.unwrap_or(ORB_HP),
             orb_speed: rt.orb_speed.unwrap_or(ORB_SPEED),
 
             elite_interval: rt.elite_interval.unwrap_or(ELITE_INTERVAL),
@@ -238,9 +256,9 @@ impl Config {
                 .miniboss_interval_jitter
                 .unwrap_or(MINIBOSS_INTERVAL_JITTER),
             elite_hp: rt.elite_hp.unwrap_or(ELITE_HP),
+            elite_speed: rt.elite_speed.unwrap_or(ELITE_SPEED),
             miniboss_hp: rt.miniboss_hp.unwrap_or(MINIBOSS_HP),
 
-            spawn_rate_scale: rt.spawn_rate_scale.unwrap_or(SPAWN_RATE_SCALE),
             enemy_hp_scale: rt.enemy_hp_scale.unwrap_or(ENEMY_HP_SCALE),
             shielded_freq_scale: rt.shielded_freq_scale.unwrap_or(SHIELDED_FREQ_SCALE),
 
@@ -252,6 +270,8 @@ impl Config {
             analog_deadzone: rt.analog_deadzone.unwrap_or(ANALOG_DEADZONE),
 
             projectile_speed: rt.projectile_speed.unwrap_or(PROJECTILE_SPEED),
+
+            debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
         }
     }
 }
@@ -261,11 +281,11 @@ impl Config {
 // ---------------------------------------------------------------------------
 
 pub fn load_runtime_config() -> RuntimeConfig {
-    match fs::read_to_string("config.ron") {
-        Ok(text) => match ron::from_str::<RuntimeConfig>(&text) {
+    match fs::read_to_string("config.toml") {
+        Ok(text) => match toml::from_str::<RuntimeConfig>(&text) {
             Ok(cfg) => cfg,
             Err(e) => {
-                eprintln!("[config] Failed to parse config.ron: {e}. Using defaults.");
+                eprintln!("[config] Failed to parse config.toml: {e}. Using defaults.");
                 RuntimeConfig::default()
             }
         },
@@ -278,14 +298,14 @@ pub fn load_runtime_config() -> RuntimeConfig {
 // ---------------------------------------------------------------------------
 
 pub fn save_default_config_if_missing() {
-    if fs::metadata("config.ron").is_ok() {
+    if fs::metadata("config.toml").is_ok() {
         return;
     }
     let default = RuntimeConfig::default();
-    match ron::ser::to_string_pretty(&default, ron::ser::PrettyConfig::default()) {
+    match toml::to_string_pretty(&default) {
         Ok(text) => {
-            if let Err(e) = fs::write("config.ron", text) {
-                eprintln!("[config] Could not write config.ron: {e}");
+            if let Err(e) = fs::write("config.toml", text) {
+                eprintln!("[config] Could not write config.toml: {e}");
             }
         }
         Err(e) => {
