@@ -5,9 +5,10 @@ export default defineConfig({
   server: {
     port: 8080,
     open: true,
-    headers: {
+  },
+/*  headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
+      'X-Custom-Header': 'My-Value'
+    }*/
 })
