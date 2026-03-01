@@ -142,7 +142,8 @@ Critical orb-interaction rules:
 - If another enemy arrives within a brief simultaneous window (≤ 0.10 s) of the first, it may also join the current breach group (rare, organic simultaneous breach).
 - All other enemies that reach the boundary while locked are clamped at `BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET` (24 px) and remain `Moving`. They compress naturally behind the breaching enemy, forming a visible pressure cluster.
 - After all enemies in the breach group resolve, the lock is released. The frontmost compressed enemy naturally advances to `BOUNDARY_X` and starts the next breach.
-- Enemies that are staggered (knocked back) while Breaching are returned to Moving and removed from the breach group, releasing the lock early.
+- **Re-breach cooldown:** after a breach resolves naturally, a cooldown timer engages (config: `re_breach_cooldown`, default 0.4 s). During cooldown, Moving enemies at the boundary are clamped at `BOUNDARY_X`, creating a visible pressure buildup. This gives the player brief tactical breathing room but heightens the threat of the next breach. *Crucially:* if the player clears a breacher via stagger knockback or explosive shield detonation, the cooldown does NOT trigger — the next enemy advances immediately, maintaining aggressive pacing.
+- Enemies that are staggered (knocked back) while Breaching are returned to Moving and removed from the breach group, releasing the lock early (and bypassing the re-breach cooldown).
 - **Future (P2.X):** virtual slot system — 6 vertical lanes with span-based occupancy per enemy kind (Small=1, Medium/Heavy=2, Large=3) for visual variety at the boundary.
 
 Enemy stacking behavior (unchanged):

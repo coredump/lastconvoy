@@ -61,6 +61,8 @@ pub struct BoundaryController {
     pub breach_locked: bool,
     /// Countdown for explosive shield micro-stall (freezes enemy movement).
     pub stall_timer: f32,
+    /// Cooldown after a natural breach resolution; blocks new breaches until expired.
+    pub rebreach_cooldown: f32,
 }
 
 impl BoundaryController {
@@ -70,6 +72,7 @@ impl BoundaryController {
             breach_start_time: 0.0,
             breach_locked: false,
             stall_timer: 0.0,
+            rebreach_cooldown: 0.0,
         }
     }
 
@@ -78,6 +81,7 @@ impl BoundaryController {
         self.breach_start_time = 0.0;
         self.breach_locked = false;
         self.stall_timer = 0.0;
+        self.rebreach_cooldown = 0.0;
     }
 }
 
@@ -516,6 +520,10 @@ impl GameState {
             self.boundary_ctrl.stall_timer = (self.boundary_ctrl.stall_timer - dt).max(0.0);
         }
         let stalling = self.boundary_ctrl.stall_timer > 0.0;
+        if self.boundary_ctrl.rebreach_cooldown > 0.0 {
+            self.boundary_ctrl.rebreach_cooldown =
+                (self.boundary_ctrl.rebreach_cooldown - dt).max(0.0);
+        }
 
         // Update enemies (movement gated by state and stall).
         for e in &mut self.enemies {
@@ -523,7 +531,14 @@ impl GameState {
                 // Freeze all movement during micro-stall; still update shake.
                 e.shake.update(dt);
             } else {
+                let prev_x = e.x;
                 e.update(dt);
+                // While breach is locked, stop Moving enemies at the stop line.
+                // Enemies already past it keep their pre-move position (no push-back).
+                if self.boundary_ctrl.breach_locked && e.state == EnemyState::Moving {
+                    let stop_x = BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET;
+                    e.x = e.x.max(stop_x.min(prev_x));
+                }
             }
         }
 
@@ -539,7 +554,8 @@ impl GameState {
         for i in arrivals {
             let in_window = self.boundary_ctrl.breach_locked
                 && (now - self.boundary_ctrl.breach_start_time) <= simultaneous_window;
-            if !self.boundary_ctrl.breach_locked || in_window {
+            let cooldown_expired = self.boundary_ctrl.rebreach_cooldown <= 0.0;
+            if (!self.boundary_ctrl.breach_locked && cooldown_expired) || in_window {
                 let id = self.enemies[i].id;
                 self.enemies[i].state = EnemyState::Breaching;
                 self.enemies[i].x = BOUNDARY_X;
@@ -554,9 +570,13 @@ impl GameState {
                     self.enemies[i].kind, id, self.enemies[i].windup_time
                 ));
             } else {
-                // Breach locked: clamp enemy out of the boundary zone; it stays Moving
-                // and compresses naturally behind the breaching enemy via stacking.
-                self.enemies[i].x = (BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET).max(self.enemies[i].x);
+                // Breach locked or cooldown active: clamp enemy at appropriate stop line.
+                let stop_x = if self.boundary_ctrl.breach_locked {
+                    BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET
+                } else {
+                    BOUNDARY_X
+                };
+                self.enemies[i].x = stop_x.max(self.enemies[i].x);
             }
         }
 
@@ -572,6 +592,7 @@ impl GameState {
         }
 
         // Resolve each completed breach: deal damage, despawn enemy.
+        let had_resolution = !resolved_ids.is_empty();
         for id in resolved_ids {
             if let Some(pos) = self.enemies.iter().position(|e| e.id == id) {
                 let kind = self.enemies[pos].kind;
@@ -590,6 +611,9 @@ impl GameState {
         // behind the breacher; the frontmost will reach BOUNDARY_X and start the next breach.
         if self.boundary_ctrl.breach_locked && self.boundary_ctrl.breach_group.is_empty() {
             self.boundary_ctrl.breach_locked = false;
+            if had_resolution {
+                self.boundary_ctrl.rebreach_cooldown = self.config.re_breach_cooldown;
+            }
         }
 
         self.enemies
@@ -614,13 +638,11 @@ impl GameState {
             }
         }
 
-        // Boundary clamp pass: after stacking, prevent Moving enemies from drifting into the
-        // locked boundary zone (stacking could push a follower forward past the stop line).
-        if self.boundary_ctrl.breach_locked {
-            let stop_x = BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET;
+        // During re-breach cooldown, hold Moving enemies at the boundary line.
+        if self.boundary_ctrl.rebreach_cooldown > 0.0 {
             for e in &mut self.enemies {
-                if e.state == EnemyState::Moving && e.x < stop_x {
-                    e.x = stop_x;
+                if e.state == EnemyState::Moving && e.x < BOUNDARY_X {
+                    e.x = BOUNDARY_X;
                 }
             }
         }

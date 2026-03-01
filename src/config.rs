@@ -100,6 +100,8 @@ pub const SIMULTANEOUS_BREACH_WINDOW: f32 = 0.10;
 pub const EXPLOSIVE_MICRO_STALL: f32 = 0.25;
 /// How far right of BOUNDARY_X enemies are clamped while breach is locked (visible pressure cluster).
 pub const PRE_BOUNDARY_STOP_OFFSET: f32 = 24.0;
+/// Cooldown after a breach resolves naturally before a new breach can begin.
+pub const RE_BREACH_COOLDOWN: f32 = 0.4;
 
 // Orb
 pub const ORB_ACTIVATION_HIT_COUNT: f32 = 5.0;
@@ -200,6 +202,7 @@ pub struct RuntimeConfig {
 
     pub simultaneous_breach_window: Option<f32>,
     pub explosive_micro_stall: Option<f32>,
+    pub re_breach_cooldown: Option<f32>,
     pub windup_time_small: Option<f32>,
     pub windup_time_medium: Option<f32>,
     pub windup_time_heavy: Option<f32>,
@@ -279,6 +282,7 @@ pub struct Config {
 
     pub simultaneous_breach_window: f32,
     pub explosive_micro_stall: f32,
+    pub re_breach_cooldown: f32,
     pub windup_time_small: f32,
     pub windup_time_medium: f32,
     pub windup_time_heavy: f32,
@@ -361,6 +365,7 @@ impl Config {
                 .simultaneous_breach_window
                 .unwrap_or(SIMULTANEOUS_BREACH_WINDOW),
             explosive_micro_stall: rt.explosive_micro_stall.unwrap_or(EXPLOSIVE_MICRO_STALL),
+            re_breach_cooldown: rt.re_breach_cooldown.unwrap_or(RE_BREACH_COOLDOWN),
             windup_time_small: rt.windup_time_small.unwrap_or(WINDUP_TIME_SMALL),
             windup_time_medium: rt.windup_time_medium.unwrap_or(WINDUP_TIME_MEDIUM),
             windup_time_heavy: rt.windup_time_heavy.unwrap_or(WINDUP_TIME_HEAVY),
