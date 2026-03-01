@@ -8,9 +8,13 @@ description = "Build a wasm browser version"
 run = """
   rm -rf deploy
   cargo build --release --target wasm32-unknown-unknown &&
-  mkdir deploy
+  mkdir -p deploy/assets
+  cp ./assets/web/index.html ./deploy/
+  cp ./assets/web/mq_js_bundle.js ./deploy/mq_js_bundle.js
+  cp -r ./assets/fonts ./deploy/assets/
+  cp -r ./assets/sprites ./deploy/assets/
+  cp ./config.toml ./deploy/ 2>/dev/null || true
   cp ./target/wasm32-unknown-unknown/release/lastconvoy.wasm ./deploy/
-  cp ./assets/web/* ./deploy/
   """
 
 [tasks.watch]
