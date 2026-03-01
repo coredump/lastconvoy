@@ -26,6 +26,20 @@ use crate::player::Player;
 use crate::projectile::{Projectile, ProjectileSource};
 use crate::shield::{ShieldHitResult, ShieldSystem};
 use crate::sprite::Sprite;
+use crate::text::BitmapFont;
+
+const FLOATING_TEXT_TTL: f32 = 0.8;
+const FLOATING_TEXT_VY: f32 = -18.0;
+
+pub struct FloatingText {
+    pub text: String,
+    pub x: f32,
+    pub y: f32,
+    pub vy: f32,
+    pub ttl: f32,
+    pub life: f32,
+    pub color: Color,
+}
 
 pub struct SpawnController {
     pub tick_accum: f32,
@@ -127,8 +141,13 @@ pub struct GameState {
     pub miniboss_timer: f32,
     pub run_time: f32,
     pub game_over: bool,
+    pub kills_total: u32,
+    pub breaches_total: u32,
+    pub balance_log_timer: f32,
     pub debug_log: Option<crate::debug_log::DebugLog>,
     pub additive_material: Material,
+    pub ui_font: BitmapFont,
+    pub floating_texts: Vec<FloatingText>,
 }
 
 impl GameState {
@@ -153,6 +172,7 @@ impl GameState {
         orb_sprite_pierce: Sprite,
         orb_sprite_stagger: Sprite,
         orb_sprite_seal: Sprite,
+        ui_font: BitmapFont,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
         let player = Player::new(
@@ -205,6 +225,9 @@ impl GameState {
             miniboss_timer: config.miniboss_interval,
             run_time: 0.0,
             game_over: false,
+            kills_total: 0,
+            breaches_total: 0,
+            balance_log_timer: 0.0,
             debug_log: if config.debug_log_gameplay {
                 Some(crate::debug_log::DebugLog::new(
                     &config.debug_log_file.clone(),
@@ -213,6 +236,8 @@ impl GameState {
                 None
             },
             config,
+            ui_font,
+            floating_texts: Vec::new(),
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -288,12 +313,64 @@ impl GameState {
         self.miniboss_timer = self.config.miniboss_interval;
         self.run_time = 0.0;
         self.game_over = false;
+        self.kills_total = 0;
+        self.breaches_total = 0;
+        self.balance_log_timer = 0.0;
+        self.floating_texts.clear();
     }
 
     fn dlog(&mut self, msg: &str) {
         if let Some(log) = &mut self.debug_log {
             log.log(self.run_time, msg);
         }
+    }
+
+    /// Compute estimated sustained DPS at current upgrade levels (no burst, no pierce).
+    fn dps_estimate(&self) -> f32 {
+        let dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
+        let fire_rate = self.player.fire_rate;
+        dmg / fire_rate
+    }
+
+    /// Compute time-to-kill a Large enemy at current HP scaling, in seconds.
+    fn large_ttk(&self) -> f32 {
+        let base_hp = self.config.enemy_large_hp as f32;
+        let hp_mult =
+            1.0 + self.config.enemy_hp_scale * self.run_time * self.config.hp_scale_large_mult;
+        let large_hp = (base_hp * hp_mult).round().max(1.0);
+        let dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
+        let fire_rate = self.player.fire_rate;
+        large_hp * fire_rate / dmg
+    }
+
+    fn log_balance_snapshot(&mut self) {
+        let dps = self.dps_estimate();
+        let ttk = self.large_ttk();
+        let base_hp = self.config.enemy_large_hp as f32;
+        let hp_mult =
+            1.0 + self.config.enemy_hp_scale * self.run_time * self.config.hp_scale_large_mult;
+        let large_hp = (base_hp * hp_mult).round().max(1.0) as i32;
+        let med_hp_mult = 1.0 + self.config.enemy_hp_scale * self.run_time;
+        let medium_hp = (self.config.enemy_medium_hp as f32 * med_hp_mult)
+            .round()
+            .max(1.0) as i32;
+        self.dlog(&format!(
+            "BALANCE dmg={} fr_level={} burst={} pierce={} stagger={} \
+             dps={:.1} large_hp={} large_ttk={:.2}s medium_hp={} \
+             kills={} breaches={} shields={}",
+            self.damage_level,
+            self.fire_rate_level,
+            self.burst_level,
+            self.pierce_level,
+            self.stagger_level,
+            dps,
+            large_hp,
+            ttk,
+            medium_hp,
+            self.kills_total,
+            self.breaches_total,
+            self.shields.count(),
+        ));
     }
 
     /// Deal one damage event to the player: consume one shield segment, or die if none remain.
@@ -382,6 +459,15 @@ impl GameState {
         }
 
         self.run_time += dt;
+        self.update_floating_texts(dt);
+
+        // Balance snapshot every 30s
+        self.balance_log_timer -= dt;
+        if self.balance_log_timer <= 0.0 {
+            self.balance_log_timer = 30.0;
+            self.log_balance_snapshot();
+        }
+
         self.input.update(&self.config);
 
         // Player movement
@@ -430,11 +516,12 @@ impl GameState {
             if !p.alive || p.source != ProjectileSource::Player {
                 continue;
             }
-            let player_dmg = if p.is_burst {
+            let player_dmg = (if p.is_burst {
                 base_dmg * self.config.burst_damage_multiplier
             } else {
                 base_dmg
-            };
+            })
+            .round() as i32;
             for (ei, e) in self.enemies.iter_mut().enumerate() {
                 if e.is_dead() || p.hit_enemies.contains(&e.id) {
                     continue;
@@ -482,6 +569,7 @@ impl GameState {
                 }
             }
         }
+        self.kills_total += kill_logs.len() as u32;
         for msg in kill_logs {
             self.dlog(&msg);
         }
@@ -645,6 +733,7 @@ impl GameState {
                 let kind = self.enemies[pos].kind;
                 self.enemies[pos].hp = 0;
                 self.boundary_ctrl.breach_group.retain(|&bid| bid != id);
+                self.breaches_total += 1;
                 self.dlog(&format!("BREACH_RESOLVE {:?} id={}", kind, id));
                 self.take_player_damage();
                 if self.game_over {
@@ -703,35 +792,54 @@ impl GameState {
                 let y = lane_mid - ORB_H / 2.0;
                 // Build weighted pool; gate Shield if shields are full.
                 let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
-                let mut pool: Vec<OrbType> = Vec::with_capacity(5);
-                if self.burst_level < MAX_BURST_LEVEL {
-                    pool.push(OrbType::Burst);
+                // Weighted pool: leveled types get weight = remaining levels; non-leveled get 1.
+                let mut pool: Vec<(OrbType, u32)> = Vec::with_capacity(8);
+                let burst_remaining = (MAX_BURST_LEVEL - self.burst_level) as u32;
+                if burst_remaining > 0 {
+                    pool.push((OrbType::Burst, burst_remaining));
                 }
-                if self.damage_level < MAX_DAMAGE_LEVEL {
-                    pool.push(OrbType::Damage);
+                let damage_remaining = (MAX_DAMAGE_LEVEL - self.damage_level) as u32;
+                if damage_remaining > 0 {
+                    pool.push((OrbType::Damage, damage_remaining));
                 }
                 if !shields_full {
-                    pool.push(OrbType::Shield);
+                    pool.push((OrbType::Shield, 1));
                 }
-                pool.push(OrbType::Drone);
-                if self.fire_rate_level < MAX_FIRE_RATE_LEVEL {
-                    pool.push(OrbType::FireRate);
+                // Drone track is excluded from normal orb rolls until P1.10 implements
+                // drone update/firing behavior; dead-value upgrades flatten progression.
+                let fire_rate_remaining = (MAX_FIRE_RATE_LEVEL - self.fire_rate_level) as u32;
+                if fire_rate_remaining > 0 {
+                    pool.push((OrbType::FireRate, fire_rate_remaining));
                 }
-                if self.pierce_level < MAX_PIERCE_LEVEL {
-                    pool.push(OrbType::Pierce);
+                let pierce_remaining = (MAX_PIERCE_LEVEL - self.pierce_level) as u32;
+                if pierce_remaining > 0 {
+                    pool.push((OrbType::Pierce, pierce_remaining));
                 }
-                if self.stagger_level < MAX_STAGGER_LEVEL {
-                    pool.push(OrbType::Stagger);
+                let stagger_remaining = (MAX_STAGGER_LEVEL - self.stagger_level) as u32;
+                if stagger_remaining > 0 {
+                    pool.push((OrbType::Stagger, stagger_remaining));
                 }
                 if !self.shields.has_explosive() {
-                    pool.push(OrbType::Explosive);
+                    pool.push((OrbType::Explosive, 1));
                 }
                 if let Some(forced) = self.config.debug_force_orb {
-                    pool = vec![forced];
+                    pool = vec![(forced, 1)];
                 }
                 if !pool.is_empty() {
-                    let idx = rand::gen_range(0usize, pool.len());
-                    let orb_type = pool[idx];
+                    let total: u32 = pool.iter().map(|(_, w)| w).sum();
+                    let mut roll = rand::gen_range(0u32, total);
+                    let orb_type = pool
+                        .iter()
+                        .find(|(_, w)| {
+                            if roll < *w {
+                                true
+                            } else {
+                                roll -= w;
+                                false
+                            }
+                        })
+                        .map(|(t, _)| *t)
+                        .unwrap_or(pool[0].0);
                     self.orbs.push(Orb::new(
                         SCREEN_W as f32,
                         y,
@@ -777,17 +885,8 @@ impl GameState {
         }
 
         // Player-orb collection (active orbs only).
-        // INVARIANT: at most one orb of each type may be collected per frame.
-        // Spawn spacing and orb speed make simultaneous same-type collection impossible in
-        // normal gameplay. Logic below is NOT designed to handle multiples correctly —
-        // explosive in particular calls convert_to_explosive() only once regardless of count.
-        let mut shield_grants = 0u32;
-        let mut damage_collected = 0u32;
-        let mut fire_rate_collected = 0u32;
-        let mut burst_collected = 0u32;
-        let mut pierce_collected = 0u32;
-        let mut stagger_collected = 0u32;
-        let mut explosive_collected = 0u32;
+        // Track pickup origin positions for floating upgrade text.
+        let mut pickups: Vec<(OrbType, f32, f32)> = Vec::new();
         for o in &mut self.orbs {
             if o.phase == OrbPhase::Active
                 && aabb_overlap(
@@ -802,76 +901,108 @@ impl GameState {
                 )
             {
                 o.collected = true;
-                match o.orb_type {
-                    OrbType::Burst => {
-                        burst_collected += 1;
-                    }
-                    OrbType::Shield => {
-                        shield_grants += 1;
-                    }
-                    OrbType::Damage => {
-                        damage_collected += 1;
-                    }
-                    OrbType::FireRate => {
-                        fire_rate_collected += 1;
-                    }
-                    OrbType::Pierce => {
-                        pierce_collected += 1;
-                    }
-                    OrbType::Stagger => {
-                        stagger_collected += 1;
-                    }
-                    OrbType::Drone => {}
-                    OrbType::Explosive => {
-                        explosive_collected += 1;
+                pickups.push((o.orb_type, o.x + o.width * 0.5, o.y));
+            }
+        }
+
+        for (orb_type, px, py) in pickups {
+            let popup_tag = match orb_type {
+                OrbType::Damage => {
+                    if self.damage_level < MAX_DAMAGE_LEVEL {
+                        let dps_before = self.dps_estimate();
+                        let ttk_before = self.large_ttk();
+                        self.damage_level += 1;
+                        let dps_after = self.dps_estimate();
+                        let ttk_after = self.large_ttk();
+                        self.dlog(&format!(
+                            "ORB_COLLECT Damage level={} | dps {:.1}→{:.1} | large_ttk {:.2}s→{:.2}s",
+                            self.damage_level, dps_before, dps_after, ttk_before, ttk_after
+                        ));
+                        Some("+DMG")
+                    } else {
+                        None
                     }
                 }
+                OrbType::FireRate => {
+                    if self.fire_rate_level < MAX_FIRE_RATE_LEVEL {
+                        let dps_before = self.dps_estimate();
+                        let ttk_before = self.large_ttk();
+                        self.fire_rate_level += 1;
+                        let new_rate = self.config.fire_rate_levels
+                            [self.fire_rate_level.min(MAX_FIRE_RATE_LEVEL - 1)];
+                        self.player.fire_rate = new_rate;
+                        let dps_after = self.dps_estimate();
+                        let ttk_after = self.large_ttk();
+                        self.dlog(&format!(
+                            "ORB_COLLECT FireRate level={} fire_rate={:.3} | dps {:.1}→{:.1} | large_ttk {:.2}s→{:.2}s",
+                            self.fire_rate_level, new_rate, dps_before, dps_after, ttk_before, ttk_after
+                        ));
+                        Some("+RATE")
+                    } else {
+                        None
+                    }
+                }
+                OrbType::Burst => {
+                    if self.burst_level < MAX_BURST_LEVEL {
+                        self.burst_level += 1;
+                        self.burst_timer =
+                            self.config.burst_intervals[self.burst_level.min(MAX_BURST_LEVEL) - 1];
+                        self.dlog(&format!("ORB_COLLECT Burst level={}", self.burst_level));
+                        Some("+BURST")
+                    } else {
+                        None
+                    }
+                }
+                OrbType::Pierce => {
+                    if self.pierce_level < MAX_PIERCE_LEVEL {
+                        self.pierce_level += 1;
+                        self.dlog(&format!("ORB_COLLECT Pierce level={}", self.pierce_level));
+                        Some("+PIERCE")
+                    } else {
+                        None
+                    }
+                }
+                OrbType::Stagger => {
+                    if self.stagger_level < MAX_STAGGER_LEVEL {
+                        self.stagger_level += 1;
+                        self.dlog(&format!("ORB_COLLECT Stagger level={}", self.stagger_level));
+                        Some("+STAGGER")
+                    } else {
+                        None
+                    }
+                }
+                OrbType::Shield => {
+                    let before = self.shields.count();
+                    self.shields.add_segments(1);
+                    let after = self.shields.count();
+                    if after > before {
+                        Some("+SHIELD")
+                    } else {
+                        None
+                    }
+                }
+                OrbType::Explosive => {
+                    let before_has = self.shields.has_explosive();
+                    let before_count = self.shields.count();
+                    self.shields.convert_to_explosive();
+                    let after_has = self.shields.has_explosive();
+                    let after_count = self.shields.count();
+                    if after_has && !before_has {
+                        self.dlog("ORB_COLLECT Explosive");
+                        Some("+EXPLOSIVE")
+                    } else if after_count > before_count {
+                        self.dlog("ORB_COLLECT Explosive->Shield");
+                        Some("+SHIELD")
+                    } else {
+                        None
+                    }
+                }
+                OrbType::Drone => None,
+            };
+
+            if let Some(tag) = popup_tag {
+                self.spawn_upgrade_floating_text(tag, px, py);
             }
-        }
-        if shield_grants > 0 {
-            self.shields.add_segments(shield_grants);
-        }
-        for _ in 0..damage_collected {
-            if self.damage_level < MAX_DAMAGE_LEVEL {
-                self.damage_level += 1;
-            }
-            self.dlog(&format!("ORB_COLLECT Damage level={}", self.damage_level));
-        }
-        for _ in 0..fire_rate_collected {
-            if self.fire_rate_level < MAX_FIRE_RATE_LEVEL {
-                self.fire_rate_level += 1;
-            }
-            let new_rate =
-                self.config.fire_rate_levels[self.fire_rate_level.min(MAX_FIRE_RATE_LEVEL - 1)];
-            self.player.fire_rate = new_rate;
-            self.dlog(&format!(
-                "ORB_COLLECT FireRate level={} fire_rate={:.3}",
-                self.fire_rate_level, new_rate
-            ));
-        }
-        for _ in 0..burst_collected {
-            if self.burst_level < MAX_BURST_LEVEL {
-                self.burst_level += 1;
-            }
-            self.burst_timer =
-                self.config.burst_intervals[self.burst_level.min(MAX_BURST_LEVEL) - 1];
-            self.dlog(&format!("ORB_COLLECT Burst level={}", self.burst_level));
-        }
-        for _ in 0..pierce_collected {
-            if self.pierce_level < MAX_PIERCE_LEVEL {
-                self.pierce_level += 1;
-            }
-            self.dlog(&format!("ORB_COLLECT Pierce level={}", self.pierce_level));
-        }
-        for _ in 0..stagger_collected {
-            if self.stagger_level < MAX_STAGGER_LEVEL {
-                self.stagger_level += 1;
-            }
-            self.dlog(&format!("ORB_COLLECT Stagger level={}", self.stagger_level));
-        }
-        if explosive_collected > 0 {
-            self.shields.convert_to_explosive();
-            self.dlog("ORB_COLLECT Explosive");
         }
 
         let player_cx = self.player.x + self.player.width / 2.0;
@@ -918,7 +1049,11 @@ impl GameState {
         self.player_sprite
             .draw(self.player.x + self.player.shake.offset_x(), self.player.y);
         for p in &self.projectiles {
-            let sprite = if p.is_burst { &self.burst_shot_sprite } else { &self.shot_sprite };
+            let sprite = if p.is_burst {
+                &self.burst_shot_sprite
+            } else {
+                &self.shot_sprite
+            };
             sprite.draw(p.x, p.y - 0.5);
         }
         for e in &self.enemies {
@@ -945,6 +1080,9 @@ impl GameState {
         self.draw_orbs();
 
         self.draw_shield_hud();
+        self.draw_upgrade_hud();
+        self.draw_run_timer_hud();
+        self.draw_floating_texts();
 
         if self.game_over {
             self.draw_game_over();
@@ -1024,16 +1162,82 @@ impl GameState {
         // Simple overlay — dim the screen and prompt restart.
         let overlay = Color::from_rgba(0, 0, 0, 160);
         draw_rectangle(0.0, 0.0, SCREEN_W as f32, 180.0, overlay);
-        // No text rendering in Phase 1 (no font loaded) — the blank screen + shield HUD
-        // at 0 segments is sufficient feedback. Restart on Space/Enter/R.
+        let title = "GAME OVER";
+        let time_line = format!("TIME {}", self.format_run_timer());
+        let kb_line = format!(
+            "KILLS {}  BREACHES {}",
+            self.kills_total, self.breaches_total
+        );
+        let restart = "PRESS SPACE/ENTER/R";
+        let restart2 = "TO RESTART";
+
+        let title_size = self.ui_font.measure(title, 2, 1);
+        let title_x = (SCREEN_W as f32 - title_size.x) * 0.5;
+        self.ui_font.draw(
+            title,
+            title_x,
+            70.0,
+            2,
+            Color::from_rgba(255, 90, 90, 255),
+            1,
+        );
+
+        let time_size = self.ui_font.measure(&time_line, 2, 1);
+        let time_x = (SCREEN_W as f32 - time_size.x) * 0.5;
+        self.ui_font.draw(
+            &time_line,
+            time_x,
+            92.0,
+            2,
+            Color::from_rgba(245, 245, 245, 255),
+            1,
+        );
+
+        let kb_size = self.ui_font.measure(&kb_line, 1, 1);
+        let kb_x = (SCREEN_W as f32 - kb_size.x) * 0.5;
+        self.ui_font.draw(
+            &kb_line,
+            kb_x,
+            108.0,
+            1,
+            Color::from_rgba(220, 220, 220, 255),
+            1,
+        );
+
+        let restart_size = self.ui_font.measure(restart, 1, 1);
+        let restart_x = (SCREEN_W as f32 - restart_size.x) * 0.5;
+        self.ui_font.draw(
+            restart,
+            restart_x,
+            124.0,
+            1,
+            Color::from_rgba(240, 240, 180, 255),
+            1,
+        );
+        let restart2_size = self.ui_font.measure(restart2, 1, 1);
+        let restart2_x = (SCREEN_W as f32 - restart2_size.x) * 0.5;
+        self.ui_font.draw(
+            restart2,
+            restart2_x,
+            134.0,
+            1,
+            Color::from_rgba(240, 240, 180, 255),
+            1,
+        );
     }
 
-    /// Draw shield segment count in the top-left corner as small green squares.
+    /// Draw shield segment count in the top-left corner as small squares.
+    /// Dark backdrop squares are drawn first for all MAX_SHIELD_SEGMENTS slots.
     fn draw_shield_hud(&self) {
         let size = 4.0_f32;
         let gap = 2.0_f32;
         let start_x = 2.0_f32;
         let y = 2.0_f32;
+        let dark = Color::from_rgba(40, 40, 40, 255);
+        for i in 0..crate::shield::MAX_SHIELD_SEGMENTS {
+            let x = start_x + i as f32 * (size + gap);
+            draw_rectangle(x, y, size, size, dark);
+        }
         for (i, seg) in self.shields.segments.iter().enumerate() {
             let x = start_x + i as f32 * (size + gap);
             let color = if seg.explosive {
@@ -1042,6 +1246,89 @@ impl GameState {
                 Color::from_rgba(0, 200, 80, 255) // green for normal
             };
             draw_rectangle(x, y, size, size, color);
+        }
+    }
+
+    /// Draw collected upgrade icons in the HUD after the shield area.
+    fn draw_upgrade_hud(&mut self) {
+        let shield_area_end = 2.0 + crate::shield::MAX_SHIELD_SEGMENTS as f32 * (4.0 + 2.0) + 2.0;
+        let icon_size = 12.0_f32;
+        let icon_gap = 2.0_f32;
+        let y = 2.0_f32;
+        let mut x = shield_area_end;
+
+        let checks: [bool; 8] = [
+            self.damage_level >= 1,
+            self.fire_rate_level >= 1,
+            self.burst_level >= 1,
+            self.pierce_level >= 1,
+            self.stagger_level >= 1,
+            self.shields.segments.len() > 1, // more than starting 1 segment
+            self.shields.segments.iter().any(|s| s.explosive),
+            !self.drones.is_empty(),
+        ];
+
+        let mut sprites: [&mut Sprite; 8] = [
+            &mut self.orb_sprite_damage,
+            &mut self.orb_sprite_fire_rate,
+            &mut self.orb_sprite_burst,
+            &mut self.orb_sprite_pierce,
+            &mut self.orb_sprite_stagger,
+            &mut self.orb_sprite_shield,
+            &mut self.orb_sprite_explosive,
+            &mut self.orb_sprite_drone,
+        ];
+
+        for (acquired, sprite) in checks.iter().zip(sprites.iter_mut()) {
+            if *acquired {
+                sprite.draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                x += icon_size + icon_gap;
+            }
+        }
+    }
+
+    fn format_run_timer(&self) -> String {
+        let total = self.run_time.max(0.0).floor() as u32;
+        let minutes = total / 60;
+        let seconds = total % 60;
+        format!("{minutes:02}:{seconds:02}")
+    }
+
+    fn draw_run_timer_hud(&self) {
+        let timer = self.format_run_timer();
+        let size = self.ui_font.measure(&timer, 1, 1);
+        let x = SCREEN_W as f32 - 2.0 - size.x;
+        self.ui_font
+            .draw(&timer, x, 2.0, 1, Color::from_rgba(220, 220, 220, 255), 1);
+    }
+
+    fn spawn_upgrade_floating_text(&mut self, tag: &str, x: f32, y: f32) {
+        let width = self.ui_font.measure(tag, 1, 1).x;
+        self.floating_texts.push(FloatingText {
+            text: tag.to_string(),
+            x: x - width * 0.5,
+            y,
+            vy: FLOATING_TEXT_VY,
+            ttl: FLOATING_TEXT_TTL,
+            life: FLOATING_TEXT_TTL,
+            color: Color::from_rgba(230, 255, 180, 255),
+        });
+    }
+
+    fn update_floating_texts(&mut self, dt: f32) {
+        for t in &mut self.floating_texts {
+            t.y += t.vy * dt;
+            t.life = (t.life - dt).max(0.0);
+        }
+        self.floating_texts.retain(|t| t.life > 0.0);
+    }
+
+    fn draw_floating_texts(&self) {
+        for t in &self.floating_texts {
+            let alpha = (t.life / t.ttl).clamp(0.0, 1.0);
+            let mut color = t.color;
+            color.a *= alpha;
+            self.ui_font.draw(&t.text, t.x, t.y, 1, color, 1);
         }
     }
 
@@ -1073,7 +1360,10 @@ impl GameState {
         let coverage = compute_coverage(&self.enemies);
         let target = coverage_target(self.run_time, &self.config);
 
-        if self.spawn_ctrl.inject_timer <= 0.0 && coverage < target {
+        // Keep injecting medium/heavy/large threats even when coverage is near target.
+        // Without this slack, mid/late runs can plateau into mostly-small traffic.
+        let inject_coverage_cap = (target + 0.10).min(1.0);
+        if self.spawn_ctrl.inject_timer <= 0.0 && coverage < inject_coverage_cap {
             // Inject a big enemy based on run time
             let kind = if let Some(forced) = self.config.debug_force_enemy {
                 forced
@@ -1088,9 +1378,12 @@ impl GameState {
             } else {
                 EnemyKind::Small
             };
+            // Ramp big-inject cadence over time so late runs keep must-react enemies.
+            let late_pressure = (self.run_time / 600.0).clamp(0.0, 1.0); // full effect by 10 min
+            let interval_scale = 1.0 - 0.25 * late_pressure; // up to 25% faster
             // Reset timer with small jitter
             let jitter = rand::gen_range(-0.3_f32, 0.3);
-            self.spawn_ctrl.inject_timer = BIG_INJECT_BASE_INTERVAL + jitter;
+            self.spawn_ctrl.inject_timer = BIG_INJECT_BASE_INTERVAL * interval_scale + jitter;
             self.try_place_enemy(kind);
         } else if coverage < target - COVERAGE_HYSTERESIS {
             let kind = self.config.debug_force_enemy.unwrap_or(EnemyKind::Small);
@@ -1187,12 +1480,7 @@ impl GameState {
                 enemy.shielded = true;
                 enemy.shield_hp = 1;
             }
-            let spawn_msg = format!(
-                "SPAWN {:?} hp={} speed={:.1} shielded={} x={:.1} y={:.1}",
-                enemy.kind, enemy.hp, enemy.speed, enemy.shielded, enemy.x, enemy.y
-            );
             self.enemies.push(enemy);
-            self.dlog(&spawn_msg);
             return;
         }
         // All retries failed — skip this spawn tick

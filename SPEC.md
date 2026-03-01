@@ -107,7 +107,7 @@ Wind-up times are tuning values — see `config.toml` (`windup_time_*`). A heavi
   - Breaching enemies in the zone are cleared; breach lock is released immediately.
   - Explosion does **not** affect the upgrade lane.
 - A brief movement freeze (micro-stall, ~0.25 s) is applied after explosion for impact readability.
-- The Explosive Shield upgrade is a modifier, not additive: unavailable if the player has 0 segments or if an explosive segment already exists.
+- The Explosive Shield upgrade allows only one explosive segment at a time. If collected with no shield segments and below cap, it grants a new explosive segment.
 
 ### Damage events (breach model)
 When an enemy completes its wind-up at the boundary, a **breach event** fires:
@@ -188,10 +188,11 @@ Upgrades are collected by physically touching an activated orb. Each OrbType is 
 
 ### (A) Shield
 - **Shield (+1 Shield Segment)**: adds one shield segment per collection. Skipped from the orb pool when shields are already at cap (3 segments). Up to 3 collections.
-- **Explosive Shield** *(planned, not yet implemented)*: converts one normal segment to an explosive segment. See §6 for behavior rules.
+- **Explosive Shield**: implemented as a shield modifier. It converts a normal segment to explosive when possible; if no segments exist and cap allows, it grants a new explosive segment. See §6 for behavior rules.
 
 ### (B) Drones
 - **Drone**: adds one attached drone. Drone fires in the same lane as the player and moves with the player. *(Collection wired; drone firing not yet implemented.)*
+- Until drone behavior is implemented, Drone is excluded from the normal orb spawn pool to avoid dead-value pickups (still force-testable via debug config).
 - Upgrade-lane drones (cross-lane, temporary) are deferred to a later expansion.
 
 ### (C) Offense — Shot modifiers
@@ -248,9 +249,9 @@ On elite trigger:
 ### Elite behavior
 - Moves right → left (approach window is DPS check).
 - If not killed before boundary:
-  - Occupies boundary slot and deals repeated damage ticks (like large/medium).
+  - Enters breach resolution flow at `BOUNDARY_X` (wind-up, then one breach event).
 - Elite scaling is time-only.
-- Can be pushed back 24 px by an explosive shield detonation, **unless** currently occupying a boundary slot.
+- Can be pushed back 24 px by an explosive shield detonation unless explicitly marked stagger-immune by event logic.
 
 After elite death:
 - Resume normal enemy spawning.
@@ -270,10 +271,10 @@ Purpose: rare punctuation events distinct from Elite events.
 
 ### Mini-Boss behavior
 - Moves right → left (approach window is a DPS check).
-- If not killed before boundary: occupies a boundary slot and deals repeated
-  damage ticks (like Large/Heavy).
+- If not killed before boundary: enters breach resolution flow at `BOUNDARY_X`
+  (wind-up, then one breach event).
 - Mini-Boss HP scales with time (time-based only, no rubber-banding).
-- Can be pushed back 24 px by an explosive shield detonation, **unless** currently occupying a boundary slot.
+- Can be pushed back 24 px by an explosive shield detonation unless explicitly marked stagger-immune by event logic.
 
 ### After Mini-Boss death
 - Resume normal enemy spawning.
@@ -308,7 +309,7 @@ Purpose: rare punctuation events distinct from Elite events.
 - The file must be human-readable and editable with a text editor — no rebuild required to change values.
 - Format: TOML (human-readable, supports comments, stable parsing).
 - If the file is missing or malformed, fall back to compile-time defaults silently (no crash).
-- The file should cover at least: player speed, fire rate, enemy speeds/HP, spawn intervals, scaling curves, boundary slot count, orb caps/HP, elite/mini-boss intervals, shield starting count.
+- The file should cover at least: player speed, fire rate, enemy speeds/HP, spawn intervals, scaling curves, breach timings/cooldowns, orb caps/HP, elite/mini-boss intervals, shield starting count.
 - Changes to the file take effect on next game launch (hot-reload is not required).
 
 ### In-game configuration screen

@@ -27,10 +27,9 @@ impl Player {
     }
 
     pub fn update(&mut self, axis: f32, dt: f32) {
-        self.y += axis * self.speed * dt;
         let y_min = ENEMY_LANE_TOP as f32;
         let y_max = BOTTOM_BORDER_TOP as f32 - PLAYER_HEIGHT;
-        self.y = self.y.clamp(y_min, y_max);
+        self.y = (self.y + axis * self.speed * dt).clamp(y_min, y_max);
 
         self.fire_timer -= dt;
         self.shake.update(dt);

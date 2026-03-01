@@ -16,6 +16,7 @@ mod projectile;
 mod render;
 mod shield;
 mod sprite;
+mod text;
 mod upgrade;
 
 use config::{
@@ -24,6 +25,7 @@ use config::{
 use game::GameState;
 use render::RenderPipeline;
 use sprite::Sprite;
+use text::BitmapFont;
 
 fn window_conf() -> Conf {
     Conf {
@@ -118,6 +120,13 @@ async fn main() {
         .expect("Failed to load orb sprite (seal)");
     orb_sprite_seal.set_animation(0);
 
+    let ui_font = BitmapFont::load(
+        "assets/fonts/monogram-bitmap.png",
+        "assets/fonts/monogram-bitmap.json",
+    )
+    .await
+    .expect("Failed to load Monogram bitmap font");
+
     let mut state = GameState::new(
         config,
         player_sprite,
@@ -138,6 +147,7 @@ async fn main() {
         orb_sprite_pierce,
         orb_sprite_stagger,
         orb_sprite_seal,
+        ui_font,
     );
     let pipeline = RenderPipeline::new();
 

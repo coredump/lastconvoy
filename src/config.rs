@@ -137,12 +137,12 @@ pub const SPAWN_MAX_RETRIES: usize = 5;
 pub const BIG_INJECT_BASE_INTERVAL: f32 = 2.2;
 
 // Scaling rates (fractional increase per second)
-pub const ENEMY_HP_SCALE: f32 = 0.001;
+pub const ENEMY_HP_SCALE: f32 = 0.003;
 pub const SHIELDED_FREQ_SCALE: f32 = 0.001;
 pub const SPEED_SCALE_PER_SEC: f32 = 0.0003; // +0.03%/s → 1.18× at 10min
 pub const SPEED_SCALE_CAP: f32 = 1.5; // speed never exceeds 1.5× base
-pub const HP_SCALE_HEAVY_MULT: f32 = 1.5; // heavy enemies scale HP 1.5× faster
-pub const HP_SCALE_LARGE_MULT: f32 = 2.0; // large enemies scale HP 2× faster
+pub const HP_SCALE_HEAVY_MULT: f32 = 2.0; // heavy enemies scale HP 2× faster
+pub const HP_SCALE_LARGE_MULT: f32 = 3.0; // large enemies scale HP 3× faster
 
 // Medium/Large introduction times (seconds into run)
 pub const MEDIUM_INTRO_TIME: f32 = 30.0;
@@ -160,11 +160,11 @@ pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15; // initial coverage target at t
 pub const DEBUG_LOG_GAMEPLAY: bool = false;
 pub const DEBUG_LOG_FILE: &str = "";
 
-pub const DAMAGE_LEVELS: [i32; 3] = [1, 2, 3];
+pub const DAMAGE_LEVELS: [f32; 3] = [1.0, 1.5, 1.8];
 pub const MAX_DAMAGE_LEVEL: usize = 3;
 pub const DAMAGE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
-pub const FIRE_RATE_LEVELS: [f32; 3] = [0.18, 0.14, 0.10];
+pub const FIRE_RATE_LEVELS: [f32; 3] = [0.18, 0.14, 0.12];
 pub const MAX_FIRE_RATE_LEVEL: usize = 3;
 pub const FIRE_RATE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
@@ -172,7 +172,7 @@ pub const BURST_INTERVALS: [f32; 3] = [5.0, 3.5, 2.0];
 pub const MAX_BURST_LEVEL: usize = 3;
 
 pub const MAX_PIERCE_LEVEL: usize = 3;
-pub const BURST_DAMAGE_MULTIPLIER: i32 = 2;
+pub const BURST_DAMAGE_MULTIPLIER: f32 = 2.0;
 
 pub const MAX_STAGGER_LEVEL: usize = 1;
 pub const STAGGER_KNOCKBACK_PX: f32 = 12.0;
@@ -240,14 +240,14 @@ pub struct RuntimeConfig {
 
     pub projectile_speed: Option<f32>,
 
-    pub damage_levels: Option<Vec<i32>>,
+    pub damage_levels: Option<Vec<f32>>,
     pub damage_upgrade_applies_to_drones: Option<bool>,
 
     pub fire_rate_levels: Option<Vec<f32>>,
     pub fire_rate_upgrade_applies_to_drones: Option<bool>,
 
     pub burst_intervals: Option<Vec<f32>>,
-    pub burst_damage_multiplier: Option<i32>,
+    pub burst_damage_multiplier: Option<f32>,
 
     // Debug flags
     pub explosive_shield_clear_distance: Option<f32>,
@@ -320,14 +320,14 @@ pub struct Config {
 
     pub projectile_speed: f32,
 
-    pub damage_levels: [i32; 3],
+    pub damage_levels: [f32; 3],
     pub damage_upgrade_applies_to_drones: bool,
 
     pub fire_rate_levels: [f32; 3],
     pub fire_rate_upgrade_applies_to_drones: bool,
 
     pub burst_intervals: [f32; 3],
-    pub burst_damage_multiplier: i32,
+    pub burst_damage_multiplier: f32,
 
     /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
     pub debug_all_enemies: bool,

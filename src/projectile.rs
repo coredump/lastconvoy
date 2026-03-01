@@ -54,7 +54,11 @@ impl Projectile {
 
     pub fn draw(&self) {
         let (color, w, h) = if self.is_burst {
-            (Color::new(1.0, 0.6, 0.2, 1.0), BURST_PROJECTILE_W, BURST_PROJECTILE_H)
+            (
+                Color::new(1.0, 0.6, 0.2, 1.0),
+                BURST_PROJECTILE_W,
+                BURST_PROJECTILE_H,
+            )
         } else {
             (Color::new(0.4, 0.9, 1.0, 1.0), PROJECTILE_W, PROJECTILE_H)
         };
