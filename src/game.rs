@@ -5,18 +5,20 @@ use crate::config::SHAKE_INTENSITY;
 use crate::config::{
     BIG_INJECT_BASE_INTERVAL, BOTTOM_BORDER_BOTTOM, BOTTOM_BORDER_TOP, BOUNDARY_X,
     COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH, Config,
-    DIVIDER_BOTTOM, DIVIDER_TOP, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP,
-    ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
-    ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
-    ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
-    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_BURST_LEVEL, MAX_DAMAGE_LEVEL,
-    MAX_FIRE_RATE_LEVEL, MAX_PIERCE_LEVEL, MAX_STAGGER_LEVEL, MEDIUM_INTRO_TIME, ORB_H, ORB_W,
-    PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_W,
-    SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT,
-    SPAWN_SLOT_WIDTH, SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
+    DIVIDER_BOTTOM, DIVIDER_TOP, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT,
+    DRONE_REMOTE_WIDTH, DRONE_Y_OFFSETS, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H,
+    ENEMY_HEAVY_HP, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP,
+    ENEMY_LARGE_H, ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H,
+    ENEMY_MEDIUM_HP, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP,
+    ENEMY_SMALL_SPEED, ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_ATTACHED_DRONES,
+    MAX_BURST_LEVEL, MAX_DAMAGE_LEVEL, MAX_FIRE_RATE_LEVEL, MAX_PIERCE_LEVEL, MAX_STAGGER_LEVEL,
+    MEDIUM_INTRO_TIME, ORB_H, ORB_W, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X,
+    PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_SPEED, PROJECTILE_W, SCREEN_W,
+    SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
+    SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
     UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
-use crate::drone::Drone;
+use crate::drone::{Drone, RemoteDrone};
 use crate::elite::EliteEvent;
 use crate::enemy::{Enemy, EnemyKind, EnemyState};
 use crate::input::InputState;
@@ -124,6 +126,9 @@ pub struct GameState {
     pub orb_sprite_pierce: Sprite,
     pub orb_sprite_stagger: Sprite,
     pub orb_sprite_seal: Sprite,
+    pub orb_sprite_drone_remote: Sprite,
+    pub drone_sprite: Sprite,
+    pub drone_remote_sprite: Sprite,
     pub damage_level: usize,
     pub fire_rate_level: usize,
     pub burst_level: usize,
@@ -132,6 +137,7 @@ pub struct GameState {
     pub burst_timer: f32,
     pub burst_ready: bool,
     pub drones: Vec<Drone>,
+    pub remote_drones: Vec<RemoteDrone>,
     pub boundary_ctrl: BoundaryController,
     pub elite_event: EliteEvent,
     pub input: InputState,
@@ -172,6 +178,9 @@ impl GameState {
         orb_sprite_pierce: Sprite,
         orb_sprite_stagger: Sprite,
         orb_sprite_seal: Sprite,
+        orb_sprite_drone_remote: Sprite,
+        drone_sprite: Sprite,
+        drone_remote_sprite: Sprite,
         ui_font: BitmapFont,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
@@ -208,6 +217,9 @@ impl GameState {
             orb_sprite_pierce,
             orb_sprite_stagger,
             orb_sprite_seal,
+            orb_sprite_drone_remote,
+            drone_sprite,
+            drone_remote_sprite,
             damage_level: 0,
             fire_rate_level: 0,
             burst_level: 0,
@@ -216,6 +228,7 @@ impl GameState {
             burst_timer: 0.0,
             burst_ready: false,
             drones: Vec::new(),
+            remote_drones: Vec::new(),
             boundary_ctrl: BoundaryController::new(),
             elite_event: EliteEvent::new(),
             input: InputState::new(),
@@ -298,6 +311,7 @@ impl GameState {
         self.projectiles.clear();
         self.orbs.clear();
         self.drones.clear();
+        self.remote_drones.clear();
         self.damage_level = 0;
         self.fire_rate_level = 0;
         self.player.fire_rate = self.config.fire_rate_levels[0];
@@ -472,7 +486,9 @@ impl GameState {
 
         // Player movement
         let axis = self.input.axis;
-        self.player.update(axis, dt);
+        let has_top_drone = self.drones.len() >= 1;
+        let has_bottom_drone = self.drones.len() >= 2;
+        self.player.update(axis, dt, has_top_drone, has_bottom_drone);
 
         // Burst timer
         if self.burst_level > 0 {
@@ -513,13 +529,20 @@ impl GameState {
         let mut stagger_targets: Vec<usize> = Vec::new();
         let base_dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
         for p in &mut self.projectiles {
-            if !p.alive || p.source != ProjectileSource::Player {
+            if !p.alive {
                 continue;
             }
-            let player_dmg = (if p.is_burst {
-                base_dmg * self.config.burst_damage_multiplier
+            let proj_dmg_base = if matches!(p.source, ProjectileSource::Drone | ProjectileSource::RemoteDrone)
+                && !self.config.damage_upgrade_applies_to_drones
+            {
+                self.config.damage_levels[0]
             } else {
                 base_dmg
+            };
+            let proj_dmg = (if p.is_burst {
+                proj_dmg_base * self.config.burst_damage_multiplier
+            } else {
+                proj_dmg_base
             })
             .round() as i32;
             for (ei, e) in self.enemies.iter_mut().enumerate() {
@@ -537,7 +560,7 @@ impl GameState {
                     e.height,
                 ) {
                     p.hit_enemies.push(e.id);
-                    e.take_damage(player_dmg);
+                    e.take_damage(proj_dmg);
                     if !e.is_dead()
                         && !e.stagger_immune
                         && self.stagger_level > 0
@@ -545,7 +568,7 @@ impl GameState {
                             e.kind,
                             EnemyKind::Small | EnemyKind::Medium | EnemyKind::Heavy
                         )
-                        && !(e.kind == EnemyKind::Small && e.hp <= 3 * player_dmg)
+                        && !(e.kind == EnemyKind::Small && e.hp <= 3 * proj_dmg)
                     {
                         stagger_targets.push(ei);
                     }
@@ -805,8 +828,12 @@ impl GameState {
                 if !shields_full {
                     pool.push((OrbType::Shield, 1));
                 }
-                // Drone track is excluded from normal orb rolls until P1.10 implements
-                // drone update/firing behavior; dead-value upgrades flatten progression.
+                let drone_remaining =
+                    (MAX_ATTACHED_DRONES.saturating_sub(self.drones.len())) as u32;
+                if drone_remaining > 0 {
+                    pool.push((OrbType::Drone, drone_remaining));
+                }
+                pool.push((OrbType::DroneRemote, 1));
                 let fire_rate_remaining = (MAX_FIRE_RATE_LEVEL - self.fire_rate_level) as u32;
                 if fire_rate_remaining > 0 {
                     pool.push((OrbType::FireRate, fire_rate_remaining));
@@ -852,7 +879,7 @@ impl GameState {
             }
         }
 
-        // Projectile-orb collision (player and drone shots).
+        // Projectile-orb collision — all shots interact with orbs equally.
         // Shots are consumed on contact with any orb regardless of phase.
         // Inactive orbs also receive a hit that advances their activation progress.
         for p in &mut self.projectiles {
@@ -879,9 +906,14 @@ impl GameState {
             }
         }
 
-        // Orb movement
+        // Orb movement + activation detection (used by remote drone despawn).
+        let mut orb_activated_this_frame = false;
         for o in &mut self.orbs {
+            let was_inactive = o.phase == OrbPhase::Inactive;
             o.update(dt);
+            if was_inactive && o.phase == OrbPhase::Active {
+                orb_activated_this_frame = true;
+            }
         }
 
         // Player-orb collection (active orbs only).
@@ -997,7 +1029,25 @@ impl GameState {
                         None
                     }
                 }
-                OrbType::Drone => None,
+                OrbType::Drone => {
+                    if self.drones.len() < MAX_ATTACHED_DRONES {
+                        let index = self.drones.len();
+                        let dy = DRONE_Y_OFFSETS[index.min(DRONE_Y_OFFSETS.len() - 1)];
+                        self.drones
+                            .push(Drone::new(self.player.x, self.player.y + dy));
+                        self.dlog(&format!("ORB_COLLECT Drone index={}", index));
+                        Some("+DRONE")
+                    } else {
+                        None
+                    }
+                }
+                OrbType::DroneRemote => {
+                    let lane_mid = (UPGRADE_LANE_TOP + UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0;
+                    let rd_y = lane_mid - DRONE_REMOTE_HEIGHT / 2.0;
+                    self.remote_drones.push(RemoteDrone::new(BOUNDARY_X, rd_y));
+                    self.dlog("ORB_COLLECT DroneRemote");
+                    Some("+REMOTE")
+                }
             };
 
             if let Some(tag) = popup_tag {
@@ -1011,15 +1061,74 @@ impl GameState {
             orb_cx >= player_cx && !o.is_collected()
         });
 
+        // Update attached drones: follow player, fire into enemy lane.
+        let drone_fire_rate = if self.config.fire_rate_upgrade_applies_to_drones {
+            self.player.fire_rate
+        } else {
+            DRONE_FIRE_RATE
+        };
+        let drone_pierce = if self.config.damage_upgrade_applies_to_drones {
+            self.pierce_level as i32
+        } else {
+            0
+        };
+        let mut drone_shots: Vec<Projectile> = Vec::new();
+        for (i, drone) in self.drones.iter_mut().enumerate() {
+            let dy = DRONE_Y_OFFSETS[i.min(DRONE_Y_OFFSETS.len() - 1)];
+            drone.x = self.player.x;
+            drone.y = self.player.y + dy;
+            drone.fire_timer -= dt;
+            if drone.fire_timer <= 0.0 {
+                drone.fire_timer = drone_fire_rate;
+                let proj_x = self.player.x + PLAYER_WIDTH;
+                let proj_y = drone.y + DRONE_HEIGHT / 2.0 - PROJECTILE_H / 2.0;
+                drone_shots.push(Projectile::new(
+                    proj_x,
+                    proj_y,
+                    self.config.projectile_speed,
+                    ProjectileSource::Drone,
+                    false,
+                    drone_pierce,
+                ));
+            }
+        }
+        self.projectiles.extend(drone_shots);
+
+        // Update remote drones: stationary, fire rightward continuously.
+        // Despawn immediately when any orb activates this frame.
+        if orb_activated_this_frame {
+            self.remote_drones.clear();
+        } else {
+            let mut rd_shots: Vec<Projectile> = Vec::new();
+            for rd in &mut self.remote_drones {
+                rd.fire_timer -= dt;
+                if rd.fire_timer <= 0.0 {
+                    rd.fire_timer = DRONE_FIRE_RATE;
+                    rd_shots.push(Projectile::new(
+                        rd.x + DRONE_REMOTE_WIDTH,
+                        rd.y + DRONE_REMOTE_HEIGHT / 2.0 - PROJECTILE_H / 2.0,
+                        PROJECTILE_SPEED,
+                        ProjectileSource::RemoteDrone,
+                        false,
+                        0,
+                    ));
+                }
+            }
+            self.projectiles.extend(rd_shots);
+        }
+
         // Advance sprite animations
         self.orb_sprite_damage.update(dt);
         self.orb_sprite_shield.update(dt);
         self.orb_sprite_drone.update(dt);
+        self.orb_sprite_drone_remote.update(dt);
         self.orb_sprite_explosive.update(dt);
         self.orb_sprite_fire_rate.update(dt);
         self.orb_sprite_burst.update(dt);
         self.orb_sprite_pierce.update(dt);
         self.orb_sprite_stagger.update(dt);
+        self.drone_sprite.update(dt);
+        self.drone_remote_sprite.update(dt);
         self.shot_sprite.update(dt);
         self.burst_shot_sprite.update(dt);
         self.player_sprite.update(dt);
@@ -1048,6 +1157,16 @@ impl GameState {
         }
         self.player_sprite
             .draw(self.player.x + self.player.shake.offset_x(), self.player.y);
+        for (i, drone) in self.drones.iter().enumerate() {
+            if i == 1 {
+                self.drone_sprite.draw_flipped_y(drone.x, drone.y);
+            } else {
+                self.drone_sprite.draw(drone.x, drone.y);
+            }
+        }
+        for rd in &self.remote_drones {
+            self.drone_remote_sprite.draw(rd.x, rd.y);
+        }
         for p in &self.projectiles {
             let sprite = if p.is_burst {
                 &self.burst_shot_sprite
@@ -1122,6 +1241,7 @@ impl GameState {
                 OrbType::Damage => &mut self.orb_sprite_damage,
                 OrbType::Shield => &mut self.orb_sprite_shield,
                 OrbType::Drone => &mut self.orb_sprite_drone,
+                OrbType::DroneRemote => &mut self.orb_sprite_drone_remote,
                 OrbType::Explosive => &mut self.orb_sprite_explosive,
                 OrbType::FireRate => &mut self.orb_sprite_fire_rate,
                 OrbType::Pierce => &mut self.orb_sprite_pierce,
@@ -1176,7 +1296,7 @@ impl GameState {
         self.ui_font.draw(
             title,
             title_x,
-            70.0,
+            60.0,
             2,
             Color::from_rgba(255, 90, 90, 255),
             1,
@@ -1187,7 +1307,7 @@ impl GameState {
         self.ui_font.draw(
             &time_line,
             time_x,
-            92.0,
+            88.0,
             2,
             Color::from_rgba(245, 245, 245, 255),
             1,
@@ -1198,7 +1318,7 @@ impl GameState {
         self.ui_font.draw(
             &kb_line,
             kb_x,
-            108.0,
+            116.0,
             1,
             Color::from_rgba(220, 220, 220, 255),
             1,
@@ -1209,7 +1329,7 @@ impl GameState {
         self.ui_font.draw(
             restart,
             restart_x,
-            124.0,
+            134.0,
             1,
             Color::from_rgba(240, 240, 180, 255),
             1,
@@ -1219,7 +1339,7 @@ impl GameState {
         self.ui_font.draw(
             restart2,
             restart2_x,
-            134.0,
+            150.0,
             1,
             Color::from_rgba(240, 240, 180, 255),
             1,

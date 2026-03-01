@@ -177,6 +177,18 @@ pub const BURST_DAMAGE_MULTIPLIER: f32 = 2.0;
 pub const MAX_STAGGER_LEVEL: usize = 1;
 pub const STAGGER_KNOCKBACK_PX: f32 = 12.0;
 
+pub const MAX_ATTACHED_DRONES: usize = 2;
+/// Base fire interval for attached drones (seconds). Upgraded by FIRE_RATE_UPGRADE_APPLIES_TO_DRONES.
+pub const DRONE_FIRE_RATE: f32 = 0.18;
+pub const DRONE_WIDTH: f32 = 24.0;
+pub const DRONE_HEIGHT: f32 = 8.0;
+pub const DRONE_REMOTE_WIDTH: f32 = 24.0;
+pub const DRONE_REMOTE_HEIGHT: f32 = 10.0;
+/// Y offsets from player.y for each attached drone slot (negative = above player).
+pub const DRONE_Y_OFFSETS: [f32; 2] = [-10.0, 18.0];
+/// Extra pixel gap between the player/drone stack and the lane boundaries.
+pub const PLAYER_LANE_PADDING: f32 = 2.0;
+
 pub const EXPLOSIVE_SHIELD_CLEAR_DISTANCE: f32 = 80.0;
 
 // ---------------------------------------------------------------------------
@@ -462,6 +474,7 @@ impl Config {
                     "pierce" => Some(OrbType::Pierce),
                     "stagger" => Some(OrbType::Stagger),
                     "explosive" => Some(OrbType::Explosive),
+                    "droneremote" => Some(OrbType::DroneRemote),
                     _ => None,
                 }
             }),

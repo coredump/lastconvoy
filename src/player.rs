@@ -1,4 +1,7 @@
-use crate::config::{BOTTOM_BORDER_TOP, ENEMY_LANE_TOP, PLAYER_HEIGHT};
+use crate::config::{
+    BOTTOM_BORDER_TOP, DRONE_HEIGHT, DRONE_Y_OFFSETS, ENEMY_LANE_TOP, PLAYER_HEIGHT,
+    PLAYER_LANE_PADDING,
+};
 use crate::sprite::ShakeEffect;
 
 pub struct Player {
@@ -26,9 +29,19 @@ impl Player {
         }
     }
 
-    pub fn update(&mut self, axis: f32, dt: f32) {
-        let y_min = ENEMY_LANE_TOP as f32;
-        let y_max = BOTTOM_BORDER_TOP as f32 - PLAYER_HEIGHT;
+    pub fn update(&mut self, axis: f32, dt: f32, has_top_drone: bool, has_bottom_drone: bool) {
+        let top_drone_overhang = if has_top_drone {
+            -DRONE_Y_OFFSETS[0].min(0.0) // positive: how far above player the drone extends
+        } else {
+            0.0
+        };
+        let bottom_drone_overhang = if has_bottom_drone {
+            (DRONE_Y_OFFSETS[1] + DRONE_HEIGHT - PLAYER_HEIGHT).max(0.0)
+        } else {
+            0.0
+        };
+        let y_min = ENEMY_LANE_TOP as f32 + top_drone_overhang + PLAYER_LANE_PADDING;
+        let y_max = BOTTOM_BORDER_TOP as f32 - PLAYER_HEIGHT - bottom_drone_overhang - PLAYER_LANE_PADDING;
         self.y = (self.y + axis * self.speed * dt).clamp(y_min, y_max);
 
         self.fire_timer -= dt;
