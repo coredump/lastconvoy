@@ -1,0 +1,30 @@
+{ "frames": {
+   "upgrade track_0": {
+    "frame": { "x": 0, "y": 0, "w": 50, "h": 21 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 50, "h": 21 },
+    "sourceSize": { "w": 50, "h": 21 },
+    "duration": 100
+   }
+ },
+ "meta": {
+  "app": "http://www.aseprite.org/",
+  "version": "1.3.16.1-dev",
+  "image": "upgrade_track.png",
+  "format": "RGBA8888",
+  "size": { "w": 50, "h": 21 },
+  "scale": "1",
+  "frameTags": [
+  ],
+  "layers": [
+   { "name": "Layer 1", "opacity": 255, "blendMode": "normal" },
+   { "name": "Layer 3", "opacity": 255, "blendMode": "normal" },
+   { "name": "Layer 2", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
+   { "name": "rail", "color": "#0000ffff", "keys": [{ "frame": 0, "bounds": {"x": 40, "y": 0, "w": 10, "h": 21 } }] },
+   { "name": "front", "color": "#0000ffff", "keys": [{ "frame": 0, "bounds": {"x": 0, "y": 0, "w": 40, "h": 21 } }] }
+  ]
+ }
+}
