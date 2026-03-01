@@ -77,14 +77,19 @@ impl ShieldSystem {
     }
 
     /// Convert the last non-explosive segment to explosive.
-    /// If no normal segments exist and there is space, grant a new explosive segment.
-    /// Has no effect if already at max segments and all are explosive.
+    /// If an explosive segment already exists, the extra explosive orb is treated as a normal shield.
+    /// INVARIANT: called at most once per frame (see game.rs orb-collection comment).
     pub fn convert_to_explosive(&mut self) {
+        // Only one explosive segment is meaningful. Extra explosive orbs become normal shields.
+        if self.has_explosive() {
+            self.add_segments(1);
+            return;
+        }
         // Find a non-explosive segment (search from end) and convert it.
         if let Some(seg) = self.segments.iter_mut().rev().find(|s| !s.explosive) {
             seg.explosive = true;
         } else if self.segments.len() < MAX_SHIELD_SEGMENTS {
-            // No normal segments exist; grant a fresh explosive segment.
+            // No segments at all; grant a fresh explosive one.
             self.segments.push(ShieldSegment::new_explosive());
         }
     }

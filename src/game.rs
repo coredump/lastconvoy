@@ -725,7 +725,11 @@ impl GameState {
             o.update(dt);
         }
 
-        // Player-orb collection (active orbs only)
+        // Player-orb collection (active orbs only).
+        // INVARIANT: at most one orb of each type may be collected per frame.
+        // Spawn spacing and orb speed make simultaneous same-type collection impossible in
+        // normal gameplay. Logic below is NOT designed to handle multiples correctly —
+        // explosive in particular calls convert_to_explosive() only once regardless of count.
         let mut shield_grants = 0u32;
         let mut damage_collected = 0u32;
         let mut fire_rate_collected = 0u32;
@@ -975,7 +979,9 @@ impl GameState {
 
         if self.spawn_ctrl.inject_timer <= 0.0 && coverage < target {
             // Inject a big enemy based on run time
-            let kind = if self.config.debug_all_enemies || self.run_time >= LARGE_INTRO_TIME {
+            let kind = if let Some(forced) = self.config.debug_force_enemy {
+                forced
+            } else if self.config.debug_all_enemies || self.run_time >= LARGE_INTRO_TIME {
                 let r = rand::gen_range(0usize, 3);
                 [EnemyKind::Medium, EnemyKind::Heavy, EnemyKind::Large][r]
             } else if self.run_time >= HEAVY_INTRO_TIME {
@@ -991,7 +997,8 @@ impl GameState {
             self.spawn_ctrl.inject_timer = BIG_INJECT_BASE_INTERVAL + jitter;
             self.try_place_enemy(kind);
         } else if coverage < target - COVERAGE_HYSTERESIS {
-            self.try_place_enemy(EnemyKind::Small);
+            let kind = self.config.debug_force_enemy.unwrap_or(EnemyKind::Small);
+            self.try_place_enemy(kind);
         }
     }
 

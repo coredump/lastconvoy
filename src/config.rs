@@ -1,3 +1,4 @@
+use crate::enemy::EnemyKind;
 use crate::orb::OrbType;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -225,6 +226,7 @@ pub struct RuntimeConfig {
     pub debug_log_gameplay: Option<bool>,
     pub debug_log_file: Option<String>,
     pub debug_force_orb: Option<String>,
+    pub debug_force_enemy: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -299,6 +301,8 @@ pub struct Config {
 
     /// Debug: if Some, only this orb type spawns (bypasses level gates).
     pub debug_force_orb: Option<OrbType>,
+    /// Debug: if Some, only this enemy kind spawns (bypasses intro timers and random selection).
+    pub debug_force_enemy: Option<EnemyKind>,
 }
 
 impl Config {
@@ -415,6 +419,15 @@ impl Config {
                     "stagger" => Some(OrbType::Stagger),
                     "explosive" => Some(OrbType::Explosive),
                     _ => None,
+                }
+            }),
+            debug_force_enemy: rt.debug_force_enemy.as_deref().and_then(|s| {
+                match s.to_lowercase().as_str() {
+                    "small" => Some(EnemyKind::Small),
+                    "medium" => Some(EnemyKind::Medium),
+                    "heavy" => Some(EnemyKind::Heavy),
+                    "large" => Some(EnemyKind::Large),
+                    _ => None, // Elite is event-only; not allowed here
                 }
             }),
         }
