@@ -10,3 +10,6 @@ config.toml
 config.ron
 .claude/
 .serena/
+.playright-mcp
+wasm-check*
+console-*
