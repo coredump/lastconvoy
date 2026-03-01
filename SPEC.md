@@ -187,17 +187,19 @@ Upgrades are collected by physically touching an activated orb. Each OrbType is 
 - **Drone**: adds one attached drone. Drone fires in the same lane as the player and moves with the player.
 - **DroneRemote**: spawns a temporary drone in the upgrade lane that seeks and fires leftward at inactive orbs to accelerate their activation (Phase 1 only). Despawns after TTL (`DRONE_REMOTE_TTL`).
 
-### (C) Offense — Shot modifiers
-All shot modifiers apply to player shots only at present; drone interaction is tracked per modifier.
+### (C) Offense — Temporary buffs
+Offense orbs are temporary buffs, not permanent levels. Re-collecting an active offense buff refreshes its timer; it does not stack potency.
 
-- **Damage** (3 levels): increases flat damage per hit. Level 1 = 1, Level 2 = 2, Level 3 = 3. Orb removed from pool at max level.
-- **FireRate** (3 levels): decreases shot interval. Level 1 = 0.18 s, Level 2 = 0.14 s, Level 3 = 0.10 s. Orb removed from pool at max level.
-- **Burst / Charge Burst** (3 levels): on a separate cooldown timer, the next shot deals double damage. Cooldown interval per level: 5.0 s, 3.5 s, 2.0 s. Orb removed from pool at max level.
-- **Pierce** (3 levels): projectile passes through up to N additional enemies (level = max enemies pierced beyond the first). A shot cannot hit the same enemy more than once. Orb removed from pool at max level.
-- **Stagger Shot** (1 level): on hit, instantly displaces the enemy rightward by up to 12 px. Affects Small, Medium, and Heavy only — does NOT affect Large, Elite, or Mini-Boss. Applies **at most once per enemy** (subsequent hits do not knockback). Displacement is clamped by the nearest enemy to the right in the same y-band (zero movement if already touching). Orb removed from pool at max level.
+- **Damage Buff**: while active, increases flat projectile damage.
+- **FireRate Buff**: while active, decreases player shot interval.
+- **Burst Buff**: while active, periodically marks the next shot as a burst shot (double-damage multiplier).
+- **Pierce Buff**: while active, projectiles pass through additional enemies. A shot cannot hit the same enemy more than once.
+- **Stagger Buff**: while active, hits displace Small/Medium/Heavy enemies rightward up to 12 px. Does not affect Large/Elite/Mini-Boss.
+
+Shot modifiers apply to player shots and can also apply to attached drone shots when the corresponding config toggle is enabled.
 
 **Pool rules:**
-- Orb types at max level are excluded from the spawn pool automatically.
+- Offense orb types with an active buff are excluded from the spawn pool until that buff expires.
 - Shield is excluded when shields are at cap.
 - No projectile size scaling.
 

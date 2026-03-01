@@ -134,17 +134,17 @@ If anything conflicts:
 - Orb spawning continues during elite events.
 - **Implementation status**: Orb struct with OrbPhase::Inactive/Active; take_hit() logic correct; spawning, movement, collision, Active-only collection all implemented. Needs gameplay verification.
 
-### P1.9 Upgrade tracks ✓ MOSTLY DONE (Drone effect pending; Explosive Shield polish pending)
+### P1.9 Upgrade tracks ✓ UPDATED (offense converted to temporary buffs)
 Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - **Shield**: +1 shield per collection (up to cap 3). Skipped from pool when full. ✓
-- **Damage** (3 levels): flat damage per shot scales with level. Levels: [1.0, 1.5, 1.8] f32; converted to i32 via `.round()` at hit. ✓
-- **FireRate** (3 levels): shot interval decreases per level (level 3: 0.12 s). ✓
-- **Burst** (3 levels): periodic double-damage shot on separate cooldown; burst multiplier 2.0 f32. ✓
-- **Pierce** (3 levels): shot passes through N additional enemies; same-enemy double-hit bug fixed. ✓
-- **Stagger** (1 level): on hit, knocks back Small/Medium/Heavy (including breaching enemies). ✓
+- **Damage buff**: temporary flat damage boost while active (refresh on re-collect; no tier stacking). ✓
+- **FireRate buff**: temporary shot-interval reduction while active (refresh on re-collect; no tier stacking). ✓
+- **Burst buff**: temporary periodic burst-shot readiness while active (refresh on re-collect; no tier stacking). ✓
+- **Pierce buff**: temporary extra pierce while active; same-enemy double-hit bug remains fixed. ✓
+- **Stagger buff**: temporary knockback on hit for Small/Medium/Heavy while active. ✓
 - **Drone**: in normal orb spawn pool; attached drone implemented and active. ✓
 - **Explosive Shield**: core behavior implemented; remaining polish/verification tracked in P1.9b. ⚠
-- **Weighted orb pool**: orb type chosen by weight = remaining upgrade levels (leveled types) or 1 (single-level). Replaces uniform random. ✓
+- **Pool gating**: active offense buff types are excluded from orb spawn pool until expiry; Shield/Explosive/Drone gates unchanged. ✓
 
 ### P1.9b Explosive Shield ⚠ PARTIAL
 - Detonation logic implemented: `trigger_explosive_shield()` kills non-elite enemies in zone, pushes Large/Elite back, clears breach group, applies micro-stall. ✓

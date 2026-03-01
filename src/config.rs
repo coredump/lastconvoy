@@ -160,21 +160,25 @@ pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15; // initial coverage target at t
 pub const DEBUG_LOG_GAMEPLAY: bool = false;
 pub const DEBUG_LOG_FILE: &str = "";
 
-pub const DAMAGE_LEVELS: [f32; 3] = [1.0, 1.5, 1.8];
-pub const MAX_DAMAGE_LEVEL: usize = 3;
+pub const BUFF_DAMAGE_DURATION: f32 = 14.0;
+pub const BUFF_FIRE_RATE_DURATION: f32 = 12.0;
+pub const BUFF_BURST_DURATION: f32 = 16.0;
+pub const BUFF_PIERCE_DURATION: f32 = 10.0;
+pub const BUFF_STAGGER_DURATION: f32 = 12.0;
+
+pub const BUFF_DAMAGE_VALUE: f32 = 1.5;
+pub const BUFF_FIRE_RATE_VALUE: f32 = 0.14;
+pub const BUFF_BURST_INTERVAL: f32 = 3.5;
+pub const BUFF_PIERCE_VALUE: i32 = 1;
+pub const BUFF_STAGGER_ENABLED: bool = true;
+
+pub const BASE_DAMAGE_VALUE: f32 = 1.0;
 pub const DAMAGE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
-pub const FIRE_RATE_LEVELS: [f32; 3] = [0.18, 0.14, 0.12];
-pub const MAX_FIRE_RATE_LEVEL: usize = 3;
+pub const BASE_FIRE_RATE_VALUE: f32 = 0.18;
 pub const FIRE_RATE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
-pub const BURST_INTERVALS: [f32; 3] = [5.0, 3.5, 2.0];
-pub const MAX_BURST_LEVEL: usize = 3;
-
-pub const MAX_PIERCE_LEVEL: usize = 3;
 pub const BURST_DAMAGE_MULTIPLIER: f32 = 2.0;
-
-pub const MAX_STAGGER_LEVEL: usize = 1;
 pub const STAGGER_KNOCKBACK_PX: f32 = 12.0;
 
 pub const MAX_ATTACHED_DRONES: usize = 2;
@@ -252,13 +256,22 @@ pub struct RuntimeConfig {
 
     pub projectile_speed: Option<f32>,
 
-    pub damage_levels: Option<Vec<f32>>,
+    pub buff_damage_duration: Option<f32>,
+    pub buff_fire_rate_duration: Option<f32>,
+    pub buff_burst_duration: Option<f32>,
+    pub buff_pierce_duration: Option<f32>,
+    pub buff_stagger_duration: Option<f32>,
+
+    pub buff_damage_value: Option<f32>,
+    pub buff_fire_rate_value: Option<f32>,
+    pub buff_burst_interval: Option<f32>,
+    pub buff_pierce_value: Option<i32>,
+    pub buff_stagger_enabled: Option<bool>,
+
     pub damage_upgrade_applies_to_drones: Option<bool>,
 
-    pub fire_rate_levels: Option<Vec<f32>>,
     pub fire_rate_upgrade_applies_to_drones: Option<bool>,
 
-    pub burst_intervals: Option<Vec<f32>>,
     pub burst_damage_multiplier: Option<f32>,
 
     // Debug flags
@@ -332,13 +345,22 @@ pub struct Config {
 
     pub projectile_speed: f32,
 
-    pub damage_levels: [f32; 3],
+    pub buff_damage_duration: f32,
+    pub buff_fire_rate_duration: f32,
+    pub buff_burst_duration: f32,
+    pub buff_pierce_duration: f32,
+    pub buff_stagger_duration: f32,
+
+    pub buff_damage_value: f32,
+    pub buff_fire_rate_value: f32,
+    pub buff_burst_interval: f32,
+    pub buff_pierce_value: i32,
+    pub buff_stagger_enabled: bool,
+
     pub damage_upgrade_applies_to_drones: bool,
 
-    pub fire_rate_levels: [f32; 3],
     pub fire_rate_upgrade_applies_to_drones: bool,
 
-    pub burst_intervals: [f32; 3],
     pub burst_damage_multiplier: f32,
 
     /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
@@ -419,38 +441,28 @@ impl Config {
 
             projectile_speed: rt.projectile_speed.unwrap_or(PROJECTILE_SPEED),
 
-            damage_levels: {
-                let v = rt.damage_levels.unwrap_or_default();
-                if v.len() == 3 {
-                    [v[0], v[1], v[2]]
-                } else {
-                    DAMAGE_LEVELS
-                }
-            },
+            buff_damage_duration: rt.buff_damage_duration.unwrap_or(BUFF_DAMAGE_DURATION),
+            buff_fire_rate_duration: rt
+                .buff_fire_rate_duration
+                .unwrap_or(BUFF_FIRE_RATE_DURATION),
+            buff_burst_duration: rt.buff_burst_duration.unwrap_or(BUFF_BURST_DURATION),
+            buff_pierce_duration: rt.buff_pierce_duration.unwrap_or(BUFF_PIERCE_DURATION),
+            buff_stagger_duration: rt.buff_stagger_duration.unwrap_or(BUFF_STAGGER_DURATION),
+
+            buff_damage_value: rt.buff_damage_value.unwrap_or(BUFF_DAMAGE_VALUE),
+            buff_fire_rate_value: rt.buff_fire_rate_value.unwrap_or(BUFF_FIRE_RATE_VALUE),
+            buff_burst_interval: rt.buff_burst_interval.unwrap_or(BUFF_BURST_INTERVAL),
+            buff_pierce_value: rt.buff_pierce_value.unwrap_or(BUFF_PIERCE_VALUE),
+            buff_stagger_enabled: rt.buff_stagger_enabled.unwrap_or(BUFF_STAGGER_ENABLED),
+
             damage_upgrade_applies_to_drones: rt
                 .damage_upgrade_applies_to_drones
                 .unwrap_or(DAMAGE_UPGRADE_APPLIES_TO_DRONES),
 
-            fire_rate_levels: {
-                let v = rt.fire_rate_levels.unwrap_or_default();
-                if v.len() == 3 {
-                    [v[0], v[1], v[2]]
-                } else {
-                    FIRE_RATE_LEVELS
-                }
-            },
             fire_rate_upgrade_applies_to_drones: rt
                 .fire_rate_upgrade_applies_to_drones
                 .unwrap_or(FIRE_RATE_UPGRADE_APPLIES_TO_DRONES),
 
-            burst_intervals: {
-                let v = rt.burst_intervals.unwrap_or_default();
-                if v.len() == 3 {
-                    [v[0], v[1], v[2]]
-                } else {
-                    BURST_INTERVALS
-                }
-            },
             burst_damage_multiplier: rt
                 .burst_damage_multiplier
                 .unwrap_or(BURST_DAMAGE_MULTIPLIER),

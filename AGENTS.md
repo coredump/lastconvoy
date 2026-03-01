@@ -81,13 +81,12 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - No tests in Phase 1. Tests allowed Phase 2+.
 
 ## Phase 1 status
-P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 MOSTLY DONE (Shield/Damage/FireRate/Burst/Pierce/Stagger implemented; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). HP scaling bug fixed (`.ceil()` → `.round().max(1.0)`).
+P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 UPDATED (offense tracks converted from permanent levels to temporary refreshable buffs; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). HP scaling bug fixed (`.ceil()` → `.round().max(1.0)`).
 
 Recent additions (balance + UI pass):
-- **Damage type**: enemy damage is now `f32` (fractional). Damage levels: [1.0, 1.5, 1.8]; burst multiplier: 2.0 (f32). Converted to `i32` via `.round() as i32` at hit time.
+- **Offense buff model**: Damage/FireRate/Burst/Pierce/Stagger are now temporary buffs with per-type durations and fixed magnitudes; collecting an active buff refreshes timer (no tier stacking).
 - **HP scaling**: tripled (0.001 → 0.003 per second); heavy/large multipliers increased.
-- **Fire rate**: level 3 slowed slightly (interval 0.10 → 0.12 s).
-- **Weighted orb pool**: orb type selected by weight = remaining upgrade levels for leveled types, 1 for single-level types (replaces uniform random).
+- **Orb pool gating**: active offense buff types are excluded from spawn pool until expiry (Shield/Explosive/Drone rules unchanged).
 - **Spawn pressure**: big-enemy inject coverage slack +0.10 over target; cadence ramp accelerates up to 25% faster by 10 min.
 - **UI/HUD systems** (new `src/text.rs` module): BitmapFont bitmap text renderer (Monogram assets), floating upgrade-name text, upgrade icon HUD, run timer HUD, game over screen with time/kills/breaches stats.
 - **Balance telemetry**: `dps_estimate()` + `large_ttk()` logged every 30 s; kills/breaches counters tracked in `GameState`.

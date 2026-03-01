@@ -3,15 +3,14 @@ use macroquad::prelude::*;
 use crate::config::SHAKE_DURATION;
 use crate::config::SHAKE_INTENSITY;
 use crate::config::{
-    BIG_INJECT_BASE_INTERVAL, BOTTOM_BORDER_BOTTOM, BOTTOM_BORDER_TOP, BOUNDARY_X,
-    COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH, Config,
-    DIVIDER_BOTTOM, DIVIDER_TOP, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT,
+    BASE_DAMAGE_VALUE, BIG_INJECT_BASE_INTERVAL, BOTTOM_BORDER_BOTTOM, BOTTOM_BORDER_TOP,
+    BOUNDARY_X, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH,
+    Config, DIVIDER_BOTTOM, DIVIDER_TOP, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT,
     DRONE_REMOTE_WIDTH, DRONE_Y_OFFSETS, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H,
     ENEMY_HEAVY_HP, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP,
     ENEMY_LARGE_H, ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H,
     ENEMY_MEDIUM_HP, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP,
     ENEMY_SMALL_SPEED, ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_ATTACHED_DRONES,
-    MAX_BURST_LEVEL, MAX_DAMAGE_LEVEL, MAX_FIRE_RATE_LEVEL, MAX_PIERCE_LEVEL, MAX_STAGGER_LEVEL,
     MEDIUM_INTRO_TIME, ORB_H, ORB_W, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X,
     PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_SPEED, PROJECTILE_W, SCREEN_W,
     SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
@@ -32,6 +31,8 @@ use crate::text::BitmapFont;
 
 const FLOATING_TEXT_TTL: f32 = 0.8;
 const FLOATING_TEXT_VY: f32 = -18.0;
+const HUD_TIMER_BAR_W: f32 = 12.0;
+const HUD_TIMER_BAR_H: f32 = 2.0;
 
 pub struct FloatingText {
     pub text: String,
@@ -129,11 +130,11 @@ pub struct GameState {
     pub orb_sprite_drone_remote: Sprite,
     pub drone_sprite: Sprite,
     pub drone_remote_sprite: Sprite,
-    pub damage_level: usize,
-    pub fire_rate_level: usize,
-    pub burst_level: usize,
-    pub pierce_level: usize,
-    pub stagger_level: usize,
+    pub damage_buff_t: f32,
+    pub fire_rate_buff_t: f32,
+    pub burst_buff_t: f32,
+    pub pierce_buff_t: f32,
+    pub stagger_buff_t: f32,
     pub burst_timer: f32,
     pub burst_ready: bool,
     pub drones: Vec<Drone>,
@@ -220,11 +221,11 @@ impl GameState {
             orb_sprite_drone_remote,
             drone_sprite,
             drone_remote_sprite,
-            damage_level: 0,
-            fire_rate_level: 0,
-            burst_level: 0,
-            pierce_level: 0,
-            stagger_level: 0,
+            damage_buff_t: 0.0,
+            fire_rate_buff_t: 0.0,
+            burst_buff_t: 0.0,
+            pierce_buff_t: 0.0,
+            stagger_buff_t: 0.0,
             burst_timer: 0.0,
             burst_ready: false,
             drones: Vec::new(),
@@ -312,12 +313,12 @@ impl GameState {
         self.orbs.clear();
         self.drones.clear();
         self.remote_drones.clear();
-        self.damage_level = 0;
-        self.fire_rate_level = 0;
-        self.player.fire_rate = self.config.fire_rate_levels[0];
-        self.burst_level = 0;
-        self.pierce_level = 0;
-        self.stagger_level = 0;
+        self.damage_buff_t = 0.0;
+        self.fire_rate_buff_t = 0.0;
+        self.player.fire_rate = self.config.player_fire_rate;
+        self.burst_buff_t = 0.0;
+        self.pierce_buff_t = 0.0;
+        self.stagger_buff_t = 0.0;
         self.burst_timer = 0.0;
         self.burst_ready = false;
         self.elite_event = EliteEvent::new();
@@ -339,10 +340,62 @@ impl GameState {
         }
     }
 
-    /// Compute estimated sustained DPS at current upgrade levels (no burst, no pierce).
+    fn damage_buff_active(&self) -> bool {
+        self.damage_buff_t > 0.0
+    }
+
+    fn fire_rate_buff_active(&self) -> bool {
+        self.fire_rate_buff_t > 0.0
+    }
+
+    fn burst_buff_active(&self) -> bool {
+        self.burst_buff_t > 0.0
+    }
+
+    fn pierce_buff_active(&self) -> bool {
+        self.pierce_buff_t > 0.0
+    }
+
+    fn stagger_buff_active(&self) -> bool {
+        self.stagger_buff_t > 0.0 && self.config.buff_stagger_enabled
+    }
+
+    fn current_damage(&self) -> f32 {
+        if self.damage_buff_active() {
+            self.config.buff_damage_value
+        } else {
+            BASE_DAMAGE_VALUE
+        }
+    }
+
+    fn current_fire_rate(&self) -> f32 {
+        if self.fire_rate_buff_active() {
+            self.config.buff_fire_rate_value
+        } else {
+            self.config.player_fire_rate
+        }
+    }
+
+    fn current_pierce(&self) -> i32 {
+        if self.pierce_buff_active() {
+            self.config.buff_pierce_value
+        } else {
+            0
+        }
+    }
+
+    fn tick_buff_timers(&mut self, dt: f32) {
+        self.damage_buff_t = (self.damage_buff_t - dt).max(0.0);
+        self.fire_rate_buff_t = (self.fire_rate_buff_t - dt).max(0.0);
+        self.burst_buff_t = (self.burst_buff_t - dt).max(0.0);
+        self.pierce_buff_t = (self.pierce_buff_t - dt).max(0.0);
+        self.stagger_buff_t = (self.stagger_buff_t - dt).max(0.0);
+    }
+
+    /// Compute estimated sustained DPS at current buffs (no burst, no pierce).
     fn dps_estimate(&self) -> f32 {
-        let dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
-        let fire_rate = self.player.fire_rate;
+        let dmg = self.current_damage();
+        let fire_rate = self.current_fire_rate();
         dmg / fire_rate
     }
 
@@ -352,8 +405,8 @@ impl GameState {
         let hp_mult =
             1.0 + self.config.enemy_hp_scale * self.run_time * self.config.hp_scale_large_mult;
         let large_hp = (base_hp * hp_mult).round().max(1.0);
-        let dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
-        let fire_rate = self.player.fire_rate;
+        let dmg = self.current_damage();
+        let fire_rate = self.current_fire_rate();
         large_hp * fire_rate / dmg
     }
 
@@ -368,22 +421,34 @@ impl GameState {
         let medium_hp = (self.config.enemy_medium_hp as f32 * med_hp_mult)
             .round()
             .max(1.0) as i32;
+        let buffs_active = self.damage_buff_active() as u8
+            + self.fire_rate_buff_active() as u8
+            + self.burst_buff_active() as u8
+            + self.pierce_buff_active() as u8
+            + self.stagger_buff_active() as u8;
+        let pressure_bpm = if self.run_time > 0.0 {
+            self.breaches_total as f32 * 60.0 / self.run_time
+        } else {
+            0.0
+        };
         self.dlog(&format!(
-            "BALANCE dmg={} fr_level={} burst={} pierce={} stagger={} \
-             dps={:.1} large_hp={} large_ttk={:.2}s medium_hp={} \
-             kills={} breaches={} shields={}",
-            self.damage_level,
-            self.fire_rate_level,
-            self.burst_level,
-            self.pierce_level,
-            self.stagger_level,
+            "BALANCE_SNAPSHOT dps={:.2} ttk_large_s={:.2} hp_large={} hp_medium={} \
+             kills={} breaches={} pressure_bpm={:.2} shields={} buffs_active={} \
+             buff_damage_s={:.1} buff_rate_s={:.1} buff_burst_s={:.1} buff_pierce_s={:.1} buff_stagger_s={:.1}",
             dps,
-            large_hp,
             ttk,
+            large_hp,
             medium_hp,
             self.kills_total,
             self.breaches_total,
+            pressure_bpm,
             self.shields.count(),
+            buffs_active,
+            self.damage_buff_t,
+            self.fire_rate_buff_t,
+            self.burst_buff_t,
+            self.pierce_buff_t,
+            self.stagger_buff_t,
         ));
     }
 
@@ -400,10 +465,7 @@ impl GameState {
             ShieldHitResult::NormalAbsorbed => {}
         }
         let remaining = self.shields.count();
-        self.dlog(&format!(
-            "PLAYER_DMG count=1 shields_remaining={}",
-            remaining
-        ));
+        self.dlog(&format!("PLAYER_HIT shields_after={}", remaining));
     }
 
     /// Explosive shield segment broke: kill enemies in the clear zone, push Large/Elite back.
@@ -455,7 +517,7 @@ impl GameState {
         self.boundary_ctrl.stall_timer = self.config.explosive_micro_stall;
 
         self.dlog(&format!(
-            "EXPLOSIVE_SHIELD zone=[{:.0}..{:.0}] lane=[{}..{}]",
+            "EXPLOSIVE_TRIGGER zone_x0={:.0} zone_x1={:.0} lane_y0={} lane_y1={}",
             BOUNDARY_X, zone_right, ENEMY_LANE_TOP, ENEMY_LANE_BOTTOM
         ));
     }
@@ -474,6 +536,8 @@ impl GameState {
 
         self.run_time += dt;
         self.update_floating_texts(dt);
+        self.tick_buff_timers(dt);
+        self.player.fire_rate = self.current_fire_rate();
 
         // Balance snapshot every 30s
         self.balance_log_timer -= dt;
@@ -486,18 +550,21 @@ impl GameState {
 
         // Player movement
         let axis = self.input.axis;
-        let has_top_drone = self.drones.len() >= 1;
+        let has_top_drone = !self.drones.is_empty();
         let has_bottom_drone = self.drones.len() >= 2;
-        self.player.update(axis, dt, has_top_drone, has_bottom_drone);
+        self.player
+            .update(axis, dt, has_top_drone, has_bottom_drone);
 
         // Burst timer
-        if self.burst_level > 0 {
+        if self.burst_buff_active() {
             self.burst_timer -= dt;
             if self.burst_timer <= 0.0 {
                 self.burst_ready = true;
-                self.burst_timer =
-                    self.config.burst_intervals[self.burst_level.min(MAX_BURST_LEVEL) - 1];
+                self.burst_timer = self.config.buff_burst_interval;
             }
+        } else {
+            self.burst_ready = false;
+            self.burst_timer = 0.0;
         }
 
         // Auto-fire
@@ -514,7 +581,7 @@ impl GameState {
                 self.config.projectile_speed,
                 ProjectileSource::Player,
                 is_burst,
-                self.pierce_level as i32,
+                self.current_pierce(),
             ));
         }
 
@@ -523,19 +590,22 @@ impl GameState {
             p.update(dt);
         }
 
-        // Projectile-enemy collision (player projectiles only; drone shots never hit enemies per spec)
+        // Projectile-enemy collision (player + drone + remote drone shots).
         let mut kill_logs: Vec<String> = Vec::new();
         // Indices of enemies that should receive stagger knockback this frame.
         let mut stagger_targets: Vec<usize> = Vec::new();
-        let base_dmg = self.config.damage_levels[self.damage_level.min(MAX_DAMAGE_LEVEL - 1)];
+        let base_dmg = self.current_damage();
+        let stagger_enabled = self.stagger_buff_active();
         for p in &mut self.projectiles {
             if !p.alive {
                 continue;
             }
-            let proj_dmg_base = if matches!(p.source, ProjectileSource::Drone | ProjectileSource::RemoteDrone)
-                && !self.config.damage_upgrade_applies_to_drones
+            let proj_dmg_base = if matches!(
+                p.source,
+                ProjectileSource::Drone | ProjectileSource::RemoteDrone
+            ) && !self.config.damage_upgrade_applies_to_drones
             {
-                self.config.damage_levels[0]
+                BASE_DAMAGE_VALUE
             } else {
                 base_dmg
             };
@@ -563,7 +633,7 @@ impl GameState {
                     e.take_damage(proj_dmg);
                     if !e.is_dead()
                         && !e.stagger_immune
-                        && self.stagger_level > 0
+                        && stagger_enabled
                         && matches!(
                             e.kind,
                             EnemyKind::Small | EnemyKind::Medium | EnemyKind::Heavy
@@ -724,7 +794,7 @@ impl GameState {
                     self.boundary_ctrl.breach_start_time = now;
                 }
                 self.dlog(&format!(
-                    "BREACH_START {:?} id={} windup={:.2}s",
+                    "BREACH_START kind={:?} id={} windup_s={:.2}",
                     self.enemies[i].kind, id, self.enemies[i].windup_time
                 ));
             } else {
@@ -757,7 +827,7 @@ impl GameState {
                 self.enemies[pos].hp = 0;
                 self.boundary_ctrl.breach_group.retain(|&bid| bid != id);
                 self.breaches_total += 1;
-                self.dlog(&format!("BREACH_RESOLVE {:?} id={}", kind, id));
+                self.dlog(&format!("BREACH_RESOLVE kind={:?} id={}", kind, id));
                 self.take_player_damage();
                 if self.game_over {
                     return;
@@ -815,15 +885,13 @@ impl GameState {
                 let y = lane_mid - ORB_H / 2.0;
                 // Build weighted pool; gate Shield if shields are full.
                 let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
-                // Weighted pool: leveled types get weight = remaining levels; non-leveled get 1.
+                // Temporary offense buffs are excluded while active.
                 let mut pool: Vec<(OrbType, u32)> = Vec::with_capacity(8);
-                let burst_remaining = (MAX_BURST_LEVEL - self.burst_level) as u32;
-                if burst_remaining > 0 {
-                    pool.push((OrbType::Burst, burst_remaining));
+                if !self.burst_buff_active() {
+                    pool.push((OrbType::Burst, 1));
                 }
-                let damage_remaining = (MAX_DAMAGE_LEVEL - self.damage_level) as u32;
-                if damage_remaining > 0 {
-                    pool.push((OrbType::Damage, damage_remaining));
+                if !self.damage_buff_active() {
+                    pool.push((OrbType::Damage, 1));
                 }
                 if !shields_full {
                     pool.push((OrbType::Shield, 1));
@@ -834,17 +902,14 @@ impl GameState {
                     pool.push((OrbType::Drone, drone_remaining));
                 }
                 pool.push((OrbType::DroneRemote, 1));
-                let fire_rate_remaining = (MAX_FIRE_RATE_LEVEL - self.fire_rate_level) as u32;
-                if fire_rate_remaining > 0 {
-                    pool.push((OrbType::FireRate, fire_rate_remaining));
+                if !self.fire_rate_buff_active() {
+                    pool.push((OrbType::FireRate, 1));
                 }
-                let pierce_remaining = (MAX_PIERCE_LEVEL - self.pierce_level) as u32;
-                if pierce_remaining > 0 {
-                    pool.push((OrbType::Pierce, pierce_remaining));
+                if !self.pierce_buff_active() {
+                    pool.push((OrbType::Pierce, 1));
                 }
-                let stagger_remaining = (MAX_STAGGER_LEVEL - self.stagger_level) as u32;
-                if stagger_remaining > 0 {
-                    pool.push((OrbType::Stagger, stagger_remaining));
+                if !self.stagger_buff_active() {
+                    pool.push((OrbType::Stagger, 1));
                 }
                 if !self.shields.has_explosive() {
                     pool.push((OrbType::Explosive, 1));
@@ -940,68 +1005,50 @@ impl GameState {
         for (orb_type, px, py) in pickups {
             let popup_tag = match orb_type {
                 OrbType::Damage => {
-                    if self.damage_level < MAX_DAMAGE_LEVEL {
-                        let dps_before = self.dps_estimate();
-                        let ttk_before = self.large_ttk();
-                        self.damage_level += 1;
-                        let dps_after = self.dps_estimate();
-                        let ttk_after = self.large_ttk();
-                        self.dlog(&format!(
-                            "ORB_COLLECT Damage level={} | dps {:.1}→{:.1} | large_ttk {:.2}s→{:.2}s",
-                            self.damage_level, dps_before, dps_after, ttk_before, ttk_after
-                        ));
-                        Some("+DMG")
-                    } else {
-                        None
-                    }
+                    self.damage_buff_t = self.config.buff_damage_duration;
+                    self.dlog(&format!(
+                        "ORB_PICKUP type=DamageBuff ttl_s={:.1}",
+                        self.damage_buff_t
+                    ));
+                    Some("+DMG")
                 }
                 OrbType::FireRate => {
-                    if self.fire_rate_level < MAX_FIRE_RATE_LEVEL {
-                        let dps_before = self.dps_estimate();
-                        let ttk_before = self.large_ttk();
-                        self.fire_rate_level += 1;
-                        let new_rate = self.config.fire_rate_levels
-                            [self.fire_rate_level.min(MAX_FIRE_RATE_LEVEL - 1)];
-                        self.player.fire_rate = new_rate;
-                        let dps_after = self.dps_estimate();
-                        let ttk_after = self.large_ttk();
-                        self.dlog(&format!(
-                            "ORB_COLLECT FireRate level={} fire_rate={:.3} | dps {:.1}→{:.1} | large_ttk {:.2}s→{:.2}s",
-                            self.fire_rate_level, new_rate, dps_before, dps_after, ttk_before, ttk_after
-                        ));
-                        Some("+RATE")
-                    } else {
-                        None
-                    }
+                    self.fire_rate_buff_t = self.config.buff_fire_rate_duration;
+                    self.player.fire_rate = self.current_fire_rate();
+                    self.dlog(&format!(
+                        "ORB_PICKUP type=FireRateBuff ttl_s={:.1}",
+                        self.fire_rate_buff_t
+                    ));
+                    Some("+RATE")
                 }
                 OrbType::Burst => {
-                    if self.burst_level < MAX_BURST_LEVEL {
-                        self.burst_level += 1;
-                        self.burst_timer =
-                            self.config.burst_intervals[self.burst_level.min(MAX_BURST_LEVEL) - 1];
-                        self.dlog(&format!("ORB_COLLECT Burst level={}", self.burst_level));
-                        Some("+BURST")
-                    } else {
-                        None
+                    let was_active = self.burst_buff_active();
+                    self.burst_buff_t = self.config.buff_burst_duration;
+                    if !was_active {
+                        self.burst_timer = self.config.buff_burst_interval;
+                        self.burst_ready = false;
                     }
+                    self.dlog(&format!(
+                        "ORB_PICKUP type=BurstBuff ttl_s={:.1}",
+                        self.burst_buff_t
+                    ));
+                    Some("+BURST")
                 }
                 OrbType::Pierce => {
-                    if self.pierce_level < MAX_PIERCE_LEVEL {
-                        self.pierce_level += 1;
-                        self.dlog(&format!("ORB_COLLECT Pierce level={}", self.pierce_level));
-                        Some("+PIERCE")
-                    } else {
-                        None
-                    }
+                    self.pierce_buff_t = self.config.buff_pierce_duration;
+                    self.dlog(&format!(
+                        "ORB_PICKUP type=PierceBuff ttl_s={:.1}",
+                        self.pierce_buff_t
+                    ));
+                    Some("+PIERCE")
                 }
                 OrbType::Stagger => {
-                    if self.stagger_level < MAX_STAGGER_LEVEL {
-                        self.stagger_level += 1;
-                        self.dlog(&format!("ORB_COLLECT Stagger level={}", self.stagger_level));
-                        Some("+STAGGER")
-                    } else {
-                        None
-                    }
+                    self.stagger_buff_t = self.config.buff_stagger_duration;
+                    self.dlog(&format!(
+                        "ORB_PICKUP type=StaggerBuff ttl_s={:.1}",
+                        self.stagger_buff_t
+                    ));
+                    Some("+STAGGER")
                 }
                 OrbType::Shield => {
                     let before = self.shields.count();
@@ -1020,10 +1067,10 @@ impl GameState {
                     let after_has = self.shields.has_explosive();
                     let after_count = self.shields.count();
                     if after_has && !before_has {
-                        self.dlog("ORB_COLLECT Explosive");
+                        self.dlog("ORB_PICKUP type=Explosive");
                         Some("+EXPLOSIVE")
                     } else if after_count > before_count {
-                        self.dlog("ORB_COLLECT Explosive->Shield");
+                        self.dlog("ORB_PICKUP type=ShieldFromExplosive");
                         Some("+SHIELD")
                     } else {
                         None
@@ -1035,7 +1082,7 @@ impl GameState {
                         let dy = DRONE_Y_OFFSETS[index.min(DRONE_Y_OFFSETS.len() - 1)];
                         self.drones
                             .push(Drone::new(self.player.x, self.player.y + dy));
-                        self.dlog(&format!("ORB_COLLECT Drone index={}", index));
+                        self.dlog(&format!("ORB_PICKUP type=Drone index={}", index));
                         Some("+DRONE")
                     } else {
                         None
@@ -1045,7 +1092,7 @@ impl GameState {
                     let lane_mid = (UPGRADE_LANE_TOP + UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0;
                     let rd_y = lane_mid - DRONE_REMOTE_HEIGHT / 2.0;
                     self.remote_drones.push(RemoteDrone::new(BOUNDARY_X, rd_y));
-                    self.dlog("ORB_COLLECT DroneRemote");
+                    self.dlog("ORB_PICKUP type=DroneRemote");
                     Some("+REMOTE")
                 }
             };
@@ -1063,12 +1110,12 @@ impl GameState {
 
         // Update attached drones: follow player, fire into enemy lane.
         let drone_fire_rate = if self.config.fire_rate_upgrade_applies_to_drones {
-            self.player.fire_rate
+            self.current_fire_rate()
         } else {
             DRONE_FIRE_RATE
         };
         let drone_pierce = if self.config.damage_upgrade_applies_to_drones {
-            self.pierce_level as i32
+            self.current_pierce()
         } else {
             0
         };
@@ -1376,34 +1423,150 @@ impl GameState {
         let icon_gap = 2.0_f32;
         let y = 2.0_f32;
         let mut x = shield_area_end;
-
-        let checks: [bool; 8] = [
-            self.damage_level >= 1,
-            self.fire_rate_level >= 1,
-            self.burst_level >= 1,
-            self.pierce_level >= 1,
-            self.stagger_level >= 1,
-            self.shields.segments.len() > 1, // more than starting 1 segment
-            self.shields.segments.iter().any(|s| s.explosive),
-            !self.drones.is_empty(),
-        ];
-
-        let mut sprites: [&mut Sprite; 8] = [
-            &mut self.orb_sprite_damage,
-            &mut self.orb_sprite_fire_rate,
-            &mut self.orb_sprite_burst,
-            &mut self.orb_sprite_pierce,
-            &mut self.orb_sprite_stagger,
-            &mut self.orb_sprite_shield,
-            &mut self.orb_sprite_explosive,
-            &mut self.orb_sprite_drone,
-        ];
-
-        for (acquired, sprite) in checks.iter().zip(sprites.iter_mut()) {
-            if *acquired {
-                sprite.draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+        {
+            let ratio = if self.config.buff_damage_duration > 0.0 {
+                (self.damage_buff_t / self.config.buff_damage_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.damage_buff_active() {
+                self.orb_sprite_damage
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(40, 40, 40, 255),
+                );
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W * ratio,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(150, 255, 190, 255),
+                );
                 x += icon_size + icon_gap;
             }
+        }
+        {
+            let ratio = if self.config.buff_fire_rate_duration > 0.0 {
+                (self.fire_rate_buff_t / self.config.buff_fire_rate_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.fire_rate_buff_active() {
+                self.orb_sprite_fire_rate
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(40, 40, 40, 255),
+                );
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W * ratio,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(150, 255, 190, 255),
+                );
+                x += icon_size + icon_gap;
+            }
+        }
+        {
+            let ratio = if self.config.buff_burst_duration > 0.0 {
+                (self.burst_buff_t / self.config.buff_burst_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.burst_buff_active() {
+                self.orb_sprite_burst
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(40, 40, 40, 255),
+                );
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W * ratio,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(150, 255, 190, 255),
+                );
+                x += icon_size + icon_gap;
+            }
+        }
+        {
+            let ratio = if self.config.buff_pierce_duration > 0.0 {
+                (self.pierce_buff_t / self.config.buff_pierce_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.pierce_buff_active() {
+                self.orb_sprite_pierce
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(40, 40, 40, 255),
+                );
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W * ratio,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(150, 255, 190, 255),
+                );
+                x += icon_size + icon_gap;
+            }
+        }
+        {
+            let ratio = if self.config.buff_stagger_duration > 0.0 {
+                (self.stagger_buff_t / self.config.buff_stagger_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.stagger_buff_active() {
+                self.orb_sprite_stagger
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(40, 40, 40, 255),
+                );
+                draw_rectangle(
+                    x,
+                    y + icon_size + 1.0,
+                    HUD_TIMER_BAR_W * ratio,
+                    HUD_TIMER_BAR_H,
+                    Color::from_rgba(150, 255, 190, 255),
+                );
+                x += icon_size + icon_gap;
+            }
+        }
+
+        if self.shields.count() > self.config.player_starting_shields as usize {
+            self.orb_sprite_shield
+                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+            x += icon_size + icon_gap;
+        }
+        if self.shields.segments.iter().any(|s| s.explosive) {
+            self.orb_sprite_explosive
+                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+            x += icon_size + icon_gap;
+        }
+        if !self.drones.is_empty() {
+            self.orb_sprite_drone
+                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
         }
     }
 

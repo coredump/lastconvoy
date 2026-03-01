@@ -41,7 +41,8 @@ impl Player {
             0.0
         };
         let y_min = ENEMY_LANE_TOP as f32 + top_drone_overhang + PLAYER_LANE_PADDING;
-        let y_max = BOTTOM_BORDER_TOP as f32 - PLAYER_HEIGHT - bottom_drone_overhang - PLAYER_LANE_PADDING;
+        let y_max =
+            BOTTOM_BORDER_TOP as f32 - PLAYER_HEIGHT - bottom_drone_overhang - PLAYER_LANE_PADDING;
         self.y = (self.y + axis * self.speed * dt).clamp(y_min, y_max);
 
         self.fire_timer -= dt;
