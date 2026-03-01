@@ -14,6 +14,12 @@ pub enum EnemyKind {
     Elite,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnemyState {
+    Moving,
+    Breaching,
+}
+
 pub struct Enemy {
     pub id: u64,
     pub x: f32,
@@ -24,13 +30,13 @@ pub struct Enemy {
     pub speed: f32,
     pub width: f32,
     pub height: f32,
-    /// True when the enemy has stopped at the boundary (may or may not hold a slot).
-    pub at_boundary: bool,
-    pub damage_timer: f32,
+    pub state: EnemyState,
+    /// Total wind-up duration before breach resolves (seconds).
+    pub windup_time: f32,
+    /// Accumulated wind-up time while in Breaching state.
+    pub windup_elapsed: f32,
     pub shielded: bool,
     pub shield_hp: i32,
-    /// Index of the boundary slot this enemy occupies, or None if queued/not at boundary.
-    pub slot_id: Option<usize>,
     pub shake: ShakeEffect,
     pub shots_taken: i32,
     pub damage_taken: i32,
@@ -39,6 +45,7 @@ pub struct Enemy {
 }
 
 impl Enemy {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         x: f32,
         y: f32,
@@ -47,6 +54,7 @@ impl Enemy {
         speed: f32,
         width: f32,
         height: f32,
+        windup_time: f32,
     ) -> Self {
         Self {
             id: NEXT_ENEMY_ID.fetch_add(1, Ordering::Relaxed),
@@ -58,11 +66,11 @@ impl Enemy {
             speed,
             width,
             height,
-            at_boundary: false,
-            damage_timer: 0.0,
+            state: EnemyState::Moving,
+            windup_time,
+            windup_elapsed: 0.0,
             shielded: false,
             shield_hp: 0,
-            slot_id: None,
             shake: ShakeEffect::new(),
             shots_taken: 0,
             damage_taken: 0,
@@ -71,7 +79,7 @@ impl Enemy {
     }
 
     pub fn update(&mut self, dt: f32) {
-        if !self.at_boundary {
+        if self.state == EnemyState::Moving {
             self.x -= self.speed * dt;
         }
         self.shake.update(dt);

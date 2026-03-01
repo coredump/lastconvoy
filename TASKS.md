@@ -107,13 +107,16 @@ If anything conflicts:
 - Losing shields never removes drones or reduces offense.
 - **NOTE**: Vec<ShieldSegment> conversion complete. ShieldSystem in shield.rs used throughout.
 
-### P1.7 Boundary slots & jam ✓ DONE
-- Define a fixed number of boundary slots (from config).
-- When a Medium/Heavy/Large/Elite reaches the left boundary:
-  - If a slot is free: occupy it, begin damage ticking.
-  - If no slot is free: enemy stops in place (queued), does NOT tick damage.
-- When a slotted enemy is destroyed: free its slot; nearest queued enemy (if any) advances to fill it.
-- No overlap, no pushing physics.
+### P1.7 Boundary breach system ✓ DONE (replaced old slot/damage-tick model)
+- Enemy state machine: `Moving → Breaching` (no `Queued` state).
+- On reaching `BOUNDARY_X`: if breach is free, enemy enters `Breaching` (wind-up begins); else clamped at `BOUNDARY_X + 24px` and stays `Moving` (compresses naturally).
+- Wind-up timer per kind (`windup_time_*` in config). When elapsed ≥ windup_time: breach event fires → 1 shield consumed (or player dies) → enemy despawned.
+- Simultaneous breach window (0.10 s): a second arrival within the window joins the current breach group.
+- On breach group empty: lock released; compressed Moving enemies advance naturally; frontmost starts next breach.
+- Stagger knockback resets state to Moving and removes from breach group, releasing lock early.
+- Explosive shield detonation: kills non-elite enemies in zone, pushes Large/Elite back, clears breach group, applies micro-stall (0.25 s freeze).
+- Old slot-based boundary model (`boundary.rs`, `BOUNDARY_SLOT_COUNT`, `BOUNDARY_DAMAGE_TICK`) removed.
+- Enemy stacking (no overlap) unchanged.
 
 ### P1.8 Upgrade orbs (two-phase) ✓ STRUCTURALLY COMPLETE
 - Orb entity: position, HP, activated flag, current upgrade type, kind.
@@ -146,15 +149,11 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - **Drone**: collection wired; drone firing not yet implemented (see P1.10). ⚠
 - **Explosive Shield**: not yet implemented (see P1.9b below). ⚠
 
-### P1.9b Explosive Shield ⚠ NOT STARTED
-- Converts one normal shield segment to an explosive segment (max one at a time).
-- Explosive segment breaks last (after all normal segments).
-- On break: explosion 40 px forward from boundary, full enemy lane height.
-  - Elite and Mini-Boss pushed back 24 px (unless occupying a boundary slot).
-  - Non-elite enemies not pushed back.
-  - No effect on upgrade lane.
-- Upgrade unavailable if player has 0 segments or an explosive segment already exists.
-- Requires separate OrbType or a modifier flag on the Shield orb (design TBD).
+### P1.9b Explosive Shield ⚠ PARTIAL
+- Detonation logic implemented: `trigger_explosive_shield()` kills non-elite enemies in zone, pushes Large/Elite back, clears breach group, applies micro-stall. ✓
+- `ShieldSystem::convert_to_explosive()` implemented. ✓
+- `OrbType::Explosive` collection wired to `convert_to_explosive()`. ✓
+- **Remaining**: visual/audio for explosion (flash, particle hints); gameplay verification that detonation + stall reads correctly in play.
 
 ### P1.10 Drone system ⚠ STUB ONLY
 - Attached drones: persist for the run, positioned relative to player.
@@ -244,11 +243,19 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - Provide `index.html` shell for loading the WASM module.
 - Verify touch controls work in mobile browsers.
 
-### P2.5 Tests (optional but allowed in Phase 2)
+### P2.5 Virtual slot system (boundary visual variety)
+- Conceptually divide the enemy lane into 6 vertical slots.
+- Assign each enemy kind a slot span: Small=1, Medium/Heavy=2, Large/Elite=3.
+- When an enemy transitions to Breaching, snap its Y to the nearest unoccupied slot center (with small jitter to avoid grid look).
+- Track occupied slots in `BoundaryController`; release on breach resolution or stagger.
+- No gameplay effect — purely cosmetic, preventing visible column queues.
+- Deferred from P1.7 breach system implementation.
+
+### P2.6 Tests (optional but allowed in Phase 2)
 - Add integration/unit tests for:
   - Orb activation vs cycling (activation hits do not cycle).
   - Drone shots never affect orbs.
-  - Boundary slot cap and jam behavior.
+  - Breach lock: only one enemy breaches at a time; queued enemies wait.
   - Elite pauses enemy spawns but not orb spawns.
   - Input mapping toggle correctness.
 - Use `#[cfg(test)]` modules and `cargo test`.

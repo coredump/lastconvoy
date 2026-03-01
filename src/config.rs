@@ -77,9 +77,19 @@ pub const ENEMY_LARGE_SPEED: f32 = 20.0;
 pub const ORB_SPAWN_INTERVAL: f32 = 5.0;
 pub const MAX_ACTIVE_ORBS: usize = 1;
 
-// Boundary
-pub const BOUNDARY_SLOT_COUNT: usize = 3;
-pub const BOUNDARY_DAMAGE_TICK: f32 = 2.0; // seconds between boundary damage ticks
+// Boundary / breach
+/// Wind-up duration (seconds) before each enemy kind resolves its breach event.
+pub const WINDUP_TIME_SMALL: f32 = 0.8;
+pub const WINDUP_TIME_MEDIUM: f32 = 0.5;
+pub const WINDUP_TIME_HEAVY: f32 = 1.0;
+pub const WINDUP_TIME_LARGE: f32 = 1.3;
+pub const WINDUP_TIME_ELITE: f32 = 1.0;
+/// If a second enemy arrives at the boundary within this window of the first, it joins the breach group.
+pub const SIMULTANEOUS_BREACH_WINDOW: f32 = 0.10;
+/// Micro-stall duration applied to enemy movement after an explosive shield detonates.
+pub const EXPLOSIVE_MICRO_STALL: f32 = 0.25;
+/// How far right of BOUNDARY_X enemies are clamped while breach is locked (visible pressure cluster).
+pub const PRE_BOUNDARY_STOP_OFFSET: f32 = 24.0;
 
 // Orb
 pub const ORB_ACTIVATION_HIT_COUNT: f32 = 5.0;
@@ -178,8 +188,13 @@ pub struct RuntimeConfig {
     pub orb_spawn_interval: Option<f32>,
     pub max_active_orbs: Option<usize>,
 
-    pub boundary_slot_count: Option<usize>,
-    pub boundary_damage_tick: Option<f32>,
+    pub simultaneous_breach_window: Option<f32>,
+    pub explosive_micro_stall: Option<f32>,
+    pub windup_time_small: Option<f32>,
+    pub windup_time_medium: Option<f32>,
+    pub windup_time_heavy: Option<f32>,
+    pub windup_time_large: Option<f32>,
+    pub windup_time_elite: Option<f32>,
 
     pub orb_speed: Option<f32>,
 
@@ -252,8 +267,13 @@ pub struct Config {
     pub orb_spawn_interval: f32,
     pub max_active_orbs: usize,
 
-    pub boundary_slot_count: usize,
-    pub boundary_damage_tick: f32,
+    pub simultaneous_breach_window: f32,
+    pub explosive_micro_stall: f32,
+    pub windup_time_small: f32,
+    pub windup_time_medium: f32,
+    pub windup_time_heavy: f32,
+    pub windup_time_large: f32,
+    pub windup_time_elite: f32,
 
     pub orb_speed: f32,
 
@@ -327,8 +347,15 @@ impl Config {
             orb_spawn_interval: rt.orb_spawn_interval.unwrap_or(ORB_SPAWN_INTERVAL),
             max_active_orbs: rt.max_active_orbs.unwrap_or(MAX_ACTIVE_ORBS),
 
-            boundary_slot_count: rt.boundary_slot_count.unwrap_or(BOUNDARY_SLOT_COUNT),
-            boundary_damage_tick: rt.boundary_damage_tick.unwrap_or(BOUNDARY_DAMAGE_TICK),
+            simultaneous_breach_window: rt
+                .simultaneous_breach_window
+                .unwrap_or(SIMULTANEOUS_BREACH_WINDOW),
+            explosive_micro_stall: rt.explosive_micro_stall.unwrap_or(EXPLOSIVE_MICRO_STALL),
+            windup_time_small: rt.windup_time_small.unwrap_or(WINDUP_TIME_SMALL),
+            windup_time_medium: rt.windup_time_medium.unwrap_or(WINDUP_TIME_MEDIUM),
+            windup_time_heavy: rt.windup_time_heavy.unwrap_or(WINDUP_TIME_HEAVY),
+            windup_time_large: rt.windup_time_large.unwrap_or(WINDUP_TIME_LARGE),
+            windup_time_elite: rt.windup_time_elite.unwrap_or(WINDUP_TIME_ELITE),
 
             orb_speed: rt.orb_speed.unwrap_or(ORB_SPEED),
 

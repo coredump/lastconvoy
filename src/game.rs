@@ -1,6 +1,5 @@
 use macroquad::prelude::*;
 
-use crate::boundary::Boundary;
 use crate::config::SHAKE_DURATION;
 use crate::config::SHAKE_INTENSITY;
 use crate::config::{
@@ -12,14 +11,14 @@ use crate::config::{
     ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
     ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_BURST_LEVEL, MAX_DAMAGE_LEVEL,
     MAX_FIRE_RATE_LEVEL, MAX_PIERCE_LEVEL, MAX_STAGGER_LEVEL, MEDIUM_INTRO_TIME, ORB_H, ORB_W,
-    PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, PROJECTILE_W, SCREEN_W,
-    SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
-    SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
+    PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_W,
+    SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT,
+    SPAWN_SLOT_WIDTH, SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
     UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
 use crate::drone::Drone;
 use crate::elite::EliteEvent;
-use crate::enemy::{Enemy, EnemyKind};
+use crate::enemy::{Enemy, EnemyKind, EnemyState};
 use crate::input::InputState;
 use crate::orb::Orb;
 use crate::orb::{OrbPhase, OrbType};
@@ -50,6 +49,35 @@ impl SpawnController {
         self.cursor = 0;
         self.inject_timer = BIG_INJECT_BASE_INTERVAL;
         self.ramp_log_timer = 0.0;
+    }
+}
+
+pub struct BoundaryController {
+    /// IDs of enemies currently in wind-up (Breaching state).
+    pub breach_group: Vec<u64>,
+    /// Game time when the first enemy in the current group entered Breaching.
+    pub breach_start_time: f32,
+    /// True when a breach is in progress; new arrivals must queue.
+    pub breach_locked: bool,
+    /// Countdown for explosive shield micro-stall (freezes enemy movement).
+    pub stall_timer: f32,
+}
+
+impl BoundaryController {
+    fn new() -> Self {
+        Self {
+            breach_group: Vec::new(),
+            breach_start_time: 0.0,
+            breach_locked: false,
+            stall_timer: 0.0,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.breach_group.clear();
+        self.breach_start_time = 0.0;
+        self.breach_locked = false;
+        self.stall_timer = 0.0;
     }
 }
 
@@ -84,7 +112,7 @@ pub struct GameState {
     pub burst_timer: f32,
     pub burst_ready: bool,
     pub drones: Vec<Drone>,
-    pub boundary: Boundary,
+    pub boundary_ctrl: BoundaryController,
     pub elite_event: EliteEvent,
     pub input: InputState,
     pub spawn_ctrl: SpawnController,
@@ -127,8 +155,6 @@ impl GameState {
             config.player_fire_rate,
         );
 
-        let boundary = Boundary::new(config.boundary_slot_count);
-
         Self {
             player,
             player_sprite,
@@ -159,7 +185,7 @@ impl GameState {
             burst_timer: 0.0,
             burst_ready: false,
             drones: Vec::new(),
-            boundary,
+            boundary_ctrl: BoundaryController::new(),
             elite_event: EliteEvent::new(),
             input: InputState::new(),
             spawn_ctrl: SpawnController::new(),
@@ -191,7 +217,7 @@ impl GameState {
             self.config.player_fire_rate,
         );
         self.shields = ShieldSystem::new(self.config.player_starting_shields);
-        self.boundary = Boundary::new(self.config.boundary_slot_count);
+        self.boundary_ctrl.reset();
         self.enemies.clear();
         self.projectiles.clear();
         self.orbs.clear();
@@ -270,16 +296,21 @@ impl GameState {
             if self.enemies[idx].stagger_immune {
                 continue;
             }
+            let id = self.enemies[idx].id;
             self.enemies[idx].stagger_immune = true;
             self.enemies[idx].x += STAGGER_KNOCKBACK_PX;
-            self.enemies[idx].at_boundary = false;
-            if let Some(slot) = self.enemies[idx].slot_id.take() {
-                self.boundary.release_slot(slot);
-            }
+            self.enemies[idx].state = EnemyState::Moving;
+            self.boundary_ctrl.breach_group.retain(|&bid| bid != id);
             if self.enemies[idx].x + self.enemies[idx].width > SCREEN_W as f32 {
                 self.enemies[idx].x = SCREEN_W as f32 - self.enemies[idx].width;
             }
         }
+        // Clear breach lock if group emptied by explosive.
+        if self.boundary_ctrl.breach_group.is_empty() {
+            self.boundary_ctrl.breach_locked = false;
+        }
+        // Apply micro-stall.
+        self.boundary_ctrl.stall_timer = self.config.explosive_micro_stall;
 
         self.dlog(&format!(
             "EXPLOSIVE_SHIELD zone=[{:.0}..{:.0}] lane=[{}..{}]",
@@ -412,16 +443,19 @@ impl GameState {
             if self.enemies[idx].stagger_immune {
                 continue;
             }
+            let id = self.enemies[idx].id;
             self.enemies[idx].stagger_immune = true;
             self.enemies[idx].x += STAGGER_KNOCKBACK_PX;
-            self.enemies[idx].at_boundary = false;
-            if let Some(slot) = self.enemies[idx].slot_id.take() {
-                self.boundary.release_slot(slot);
-            }
+            self.enemies[idx].state = EnemyState::Moving;
+            self.boundary_ctrl.breach_group.retain(|&bid| bid != id);
             // Clamp to screen right edge.
             if self.enemies[idx].x + self.enemies[idx].width > SCREEN_W as f32 {
                 self.enemies[idx].x = SCREEN_W as f32 - self.enemies[idx].width;
             }
+        }
+        // Unlock boundary if stagger emptied the breach group.
+        if self.boundary_ctrl.breach_locked && self.boundary_ctrl.breach_group.is_empty() {
+            self.boundary_ctrl.breach_locked = false;
         }
         // Forward cascade pass: resolve overlaps created by the stagger pushes.
         // Sort enemies by x ascending so each left enemy can push the one to its right.
@@ -459,34 +493,13 @@ impl GameState {
 
         self.projectiles.retain(|p| !p.should_remove());
 
-        // Release boundary slots for dead enemies before clearing them.
-        for e in &self.enemies {
-            if e.is_dead()
-                && let Some(slot) = e.slot_id
-            {
-                self.boundary.release_slot(slot);
-            }
-        }
-
-        // Promote queued enemies (at boundary, no slot) to any newly freed slots.
-        // Nearest to the boundary (smallest x) gets priority.
-        if self.boundary.has_free_slot() {
-            let mut queued: Vec<usize> = self
-                .enemies
-                .iter()
-                .enumerate()
-                .filter(|(_, e)| e.at_boundary && e.slot_id.is_none() && !e.is_dead())
-                .map(|(i, _)| i)
-                .collect();
-            queued.sort_by(|&a, &b| self.enemies[a].x.partial_cmp(&self.enemies[b].x).unwrap());
-            for idx in queued {
-                if let Some(slot) = self.boundary.occupy_slot() {
-                    self.enemies[idx].slot_id = Some(slot);
-                    self.enemies[idx].x = BOUNDARY_X;
-                } else {
-                    break;
-                }
-            }
+        // Remove dead enemies from breach group.
+        self.boundary_ctrl
+            .breach_group
+            .retain(|id| self.enemies.iter().any(|e| e.id == *id && !e.is_dead()));
+        if self.boundary_ctrl.breach_group.is_empty() && self.boundary_ctrl.breach_locked {
+            // Last breacher died (e.g. killed by player mid-windup): unlock the boundary.
+            self.boundary_ctrl.breach_locked = false;
         }
 
         self.enemies.retain(|e| !e.is_dead() || e.shake.is_active());
@@ -498,54 +511,85 @@ impl GameState {
             self.tick_spawn();
         }
 
-        // Update enemies and handle boundary arrival/damage.
-        // Collect damage events first to avoid borrow conflict with take_player_damage.
-        let mut damage_events: u32 = 0;
-        let mut boundary_logs: Vec<String> = Vec::new();
+        // Tick micro-stall and skip enemy movement while stalling.
+        if self.boundary_ctrl.stall_timer > 0.0 {
+            self.boundary_ctrl.stall_timer = (self.boundary_ctrl.stall_timer - dt).max(0.0);
+        }
+        let stalling = self.boundary_ctrl.stall_timer > 0.0;
 
+        // Update enemies (movement gated by state and stall).
         for e in &mut self.enemies {
-            e.update(dt);
-
-            if !e.at_boundary && e.x <= BOUNDARY_X {
-                match e.kind {
-                    EnemyKind::Small => {
-                        // 1 damage event then despawn.
-                        damage_events += 1;
-                        e.hp = 0;
-                        boundary_logs.push("BREACH Small".to_string());
-                    }
-                    _ => {
-                        e.at_boundary = true;
-                        e.x = BOUNDARY_X;
-                        // Try to occupy a boundary slot.
-                        if let Some(slot) = self.boundary.occupy_slot() {
-                            e.slot_id = Some(slot);
-                        }
-                        // If no slot: enemy is queued — stops in place, no damage tick.
-                    }
-                }
+            if stalling {
+                // Freeze all movement during micro-stall; still update shake.
+                e.shake.update(dt);
+            } else {
+                e.update(dt);
             }
+        }
 
-            // Slotted enemies tick damage.
-            if e.at_boundary && e.slot_id.is_some() {
-                e.damage_timer += dt;
-                if e.damage_timer >= self.config.boundary_damage_tick {
-                    e.damage_timer = 0.0;
-                    damage_events += 1;
-                    boundary_logs.push(format!("BOUNDARY_DMG {:?} hp={}", e.kind, e.hp));
+        // Boundary arrival: transition Moving enemies that reached BOUNDARY_X.
+        let simultaneous_window = self.config.simultaneous_breach_window;
+        let now = self.run_time;
+        let mut arrivals: Vec<usize> = Vec::new();
+        for (i, e) in self.enemies.iter().enumerate() {
+            if e.state == EnemyState::Moving && e.x <= BOUNDARY_X {
+                arrivals.push(i);
+            }
+        }
+        for i in arrivals {
+            let in_window = self.boundary_ctrl.breach_locked
+                && (now - self.boundary_ctrl.breach_start_time) <= simultaneous_window;
+            if !self.boundary_ctrl.breach_locked || in_window {
+                let id = self.enemies[i].id;
+                self.enemies[i].state = EnemyState::Breaching;
+                self.enemies[i].x = BOUNDARY_X;
+                self.enemies[i].windup_elapsed = 0.0;
+                self.boundary_ctrl.breach_group.push(id);
+                if !self.boundary_ctrl.breach_locked {
+                    self.boundary_ctrl.breach_locked = true;
+                    self.boundary_ctrl.breach_start_time = now;
+                }
+                self.dlog(&format!(
+                    "BREACH_START {:?} id={} windup={:.2}s",
+                    self.enemies[i].kind, id, self.enemies[i].windup_time
+                ));
+            } else {
+                // Breach locked: clamp enemy out of the boundary zone; it stays Moving
+                // and compresses naturally behind the breaching enemy via stacking.
+                self.enemies[i].x = (BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET).max(self.enemies[i].x);
+            }
+        }
+
+        // Tick wind-up for breaching enemies; collect resolved breaches.
+        let mut resolved_ids: Vec<u64> = Vec::new();
+        for e in &mut self.enemies {
+            if e.state == EnemyState::Breaching {
+                e.windup_elapsed += dt;
+                if e.windup_elapsed >= e.windup_time {
+                    resolved_ids.push(e.id);
                 }
             }
         }
-        for msg in boundary_logs {
-            self.dlog(&msg);
+
+        // Resolve each completed breach: deal damage, despawn enemy.
+        for id in resolved_ids {
+            if let Some(pos) = self.enemies.iter().position(|e| e.id == id) {
+                let kind = self.enemies[pos].kind;
+                self.enemies[pos].hp = 0;
+                self.boundary_ctrl.breach_group.retain(|&bid| bid != id);
+                self.dlog(&format!("BREACH_RESOLVE {:?} id={}", kind, id));
+                self.take_player_damage();
+                if self.game_over {
+                    return;
+                }
+            }
         }
 
-        // Apply collected damage events.
-        for _ in 0..damage_events {
-            self.take_player_damage();
-            if self.game_over {
-                break;
-            }
+        // Unlock boundary once breach group is fully resolved.
+        // No explicit queue release needed: enemies remain Moving and compress naturally
+        // behind the breacher; the frontmost will reach BOUNDARY_X and start the next breach.
+        if self.boundary_ctrl.breach_locked && self.boundary_ctrl.breach_group.is_empty() {
+            self.boundary_ctrl.breach_locked = false;
         }
 
         self.enemies
@@ -566,6 +610,17 @@ impl GameState {
                         follower.x = right_edge;
                     }
                     break;
+                }
+            }
+        }
+
+        // Boundary clamp pass: after stacking, prevent Moving enemies from drifting into the
+        // locked boundary zone (stacking could push a follower forward past the stop line).
+        if self.boundary_ctrl.breach_locked {
+            let stop_x = BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET;
+            for e in &mut self.enemies {
+                if e.state == EnemyState::Moving && e.x < stop_x {
+                    e.x = stop_x;
                 }
             }
         }
@@ -995,6 +1050,14 @@ impl GameState {
             ),
         };
 
+        let windup_time = match kind {
+            EnemyKind::Small => self.config.windup_time_small,
+            EnemyKind::Medium => self.config.windup_time_medium,
+            EnemyKind::Heavy => self.config.windup_time_heavy,
+            EnemyKind::Large => self.config.windup_time_large,
+            EnemyKind::Elite => self.config.windup_time_elite,
+        };
+
         // HP scaling: heavier kinds scale faster
         let kind_weight = match kind {
             EnemyKind::Heavy => self.config.hp_scale_heavy_mult,
@@ -1036,7 +1099,7 @@ impl GameState {
             }
 
             // Place enemy
-            let mut enemy = Enemy::new(x, y, kind, hp, speed, w, h);
+            let mut enemy = Enemy::new(x, y, kind, hp, speed, w, h, windup_time);
             let shield_chance = (SHIELDED_FREQ_SCALE * self.run_time).min(0.5);
             if rand::gen_range(0.0_f32, 1.0) < shield_chance {
                 enemy.shielded = true;

@@ -69,12 +69,14 @@ Canonical enemy size table:
 Enemy lane height 104 px; max standard enemy height 48 px; boss hard cap 72 px.
 
 Enemy classes:
-- **Small:** 1 HP. On reaching the left boundary: trigger **one** damage event and despawn.
-- **Medium:** multi HP. On reaching boundary: stop, occupy a boundary slot, deal repeated damage ticks until destroyed.
-- **Heavy:** ~6–8 HP. On reaching boundary: stop, occupy a boundary slot, deal repeated damage ticks until destroyed. Introduced later than Medium.
-- **Large:** high HP. On reaching boundary: stop, occupy a boundary slot, deal repeated damage ticks until destroyed.
-- **Mini-Boss:** ~25–40 HP. Event-based only (see §13). On reaching boundary: stop, occupy a boundary slot, deal repeated damage ticks.
+- **Small:** 1 HP. On reaching the left boundary: winds up, triggers **one** breach event, then despawns.
+- **Medium:** multi HP. On reaching boundary: winds up (0.5 s), triggers one breach event, then despawns.
+- **Heavy:** ~6–8 HP. On reaching boundary: winds up (1.0 s), triggers one breach event, then despawns. Introduced later than Medium.
+- **Large:** high HP. On reaching boundary: winds up (1.3 s), triggers one breach event, then despawns.
+- **Mini-Boss:** ~25–40 HP. Event-based only (see §13). On reaching boundary: winds up, triggers one breach event, then despawns.
 - **Boss:** Reserved tier. No gameplay rules defined yet.
+
+Wind-up times are tuning values — see `config.toml` (`windup_time_*`). A heavier enemy has a longer wind-up, giving the player more time to intercept it before the breach resolves. Enemy differentiation comes from HP, speed, and wind-up time — **not** from breach damage amount (all non-boss enemies deal exactly 1 breach event).
 
 ### Shielded enemies (additive layer)
 - Some enemies spawn with a shield layer (extra HP layer that must be broken first).
@@ -100,19 +102,23 @@ Enemy classes:
 - The explosive segment always breaks **last** — normal segments are consumed first.
 - When the explosive segment breaks: an explosion occurs 40 px forward from the barrier, spanning the full enemy lane height.
 - Explosion effect on enemies:
-  - Elite and Mini-Boss are pushed back 24 px (unless they currently occupy a boundary slot).
-  - Non-elite enemies are **not** pushed back by the explosion.
+  - Elite and Mini-Boss are pushed back 24 px.
+  - Non-elite enemies within the zone are destroyed.
+  - Breaching enemies in the zone are cleared; breach lock is released immediately.
   - Explosion does **not** affect the upgrade lane.
+- A brief movement freeze (micro-stall, ~0.25 s) is applied after explosion for impact readability.
 - The Explosive Shield upgrade is a modifier, not additive: unavailable if the player has 0 segments or if an explosive segment already exists.
 
-### Damage events
-On a damage tick:
-- If player has shield: remove the outermost normal segment (explosive segment breaks last).
-- If player has no shield: player dies.
+### Damage events (breach model)
+When an enemy completes its wind-up at the boundary, a **breach event** fires:
+- If player has shield: remove exactly one segment (normal segments first; explosive last).
+- If player has no shield: player dies instantly.
+- The breaching enemy is despawned immediately after resolution.
+
+All enemies deal exactly **1 breach event** — there is no multi-damage or spillover.
 
 Damage sources:
-- Small enemy boundary arrival: 1 damage event then despawn.
-- Medium/large at boundary: repeated damage ticks at fixed interval until destroyed.
+- Any enemy kind that reaches the left boundary and completes its wind-up.
 
 **Losing shields never removes drones and never reduces offense.**
 
@@ -130,13 +136,17 @@ Critical orb-interaction rules:
 - **Drone shots do not affect upgrade orbs in any way** (no activation HP damage, no cycling).
 - Upgrade-lane drones (cross-lane) despawn immediately on any orb activation event; they do not interact with orbs.
 
-## 8. Boundary slots & lane jam
-- Left boundary has a finite number of occupancy slots.
-- Medium/large (and elites) occupy a slot on arrival.
-- If all slots are full:
-  - The lane **jams**: additional enemies stop moving / queue.
-  - Faster enemies stack behind slower/stopped ones (no overlapping). A faster enemy that catches up to a slower one matches its effective position and waits.
-  - Queued enemies do not deal boundary damage until they occupy a slot.
+## 8. Boundary breach & queuing
+- Only one enemy may wind up at the boundary at a time (**breach lock**).
+- When an enemy reaches `BOUNDARY_X` and breach is free: it enters the `Breaching` state, its movement stops, and the breach lock engages.
+- If another enemy arrives within a brief simultaneous window (≤ 0.10 s) of the first, it may also join the current breach group (rare, organic simultaneous breach).
+- All other enemies that reach the boundary while locked are clamped at `BOUNDARY_X + PRE_BOUNDARY_STOP_OFFSET` (24 px) and remain `Moving`. They compress naturally behind the breaching enemy, forming a visible pressure cluster.
+- After all enemies in the breach group resolve, the lock is released. The frontmost compressed enemy naturally advances to `BOUNDARY_X` and starts the next breach.
+- Enemies that are staggered (knocked back) while Breaching are returned to Moving and removed from the breach group, releasing the lock early.
+- **Future (P2.X):** virtual slot system — 6 vertical lanes with span-based occupancy per enemy kind (Small=1, Medium/Heavy=2, Large=3) for visual variety at the boundary.
+
+Enemy stacking behavior (unchanged):
+- Faster enemies stack behind slower/stopped ones (no overlapping). A faster enemy that catches up to a slower one matches its effective position and waits.
 
 ## 9. Upgrade lane & orb interaction (two-phase)
 Orbs are interactive and require deliberate time/aim.

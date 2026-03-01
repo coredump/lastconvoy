@@ -3,7 +3,6 @@
 
 use macroquad::prelude::*;
 
-mod boundary;
 mod config;
 mod debug_log;
 mod drone;
