@@ -22,22 +22,23 @@ If anything in the repo conflicts with this document regarding gameplay rules, *
 - Scaling: Integer only (×1, ×2, ×3, ×4, ×5, ×6). No fractional scaling.
 
 ## 3. Lanes
-Two horizontal lanes (always):
-- **Top lane:** Enemies
-- **Bottom lane:** Upgrades (orbs)
-Upgrade lane is visually smaller than enemy lane.
+Three gameplay lanes (always):
+- **Top upgrade lane:** Upgrades (orbs)
+- **Enemy lane:** Enemies
+- **Bottom upgrade lane:** Upgrades (orbs)
+Each upgrade lane is visually smaller than the enemy lane.
 
-Lanes are **independent systems** (separate spawn timers, separate caps).
+Lanes are independent movement/combat spaces, but orb spawning is synchronized across both upgrade lanes (see §9).
 
 Coordinate ranges (locked):
 
 | Section       | Rows     | Height |
 |---------------|----------|--------|
-| Top Border    | 0–15     | 16 px  |
-| Enemy Lane    | 16–119   | 104 px |
-| Divider       | 120–123  | 4 px   |
-| Upgrade Lane  | 124–163  | 40 px  |
-| Bottom Border | 164–179  | 16 px  |
+| Top Border    | 0–20     | 21 px  |
+| Top Upgrade Lane | 21–42 | 22 px  |
+| Enemy Lane    | 43–136   | 94 px |
+| Bottom Upgrade Lane | 137–158 | 22 px |
+| Bottom Border | 159–179  | 21 px  |
 
 ## 4. Player
 - Fixed on left side.
@@ -66,7 +67,7 @@ Canonical enemy size table:
 | Mini-Boss | 64×48      | event-based only; 2–3 px padding |
 | Boss      | 72×72 max  | reserved; no gameplay rules yet |
 
-Enemy lane height 104 px; max standard enemy height 48 px; boss hard cap 72 px.
+Enemy lane height 94 px; max standard enemy height 48 px; boss hard cap 72 px.
 
 Enemy classes:
 - **Small:** 1 HP. On reaching the left boundary: winds up, triggers **one** breach event, then despawns.
@@ -134,7 +135,8 @@ Shot-type modifiers apply to **all** shooting entities (player + drones).
 
 Critical orb-interaction rules:
 - All shots (player, attached drone, remote drone) interact with orbs equally — any shot can activate a sealed orb.
-- **Remote (upgrade-lane) drones** are stationary in the upgrade lane. They fire rightward continuously, hitting incoming inactive orbs to accelerate activation. They despawn immediately when any orb activates.
+- **Remote (upgrade-lane) drones** are stationary in either upgrade lane (top or bottom). They fire rightward continuously, hitting incoming inactive orbs to accelerate activation. They despawn immediately when any orb activates.
+- **Shot-only lane barrier:** an invisible 1px barrier exists on the upgrade-side edge of each enemy/upgrade boundary. Shots crossing these lines are blocked except through a left-side gate corridor.
 
 ## 8. Boundary breach & queuing
 - Only one enemy may wind up at the boundary at a time (**breach lock**).
@@ -153,14 +155,16 @@ Enemy stacking behavior (unchanged):
 Orbs are interactive and require deliberate time/aim.
 
 ### Orb spawning
-- Orbs spawn continuously on a timer in upgrade lane.
+- Orbs spawn continuously on a timer, attempting one spawn in each upgrade lane on each tick.
 - Spawn rate slowly increases with time (difficulty).
 - Small random offset ("predictable but not to the second").
-- Enforce max active orb cap; if at cap, delay spawn.
+- Enforce max active orb cap (global across both upgrade lanes); if at cap, delay spawn.
+- Orb type is rolled independently per lane when both lanes spawn on the same tick.
+- If only one global orb slot remains, only one lane spawns that tick.
 - Enemy spawns pause during elites; **orb spawns continue during elites**.
 
 ### Orb movement
-- Orbs move right → left in upgrade lane.
+- Orbs move right → left in their selected upgrade lane.
 
 ### Two-phase interaction
 Orbs spawn sealed (inactive).
@@ -185,7 +189,7 @@ Upgrades are collected by physically touching an activated orb. Each OrbType is 
 
 ### (B) Drones
 - **Drone**: adds one attached drone. Drone fires in the same lane as the player and moves with the player.
-- **DroneRemote**: spawns a temporary drone in the upgrade lane that seeks and fires leftward at inactive orbs to accelerate their activation (Phase 1 only). Despawns after TTL (`DRONE_REMOTE_TTL`).
+- **DroneRemote**: on pickup, spawns two temporary drones (one per upgrade lane). They fire rightward at inactive orbs to accelerate activation (Phase 1 only) and despawn when any orb activates.
 
 ### (C) Offense — Temporary buffs
 Offense orbs are temporary buffs, not permanent levels. Re-collecting an active offense buff refreshes its timer; it does not stack potency.
@@ -374,12 +378,19 @@ Steel must remain visible. Enemies cannot be fully magenta.
 - No internal shade equals outline value.
 If silhouette fails at 1×, redesign.
 
-### Divider Design
-Height: 4 px. Must feel intentional — energy rail, shield barrier, or mechanical seam.
-Never a flat single-color strip.
+### Upgrade Lane Framing
+Top and bottom upgrade lanes mirror each other in height and color, and both remain gameplay-active orb lanes.
+
+### Boundary Shield Visual
+The boundary shield sprite spans vertically from 2 px inside the top border bottom edge to 2 px inside the bottom border top edge:
+- Top of shield: y = TOP_BORDER_BOTTOM + 2 = 22
+- Bottom of shield: y = BOTTOM_BORDER_TOP − 2 = 157 (inclusive)
+- Total height: 136 px
+
+Rendered using 3-slice vertical repeat: `top` and `bot` slices drawn at natural height (15 px each); `mid` slice (12 px) tiled to fill the remainder. The current animation frame's x-offset is applied to all slice source rects. Orange tint applied when an explosive segment is present.
 
 ### Border Design
-Top and Bottom Borders: 16 px each.
+Top and Bottom Borders: 21 px each.
 Must feel part of world (biome enclosure, structural framing) — not UI bars.
 
 ### Hard Constraints

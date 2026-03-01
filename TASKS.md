@@ -28,12 +28,12 @@ If anything conflicts:
   - `shield.rs` — shield segment model
   - `upgrade.rs` — upgrade track definitions
   - `elite.rs` — elite event system
-  - `boundary.rs` — boundary slot and jam system
+  - `boundary.rs` — boundary breach lock and cooldown system
   - `render.rs` — integer-scaled render-to-texture pipeline
   - `text.rs` — BitmapFont bitmap text renderer (Monogram assets)
 - Centralize all tuning constants in `config.rs` as compile-time defaults:
   - lane bounds, speeds, caps, timers, scaling curves
-  - boundary slot count
+  - boundary breach timing and cooldown durations
   - orb caps, orb HP curve
   - elite interval + random offset range
 - Implement **runtime config file** loading (see SPEC §17):
@@ -76,7 +76,7 @@ If anything conflicts:
 - Player projectiles tagged as `source: Player` (matters for orb interaction).
 
 ### P1.4 Lane visuals ✓ DONE
-- Draw top border (rows 0–15), enemy lane background (16–119), divider (120–123), upgrade lane background (124–163), bottom border (164–179).
+- Draw top border (rows 0–20), top upgrade lane background (21–42), enemy lane background (43–136), bottom upgrade lane background (137–158), bottom border (159–179).
 - Divider: 4 px, styled as energy rail / barrier (not flat color).
 - Borders: styled as structural framing (not UI bars).
 - Use placeholder colors from the palette spec; refine art later.
@@ -92,8 +92,7 @@ If anything conflicts:
 - Movement: right → left within enemy lane bounds.
 - Collision with player projectiles: reduce HP, despawn projectile (unless piercing).
 - Boundary arrival behavior:
-  - Small: trigger 1 damage event on player, then despawn.
-  - Medium / Heavy / Large: stop at boundary, occupy a boundary slot, tick damage at interval until destroyed.
+  - All: trigger 1 damage event on player (via breach wind-up mechanism), then despawn.
 - Shielded enemies:
   - Some enemies spawn with an extra shield HP layer (must be broken before main HP).
   - No shield regen.
@@ -176,7 +175,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
   - Randomly choose variant A (single elite) or C (elite + support enemies).
   - Spawn `EnemyElite1` (48×40 px, from config HP) in enemy lane, moving right → left.
   - Orb spawning continues uninterrupted.
-- Elite is a DPS check: if not killed before boundary, occupies a slot and ticks damage.
+- Elite is a DPS check: if not killed before boundary, enters breach wind-up and deals damage like any other enemy.
 - On elite death:
   - Resume normal enemy spawning.
   - Apply a small global scaling bump (config-defined).
@@ -189,7 +188,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
   - Pause normal enemy spawning.
   - Spawn one Mini-Boss (64×48 px, 25–40 HP scaled by time) in enemy lane.
   - Orb spawning continues.
-- Boundary behavior: occupy slot + tick damage (like Large/Heavy).
+- Boundary behavior: enters breach wind-up and deals damage via the standard breach mechanism.
 - On death: resume spawning, apply small scaling bump.
 - **Status**: miniboss_timer exists in GameState but no spawn or event logic implemented.
 
@@ -207,7 +206,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - Touch input works (at least in WASM build). ⚠ Touch stub only
 - Orbs work exactly as specified (activate then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
 - Elites and Mini-Bosses work with enemy spawn pause (orbs continue). ⚠ NOT STARTED (no event pause logic)
-- Boundary slots and jam work. ✓ COMPLETE
+- Boundary breach lock and compression work. ✓ COMPLETE
 - No menus required. ✓
 - No tests required. ✓
 - Runs natively for dev; builds to WASM for browser. ✓ WASM build exists

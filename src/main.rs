@@ -134,6 +134,10 @@ async fn main() {
         .await
         .expect("Failed to load drone_remote sprite");
 
+    let rail_wall_sprite = Sprite::from_json("assets/sprites/objects/rail_wall.json")
+        .await
+        .expect("Failed to load rail_wall sprite");
+
     let ui_font = BitmapFont::load(
         "assets/fonts/monogram-bitmap.png",
         "assets/fonts/monogram-bitmap.json",
@@ -164,6 +168,7 @@ async fn main() {
         orb_sprite_drone_remote,
         drone_sprite,
         drone_remote_sprite,
+        rail_wall_sprite,
         ui_font,
     );
     let pipeline = RenderPipeline::new();

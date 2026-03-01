@@ -5,19 +5,20 @@ use crate::config::SHAKE_INTENSITY;
 use crate::config::{
     BASE_DAMAGE_VALUE, BIG_INJECT_BASE_INTERVAL, BOTTOM_BORDER_BOTTOM, BOTTOM_BORDER_TOP,
     BOUNDARY_X, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH,
-    Config, DIVIDER_BOTTOM, DIVIDER_TOP, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT,
-    DRONE_REMOTE_WIDTH, DRONE_Y_OFFSETS, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H,
-    ENEMY_HEAVY_HP, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP,
-    ENEMY_LARGE_H, ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H,
-    ENEMY_MEDIUM_HP, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP,
-    ENEMY_SMALL_SPEED, ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_ATTACHED_DRONES,
-    MEDIUM_INTRO_TIME, ORB_H, ORB_W, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X,
-    PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_SPEED, PROJECTILE_W, SCREEN_W,
-    SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
-    SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
+    Config, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT, DRONE_REMOTE_WIDTH,
+    DRONE_Y_OFFSETS, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP,
+    ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
+    ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
+    ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
+    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_ATTACHED_DRONES, MEDIUM_INTRO_TIME,
+    ORB_H, ORB_W, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H,
+    PROJECTILE_SPEED, PROJECTILE_W, SCREEN_W, SHIELDED_FREQ_SCALE, SHOT_BARRIER_BOTTOM_Y,
+    SHOT_BARRIER_GATE_X_MAX, SHOT_BARRIER_TOP_Y, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES,
+    SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH, SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX,
+    TOP_BORDER_BOTTOM, TOP_BORDER_TOP, TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP,
     UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
-use crate::drone::{Drone, RemoteDrone};
+use crate::drone::{Drone, RemoteDrone, RemoteDroneLane};
 use crate::elite::EliteEvent;
 use crate::enemy::{Enemy, EnemyKind, EnemyState};
 use crate::input::InputState;
@@ -112,6 +113,7 @@ pub struct GameState {
     pub enemy_large_sprite: Sprite,
     pub enemy_elite_sprite: Sprite,
     pub boundary_shield_sprite: Sprite,
+    pub rail_wall_sprite: Sprite,
     pub shot_sprite: Sprite,
     pub burst_shot_sprite: Sprite,
     pub shields: ShieldSystem,
@@ -146,6 +148,7 @@ pub struct GameState {
     pub orb_spawn_timer: f32,
     pub elite_timer: f32,
     pub miniboss_timer: f32,
+    pub run_id: u32,
     pub run_time: f32,
     pub game_over: bool,
     pub kills_total: u32,
@@ -182,6 +185,7 @@ impl GameState {
         orb_sprite_drone_remote: Sprite,
         drone_sprite: Sprite,
         drone_remote_sprite: Sprite,
+        rail_wall_sprite: Sprite,
         ui_font: BitmapFont,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
@@ -194,7 +198,7 @@ impl GameState {
             config.player_fire_rate,
         );
 
-        Self {
+        let mut state = Self {
             player,
             player_sprite,
             enemy_small_sprite,
@@ -221,6 +225,7 @@ impl GameState {
             orb_sprite_drone_remote,
             drone_sprite,
             drone_remote_sprite,
+            rail_wall_sprite,
             damage_buff_t: 0.0,
             fire_rate_buff_t: 0.0,
             burst_buff_t: 0.0,
@@ -237,6 +242,7 @@ impl GameState {
             orb_spawn_timer: 0.0,
             elite_timer: config.elite_interval,
             miniboss_timer: config.miniboss_interval,
+            run_id: 1,
             run_time: 0.0,
             game_over: false,
             kills_total: 0,
@@ -292,7 +298,9 @@ impl GameState {
                 )
                 .expect("additive material")
             },
-        }
+        };
+        state.log_run_start("boot");
+        state
     }
 
     /// Reset all mutable game state for a new run (keeps config and sprites).
@@ -326,18 +334,39 @@ impl GameState {
         self.orb_spawn_timer = 0.0;
         self.elite_timer = self.config.elite_interval;
         self.miniboss_timer = self.config.miniboss_interval;
+        self.run_id = self.run_id.saturating_add(1);
         self.run_time = 0.0;
         self.game_over = false;
         self.kills_total = 0;
         self.breaches_total = 0;
         self.balance_log_timer = 0.0;
         self.floating_texts.clear();
+        self.log_run_start("restart");
     }
 
     fn dlog(&mut self, msg: &str) {
         if let Some(log) = &mut self.debug_log {
             log.log(self.run_time, msg);
         }
+    }
+
+    fn log_run_start(&mut self, source: &str) {
+        self.dlog(&format!(
+            "RUN_START run_id={} source={}",
+            self.run_id, source
+        ));
+    }
+
+    fn log_run_end(&mut self, reason: &str) {
+        self.dlog(&format!(
+            "RUN_END run_id={} reason={} time_s={:.1} kills={} breaches={} shields={}",
+            self.run_id,
+            reason,
+            self.run_time,
+            self.kills_total,
+            self.breaches_total,
+            self.shields.count()
+        ));
     }
 
     fn damage_buff_active(&self) -> bool {
@@ -457,6 +486,9 @@ impl GameState {
         self.player.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
         match self.shields.take_hit() {
             ShieldHitResult::NoShield => {
+                if !self.game_over {
+                    self.log_run_end("death");
+                }
                 self.game_over = true;
             }
             ShieldHitResult::ExplosiveBreak => {
@@ -588,6 +620,11 @@ impl GameState {
         // Update projectiles
         for p in &mut self.projectiles {
             p.update(dt);
+        }
+        for p in &mut self.projectiles {
+            if p.alive && Self::projectile_hits_shot_barrier(p) {
+                p.alive = false;
+            }
         }
 
         // Projectile-enemy collision (player + drone + remote drone shots).
@@ -881,8 +918,6 @@ impl GameState {
         if self.orb_spawn_timer <= 0.0 {
             self.orb_spawn_timer = self.config.orb_spawn_interval;
             if self.orbs.len() < self.config.max_active_orbs {
-                let lane_mid = (UPGRADE_LANE_TOP + UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0;
-                let y = lane_mid - ORB_H / 2.0;
                 // Build weighted pool; gate Shield if shields are full.
                 let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
                 // Temporary offense buffs are excluded while active.
@@ -919,27 +954,71 @@ impl GameState {
                 }
                 if !pool.is_empty() {
                     let total: u32 = pool.iter().map(|(_, w)| w).sum();
-                    let mut roll = rand::gen_range(0u32, total);
-                    let orb_type = pool
-                        .iter()
-                        .find(|(_, w)| {
-                            if roll < *w {
-                                true
-                            } else {
-                                roll -= w;
-                                false
-                            }
-                        })
-                        .map(|(t, _)| *t)
-                        .unwrap_or(pool[0].0);
-                    self.orbs.push(Orb::new(
-                        SCREEN_W as f32,
-                        y,
-                        ORB_W,
-                        ORB_H,
-                        self.config.orb_speed,
-                        orb_type,
-                    ));
+                    let roll_orb_type = || -> OrbType {
+                        let mut roll = rand::gen_range(0u32, total);
+                        pool.iter()
+                            .find(|(_, w)| {
+                                if roll < *w {
+                                    true
+                                } else {
+                                    roll -= w;
+                                    false
+                                }
+                            })
+                            .map(|(t, _)| *t)
+                            .unwrap_or(pool[0].0)
+                    };
+                    let remaining = self.config.max_active_orbs.saturating_sub(self.orbs.len());
+                    if remaining >= 2 {
+                        let top_type = roll_orb_type();
+                        let bottom_type = roll_orb_type();
+                        self.orbs.push(Orb::new(
+                            SCREEN_W as f32,
+                            self.upgrade_lane_mid_top() - ORB_H / 2.0,
+                            ORB_W,
+                            ORB_H,
+                            self.config.orb_speed,
+                            top_type,
+                        ));
+                        self.orbs.push(Orb::new(
+                            SCREEN_W as f32,
+                            self.upgrade_lane_mid_bottom() - ORB_H / 2.0,
+                            ORB_W,
+                            ORB_H,
+                            self.config.orb_speed,
+                            bottom_type,
+                        ));
+                    } else if remaining == 1 {
+                        let top_mid = self.upgrade_lane_mid_top();
+                        let bottom_mid = self.upgrade_lane_mid_bottom();
+                        let top_count = self
+                            .orbs
+                            .iter()
+                            .filter(|orb| orb.y + ORB_H / 2.0 < ENEMY_LANE_TOP as f32)
+                            .count();
+                        let bottom_count = self
+                            .orbs
+                            .iter()
+                            .filter(|orb| orb.y + ORB_H / 2.0 > ENEMY_LANE_BOTTOM as f32)
+                            .count();
+                        let lane_mid = if top_count < bottom_count {
+                            top_mid
+                        } else if bottom_count < top_count {
+                            bottom_mid
+                        } else if rand::gen_range(0u32, 2) == 0 {
+                            top_mid
+                        } else {
+                            bottom_mid
+                        };
+                        self.orbs.push(Orb::new(
+                            SCREEN_W as f32,
+                            lane_mid - ORB_H / 2.0,
+                            ORB_W,
+                            ORB_H,
+                            self.config.orb_speed,
+                            roll_orb_type(),
+                        ));
+                    }
                 }
             }
         }
@@ -1089,9 +1168,18 @@ impl GameState {
                     }
                 }
                 OrbType::DroneRemote => {
-                    let lane_mid = (UPGRADE_LANE_TOP + UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0;
-                    let rd_y = lane_mid - DRONE_REMOTE_HEIGHT / 2.0;
-                    self.remote_drones.push(RemoteDrone::new(BOUNDARY_X, rd_y));
+                    let top_y = self.upgrade_lane_mid_top() - DRONE_REMOTE_HEIGHT / 2.0;
+                    let bottom_y = self.upgrade_lane_mid_bottom() - DRONE_REMOTE_HEIGHT / 2.0;
+                    self.remote_drones.push(RemoteDrone::new(
+                        BOUNDARY_X,
+                        top_y,
+                        RemoteDroneLane::Top,
+                    ));
+                    self.remote_drones.push(RemoteDrone::new(
+                        BOUNDARY_X,
+                        bottom_y,
+                        RemoteDroneLane::Bottom,
+                    ));
                     self.dlog("ORB_PICKUP type=DroneRemote");
                     Some("+REMOTE")
                 }
@@ -1102,10 +1190,8 @@ impl GameState {
             }
         }
 
-        let player_cx = self.player.x + self.player.width / 2.0;
         self.orbs.retain(|o| {
-            let orb_cx = o.x + o.width / 2.0;
-            orb_cx >= player_cx && !o.is_collected()
+            o.x + o.width > 0.0 && !o.is_collected()
         });
 
         // Update attached drones: follow player, fire into enemy lane.
@@ -1185,6 +1271,7 @@ impl GameState {
         self.enemy_large_sprite.update(dt);
         self.enemy_elite_sprite.update(dt);
         self.boundary_shield_sprite.update(dt);
+        self.rail_wall_sprite.update(dt);
         self.shields.update(dt);
     }
 
@@ -1196,9 +1283,15 @@ impl GameState {
             } else {
                 WHITE
             };
-            self.boundary_shield_sprite.draw_tinted(
-                BOUNDARY_X + self.shields.shake.offset_x(),
-                ENEMY_LANE_TOP as f32,
+            let shield_y = TOP_UPGRADE_LANE_TOP as f32; // 21.0
+            let shield_h = UPGRADE_LANE_BOTTOM as f32 - shield_y + 1.0; // 138.0
+            self.boundary_shield_sprite.draw_3slice_vertical(
+                BOUNDARY_X - 3.0 + self.shields.shake.offset_x(),
+                shield_y,
+                shield_h,
+                "top",
+                "mid",
+                "bot",
                 shield_tint,
             );
         }
@@ -1212,7 +1305,11 @@ impl GameState {
             }
         }
         for rd in &self.remote_drones {
-            self.drone_remote_sprite.draw(rd.x, rd.y);
+            if rd.lane == RemoteDroneLane::Top {
+                self.drone_remote_sprite.draw_flipped_y(rd.x, rd.y);
+            } else {
+                self.drone_remote_sprite.draw(rd.x, rd.y);
+            }
         }
         for p in &self.projectiles {
             let sprite = if p.is_burst {
@@ -1577,6 +1674,25 @@ impl GameState {
         format!("{minutes:02}:{seconds:02}")
     }
 
+    fn upgrade_lane_mid_top(&self) -> f32 {
+        (TOP_UPGRADE_LANE_TOP + TOP_UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0
+    }
+
+    fn upgrade_lane_mid_bottom(&self) -> f32 {
+        (UPGRADE_LANE_TOP + UPGRADE_LANE_BOTTOM + 1) as f32 / 2.0
+    }
+
+    fn projectile_hits_shot_barrier(p: &Projectile) -> bool {
+        if p.x <= SHOT_BARRIER_GATE_X_MAX {
+            return false;
+        }
+        let y0 = p.y;
+        let y1 = p.y + PROJECTILE_H;
+        let overlaps_top = y0 < SHOT_BARRIER_TOP_Y + 1.0 && y1 > SHOT_BARRIER_TOP_Y;
+        let overlaps_bottom = y0 < SHOT_BARRIER_BOTTOM_Y + 1.0 && y1 > SHOT_BARRIER_BOTTOM_Y;
+        overlaps_top || overlaps_bottom
+    }
+
     fn draw_run_timer_hud(&self) {
         let timer = self.format_run_timer();
         let size = self.ui_font.measure(&timer, 1, 1);
@@ -1778,13 +1894,22 @@ impl GameState {
         let steel_mid = Color::from_rgba(58, 70, 90, 255);
         let teal_very_dark = Color::from_rgba(0, 50, 44, 255);
 
-        // Top border (rows 0–15): Steel Dark fill + Steel Mid accent on inner edge
+        // Top border (rows 0–20): Steel Dark fill + Steel Mid accent on inner edge
         let tb_y = TOP_BORDER_TOP as f32;
         let tb_h = (TOP_BORDER_BOTTOM - TOP_BORDER_TOP + 1) as f32;
         draw_rectangle(0.0, tb_y, w, tb_h, steel_dark);
         draw_rectangle(0.0, tb_y + tb_h - 1.0, w, 1.0, steel_mid);
 
-        // Enemy lane (rows 16–119): Space Very Dark
+        // Top upgrade lane (rows 21–42): Upgrade Teal Very Dark
+        draw_rectangle(
+            0.0,
+            TOP_UPGRADE_LANE_TOP as f32,
+            w,
+            (TOP_UPGRADE_LANE_BOTTOM - TOP_UPGRADE_LANE_TOP + 1) as f32,
+            teal_very_dark,
+        );
+
+        // Enemy lane (rows 43–136): Space Very Dark
         draw_rectangle(
             0.0,
             ENEMY_LANE_TOP as f32,
@@ -1792,25 +1917,7 @@ impl GameState {
             (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32,
             space_very_dark,
         );
-        // Boundary marker: subtle vertical line across the enemy lane
-        draw_rectangle(
-            BOUNDARY_X,
-            ENEMY_LANE_TOP as f32,
-            1.0,
-            (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32,
-            steel_dark,
-        );
-
-        // Divider (rows 120–123): Steel Mid flat placeholder
-        draw_rectangle(
-            0.0,
-            DIVIDER_TOP as f32,
-            w,
-            (DIVIDER_BOTTOM - DIVIDER_TOP + 1) as f32,
-            steel_mid,
-        );
-
-        // Upgrade lane (rows 124–163): Upgrade Teal Very Dark
+        // Bottom upgrade lane (rows 137–158): Upgrade Teal Very Dark
         draw_rectangle(
             0.0,
             UPGRADE_LANE_TOP as f32,
@@ -1819,11 +1926,28 @@ impl GameState {
             teal_very_dark,
         );
 
-        // Bottom border (rows 164–179): Steel Dark fill + Steel Mid accent on inner edge
+        // Bottom border (rows 159–179): Steel Dark fill + Steel Mid accent on inner edge
         let bb_y = BOTTOM_BORDER_TOP as f32;
         let bb_h = (BOTTOM_BORDER_BOTTOM - BOTTOM_BORDER_TOP + 1) as f32;
         draw_rectangle(0.0, bb_y, w, bb_h, steel_dark);
         draw_rectangle(0.0, bb_y, w, 1.0, steel_mid);
+
+        // Rail wall: tile the animated sprite (36×36) from x=0; right edge aligns with BOUNDARY_X.
+        // Only draw within the non-border area (y=21–158); clip the last partial tile.
+        let rail_x = 0.0_f32; // left-aligned to screen edge
+        let tile_h = 36.0_f32;
+        let rail_start = TOP_UPGRADE_LANE_TOP as f32; // 21.0
+        let rail_end = UPGRADE_LANE_BOTTOM as f32 + 1.0; // 159.0 (exclusive)
+        let mut cursor = rail_start;
+        while cursor < rail_end {
+            let available = rail_end - cursor;
+            if available >= tile_h {
+                self.rail_wall_sprite.draw(rail_x, cursor);
+            } else {
+                self.rail_wall_sprite.draw_clipped_h(rail_x, cursor, available);
+            }
+            cursor += tile_h;
+        }
     }
 }
 

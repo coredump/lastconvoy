@@ -112,6 +112,8 @@ pub struct Sprite {
     timer: f32,
     current_frame: u32,
     pp_dir: i8, // +1 forward, -1 reverse (pingpong only)
+    /// Named slices from Aseprite export, in frame-local coordinates.
+    pub slices: HashMap<String, Rect>,
 }
 
 impl Sprite {
@@ -177,6 +179,16 @@ impl Sprite {
             .map_err(|e| format!("Failed to load texture {texture_path}: {e}"))?;
         texture.set_filter(FilterMode::Nearest);
 
+        let mut slices = HashMap::new();
+        for s in &parsed.meta.slices {
+            if let Some(key) = s.keys.first() {
+                slices.insert(
+                    s.name.clone(),
+                    Rect::new(key.bounds.x, key.bounds.y, key.bounds.w, key.bounds.h),
+                );
+            }
+        }
+
         Ok(Self {
             texture,
             anim,
@@ -186,6 +198,7 @@ impl Sprite {
             timer: 0.0,
             current_frame: 0,
             pp_dir: 1,
+            slices,
         })
     }
 
@@ -244,6 +257,24 @@ impl Sprite {
                 source: Some(f.source_rect),
                 dest_size: Some(f.dest_size),
                 flip_y: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    /// Draw the current frame at (x, y), clipped to `clip_h` pixels tall (from the top).
+    pub fn draw_clipped_h(&self, x: f32, y: f32, clip_h: f32) {
+        let f = self.anim.frame();
+        let mut src = f.source_rect;
+        src.h = clip_h;
+        draw_texture_ex(
+            &self.texture,
+            x,
+            y,
+            WHITE,
+            DrawTextureParams {
+                source: Some(src),
+                dest_size: Some(vec2(f.dest_size.x, clip_h)),
                 ..Default::default()
             },
         );
@@ -341,6 +372,57 @@ impl Sprite {
         );
         self.anim.set_frame(saved);
     }
+
+    /// Draw the sprite using 3-slice vertical scaling.
+    ///
+    /// The top and bottom slices are drawn at their natural height; the middle slice
+    /// repeats (with partial clipping on the last tile) to fill the gap.
+    /// All slice rects are frame-local (relative to the top-left of the frame).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_3slice_vertical(
+        &self,
+        x: f32,
+        y: f32,
+        total_h: f32,
+        top: &str,
+        mid: &str,
+        bot: &str,
+        tint: Color,
+    ) {
+        let frame_x = self.anim.frame().source_rect.x;
+
+        let draw_slice = |sy: f32, slice: &Rect, clip_h: f32| {
+            draw_texture_ex(
+                &self.texture,
+                x,
+                sy,
+                tint,
+                DrawTextureParams {
+                    source: Some(Rect::new(frame_x + slice.x, slice.y, slice.w, clip_h)),
+                    dest_size: Some(vec2(slice.w, clip_h)),
+                    ..Default::default()
+                },
+            );
+        };
+
+        let top_r = self.slices.get(top).copied().unwrap_or_default();
+        let mid_r = self.slices.get(mid).copied().unwrap_or_default();
+        let bot_r = self.slices.get(bot).copied().unwrap_or_default();
+
+        draw_slice(y, &top_r, top_r.h);
+        draw_slice(y + total_h - bot_r.h, &bot_r, bot_r.h);
+
+        // Fill middle
+        let mid_start = y + top_r.h;
+        let mid_end = y + total_h - bot_r.h;
+        let mut cursor = mid_start;
+        while cursor < mid_end {
+            let available = mid_end - cursor;
+            let tile_h = mid_r.h.min(available);
+            draw_slice(cursor, &mid_r, tile_h);
+            cursor += tile_h;
+        }
+    }
 }
 
 // --- Aseprite JSON deserialization ---
@@ -364,9 +446,30 @@ struct AseRect {
 }
 
 #[derive(Deserialize)]
+struct AseSliceBounds {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+#[derive(Deserialize)]
+struct AseSliceKey {
+    bounds: AseSliceBounds,
+}
+
+#[derive(Deserialize)]
+struct AseSlice {
+    name: String,
+    keys: Vec<AseSliceKey>,
+}
+
+#[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct AseMeta {
     frameTags: Vec<AseFrameTag>,
+    #[serde(default)]
+    slices: Vec<AseSlice>,
 }
 
 #[derive(Deserialize)]
