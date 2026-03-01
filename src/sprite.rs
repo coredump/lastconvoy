@@ -225,6 +225,25 @@ impl Sprite {
         );
         self.anim.set_frame(saved);
     }
+
+    /// Draw an arbitrary frame of the current animation tag without affecting animation state.
+    pub fn draw_frame(&mut self, x: f32, y: f32, frame: u32, tint: Color) {
+        let saved = self.current_frame;
+        self.anim.set_frame(frame);
+        let f = self.anim.frame();
+        draw_texture_ex(
+            &self.texture,
+            x,
+            y,
+            tint,
+            DrawTextureParams {
+                source: Some(f.source_rect),
+                dest_size: Some(f.dest_size),
+                ..Default::default()
+            },
+        );
+        self.anim.set_frame(saved);
+    }
 }
 
 // --- Aseprite JSON deserialization ---

@@ -33,6 +33,8 @@ pub struct Orb {
     pub activation_progress: f32,
     /// Set by collision code each frame; consumed in update().
     pub hit_this_frame: bool,
+    /// Accumulates time when inactive and not being hit (for seal blink effect).
+    pub decay_blink_timer: f32,
 }
 
 impl Orb {
@@ -48,6 +50,7 @@ impl Orb {
             collected: false,
             activation_progress: 0.0,
             hit_this_frame: false,
+            decay_blink_timer: 0.0,
         }
     }
 
@@ -57,8 +60,14 @@ impl Orb {
         if self.phase == OrbPhase::Inactive {
             if self.hit_this_frame {
                 self.activation_progress += 1.0 / ORB_ACTIVATION_HIT_COUNT;
+                self.decay_blink_timer = 0.0;
             } else {
                 self.activation_progress -= dt * ORB_ACTIVATION_DECAY_PER_SEC;
+                if self.activation_progress > 0.0 {
+                    self.decay_blink_timer += dt;
+                } else {
+                    self.decay_blink_timer = 0.0;
+                }
             }
             self.activation_progress = self.activation_progress.clamp(0.0, 1.0);
             if self.activation_progress >= 1.0 {

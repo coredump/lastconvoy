@@ -65,46 +65,52 @@ async fn main() {
         .expect("Failed to load boundary_shield sprite");
 
     // Load one Sprite per OrbType, each pre-locked to its animation tag index.
-    // Tag indices in upgrades.json: 0=damage, 4=stagger, 5=extradrone, 7=shield
+    // Tag indices in upgrades.json (0-based): 0=seal, 1=damage, 2=rate, 3=burst,
+    //   4=pierce, 5=stagger, 6=extradrone, 7=detacheddrone, 8=shield, 9=explosive
     let mut orb_sprite_damage = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (damage)");
-    orb_sprite_damage.set_animation(0);
+    orb_sprite_damage.set_animation(1);
 
     let mut orb_sprite_shield = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (shield)");
-    orb_sprite_shield.set_animation(7);
+    orb_sprite_shield.set_animation(8);
 
     let mut orb_sprite_drone = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (drone)");
-    orb_sprite_drone.set_animation(5);
+    orb_sprite_drone.set_animation(6);
 
     let mut orb_sprite_fire_rate = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (fire_rate)");
-    orb_sprite_fire_rate.set_animation(1);
+    orb_sprite_fire_rate.set_animation(2);
 
     let mut orb_sprite_burst = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (burst)");
-    orb_sprite_burst.set_animation(2);
+    orb_sprite_burst.set_animation(3);
 
     let mut orb_sprite_pierce = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (pierce)");
-    orb_sprite_pierce.set_animation(3);
+    orb_sprite_pierce.set_animation(4);
 
     let mut orb_sprite_stagger = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (stagger)");
-    orb_sprite_stagger.set_animation(4);
+    orb_sprite_stagger.set_animation(5);
 
     let mut orb_sprite_explosive = Sprite::from_json("assets/sprites/objects/upgrades.json")
         .await
         .expect("Failed to load orb sprite (explosive)");
-    orb_sprite_explosive.set_animation(8);
+    orb_sprite_explosive.set_animation(9);
+
+    let mut orb_sprite_seal = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite (seal)");
+    orb_sprite_seal.set_animation(0);
 
     let mut state = GameState::new(
         config,
@@ -123,6 +129,7 @@ async fn main() {
         orb_sprite_burst,
         orb_sprite_pierce,
         orb_sprite_stagger,
+        orb_sprite_seal,
     );
     let pipeline = RenderPipeline::new();
 
