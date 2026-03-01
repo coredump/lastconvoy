@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use macroquad::prelude::{Color, WHITE};
 
 use crate::config::{
-    DAMAGE_FLASH_COLOR, DAMAGE_FLASH_COOLDOWN, DAMAGE_FLASH_DURATION, SHAKE_DURATION,
-    SHAKE_INTENSITY, WINDUP_FLASH_COLOR, WINDUP_FLASH_FREQ_MAX, WINDUP_FLASH_FREQ_MIN,
+    DAMAGE_FLASH_COLOR, DAMAGE_FLASH_COOLDOWN, DAMAGE_FLASH_DURATION, WINDUP_FLASH_COLOR,
+    WINDUP_FLASH_FREQ_MAX, WINDUP_FLASH_FREQ_MIN,
 };
 use crate::sprite::{FlashEffect, ShakeEffect};
 
@@ -43,13 +43,13 @@ pub struct Enemy {
     pub shielded: bool,
     pub shield_hp: i32,
     pub shake: ShakeEffect,
-    pub flash: FlashEffect,
     /// Oscillator phase for windup flash (0..1 cycles).
     pub windup_phase: f32,
     pub shots_taken: i32,
     pub damage_taken: i32,
     /// True once this enemy has been knocked back; prevents repeated knockback.
     pub stagger_immune: bool,
+    pub flash: FlashEffect,
 }
 
 impl Enemy {
@@ -80,11 +80,11 @@ impl Enemy {
             shielded: false,
             shield_hp: 0,
             shake: ShakeEffect::new(),
-            flash: FlashEffect::new(),
             windup_phase: 0.0,
             shots_taken: 0,
             damage_taken: 0,
             stagger_immune: false,
+            flash: FlashEffect::new(),
         }
     }
 
@@ -104,6 +104,11 @@ impl Enemy {
     pub fn take_damage(&mut self, amount: i32) {
         self.shots_taken += 1;
         self.damage_taken += amount;
+        self.flash.trigger(
+            DAMAGE_FLASH_COLOR,
+            DAMAGE_FLASH_DURATION,
+            DAMAGE_FLASH_COOLDOWN,
+        );
         if self.shielded && self.shield_hp > 0 {
             self.shield_hp -= amount;
             if self.shield_hp <= 0 {
@@ -112,14 +117,6 @@ impl Enemy {
         } else {
             self.hp -= amount;
         }
-        if self.kind != EnemyKind::Small {
-            self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
-        }
-        self.flash.trigger(
-            DAMAGE_FLASH_COLOR,
-            DAMAGE_FLASH_DURATION,
-            DAMAGE_FLASH_COOLDOWN,
-        );
     }
 
     /// Returns the windup flash tint based on the current oscillator phase.

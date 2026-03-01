@@ -32,8 +32,10 @@ pub const BOTTOM_BORDER_BOTTOM: u32 = 179;
 
 // Projectile
 pub const PROJECTILE_SPEED: f32 = 200.0;
-pub const PROJECTILE_W: f32 = 4.0;
-pub const PROJECTILE_H: f32 = 2.0;
+pub const PROJECTILE_W: f32 = 7.0;
+pub const PROJECTILE_H: f32 = 3.0;
+pub const BURST_PROJECTILE_W: f32 = 7.0;
+pub const BURST_PROJECTILE_H: f32 = 3.0;
 
 // Player
 pub const PLAYER_X: f32 = 8.0;
@@ -51,8 +53,8 @@ pub const SHAKE_DURATION: f32 = 0.15; // seconds
 
 // Enemy flash colors and timing
 pub const DAMAGE_FLASH_COLOR: macroquad::prelude::Color =
-    macroquad::prelude::Color::new(1.0, 0.3, 0.3, 1.0);
-pub const DAMAGE_FLASH_DURATION: f32 = 0.12;
+    macroquad::prelude::Color::new(0.7, 1.0, 1.0, 1.0);
+pub const DAMAGE_FLASH_DURATION: f32 = 0.017;
 pub const DAMAGE_FLASH_COOLDOWN: f32 = 0.08;
 pub const WINDUP_FLASH_COLOR: macroquad::prelude::Color =
     macroquad::prelude::Color::new(1.0, 0.85, 0.85, 1.0);

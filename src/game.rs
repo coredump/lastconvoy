@@ -95,6 +95,7 @@ pub struct GameState {
     pub enemy_large_sprite: Sprite,
     pub enemy_elite_sprite: Sprite,
     pub boundary_shield_sprite: Sprite,
+    pub shot_sprite: Sprite,
     pub shields: ShieldSystem,
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
@@ -126,6 +127,7 @@ pub struct GameState {
     pub run_time: f32,
     pub game_over: bool,
     pub debug_log: Option<crate::debug_log::DebugLog>,
+    pub additive_material: Material,
 }
 
 impl GameState {
@@ -139,6 +141,7 @@ impl GameState {
         enemy_large_sprite: Sprite,
         enemy_elite_sprite: Sprite,
         boundary_shield_sprite: Sprite,
+        shot_sprite: Sprite,
         orb_sprite_damage: Sprite,
         orb_sprite_shield: Sprite,
         orb_sprite_drone: Sprite,
@@ -168,6 +171,7 @@ impl GameState {
             enemy_large_sprite,
             enemy_elite_sprite,
             boundary_shield_sprite,
+            shot_sprite,
             shields: ShieldSystem::new(config.player_starting_shields),
             enemies: Vec::new(),
             projectiles: Vec::new(),
@@ -206,6 +210,46 @@ impl GameState {
                 None
             },
             config,
+            additive_material: {
+                use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
+                load_material(
+                    ShaderSource::Glsl {
+                        vertex: r#"#version 100
+                            attribute vec3 position;
+                            attribute vec2 texcoord;
+                            attribute vec4 color0;
+                            attribute vec4 normal;
+                            varying lowp vec2 uv;
+                            varying lowp vec4 color;
+                            uniform mat4 Model;
+                            uniform mat4 Projection;
+                            void main() {
+                                gl_Position = Projection * Model * vec4(position, 1);
+                                color = color0 / 255.0;
+                                uv = texcoord;
+                            }"#,
+                        fragment: r#"#version 100
+                            varying lowp vec4 color;
+                            varying lowp vec2 uv;
+                            uniform sampler2D Texture;
+                            void main() {
+                                gl_FragColor = color * texture2D(Texture, uv);
+                            }"#,
+                    },
+                    MaterialParams {
+                        pipeline_params: PipelineParams {
+                            color_blend: Some(BlendState::new(
+                                Equation::Add,
+                                BlendFactor::Value(BlendValue::SourceAlpha),
+                                BlendFactor::One,
+                            )),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                )
+                .expect("additive material")
+            },
         }
     }
 
@@ -842,6 +886,7 @@ impl GameState {
         self.orb_sprite_burst.update(dt);
         self.orb_sprite_pierce.update(dt);
         self.orb_sprite_stagger.update(dt);
+        self.shot_sprite.update(dt);
         self.player_sprite.update(dt);
         self.enemy_small_sprite.update(dt);
         self.enemy_medium_sprite.update(dt);
@@ -869,7 +914,7 @@ impl GameState {
         self.player_sprite
             .draw(self.player.x + self.player.shake.offset_x(), self.player.y);
         for p in &self.projectiles {
-            p.draw();
+            self.shot_sprite.draw(p.x, p.y - 0.5);
         }
         for e in &self.enemies {
             let sprite = match e.kind {
@@ -882,9 +927,14 @@ impl GameState {
             let tint = if e.state == EnemyState::Breaching {
                 e.windup_tint()
             } else {
-                e.flash.tint()
+                WHITE
             };
-            sprite.draw_tinted(e.x + e.shake.offset_x(), e.y, tint);
+            let draw_x = e.x + e.shake.offset_x();
+            sprite.draw_tinted(draw_x, e.y, tint);
+            let flash_color = e.flash.tint();
+            if flash_color != WHITE {
+                sprite.draw_additive(draw_x, e.y, flash_color, 0.7, &self.additive_material);
+            }
         }
 
         self.draw_orbs();

@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 
-use crate::config::{PROJECTILE_H, PROJECTILE_W, SCREEN_W};
+use crate::config::{BURST_PROJECTILE_H, BURST_PROJECTILE_W, PROJECTILE_H, PROJECTILE_W, SCREEN_W};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProjectileSource {
@@ -53,7 +53,11 @@ impl Projectile {
     }
 
     pub fn draw(&self) {
-        let color = if self.is_burst { RED } else { YELLOW };
-        draw_rectangle(self.x, self.y, PROJECTILE_W, PROJECTILE_H, color);
+        let (color, w, h) = if self.is_burst {
+            (Color::new(1.0, 0.6, 0.2, 1.0), BURST_PROJECTILE_W, BURST_PROJECTILE_H)
+        } else {
+            (Color::new(0.4, 0.9, 1.0, 1.0), PROJECTILE_W, PROJECTILE_H)
+        };
+        draw_rectangle(self.x, self.y, w, h, color);
     }
 }

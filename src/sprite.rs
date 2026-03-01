@@ -88,16 +88,7 @@ impl FlashEffect {
 
     /// Returns the tint color for this frame. WHITE when inactive.
     pub fn tint(&self) -> Color {
-        if self.timer <= 0.0 || self.duration <= 0.0 {
-            return WHITE;
-        }
-        let t = self.timer / self.duration;
-        Color::new(
-            1.0 - t + self.color.r * t,
-            1.0 - t + self.color.g * t,
-            1.0 - t + self.color.b * t,
-            1.0,
-        )
+        if self.timer <= 0.0 { WHITE } else { self.color }
     }
 }
 
@@ -255,6 +246,26 @@ impl Sprite {
                 ..Default::default()
             },
         );
+    }
+
+    /// Draw the current frame additively using `material`, then restore the default material.
+    /// The `color` alpha is scaled to `intensity` (0.0–1.0) for the overlay brightness.
+    pub fn draw_additive(&self, x: f32, y: f32, color: Color, intensity: f32, material: &Material) {
+        let f = self.anim.frame();
+        let tint = Color::new(color.r, color.g, color.b, color.a * intensity);
+        gl_use_material(material);
+        draw_texture_ex(
+            &self.texture,
+            x,
+            y,
+            tint,
+            DrawTextureParams {
+                source: Some(f.source_rect),
+                dest_size: Some(f.dest_size),
+                ..Default::default()
+            },
+        );
+        gl_use_default_material();
     }
 
     /// Draw frame 0 of the current animation with a color tint (animation frozen).

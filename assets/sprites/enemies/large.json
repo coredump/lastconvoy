@@ -1,5 +1,5 @@
 { "frames": {
-   "large_0": {
+   "Loop_0": {
     "frame": { "x": 0, "y": 0, "w": 40, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -7,7 +7,7 @@
     "sourceSize": { "w": 40, "h": 32 },
     "duration": 200
    },
-   "large_1": {
+   "Loop_1": {
     "frame": { "x": 40, "y": 0, "w": 40, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -15,7 +15,7 @@
     "sourceSize": { "w": 40, "h": 32 },
     "duration": 200
    },
-   "large_2": {
+   "Loop_2": {
     "frame": { "x": 80, "y": 0, "w": 40, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -23,7 +23,7 @@
     "sourceSize": { "w": 40, "h": 32 },
     "duration": 200
    },
-   "large_3": {
+   "Loop_3": {
     "frame": { "x": 120, "y": 0, "w": 40, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -31,7 +31,7 @@
     "sourceSize": { "w": 40, "h": 32 },
     "duration": 200
    },
-   "large_4": {
+   "Loop_4": {
     "frame": { "x": 160, "y": 0, "w": 40, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -39,7 +39,7 @@
     "sourceSize": { "w": 40, "h": 32 },
     "duration": 200
    },
-   "large_5": {
+   "Loop_5": {
     "frame": { "x": 200, "y": 0, "w": 40, "h": 32 },
     "rotated": false,
     "trimmed": false,
@@ -62,7 +62,8 @@
    { "name": "body", "opacity": 255, "blendMode": "normal" },
    { "name": "static corruption", "opacity": 255, "blendMode": "normal" },
    { "name": "moving corr", "opacity": 255, "blendMode": "normal" },
-   { "name": "growth", "opacity": 255, "blendMode": "normal" }
+   { "name": "growth", "opacity": 255, "blendMode": "normal" },
+   { "name": "flash2", "opacity": 179, "blendMode": "addition" }
   ],
   "slices": [
   ]
