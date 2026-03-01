@@ -96,6 +96,7 @@ pub struct GameState {
     pub enemy_elite_sprite: Sprite,
     pub boundary_shield_sprite: Sprite,
     pub shot_sprite: Sprite,
+    pub burst_shot_sprite: Sprite,
     pub shields: ShieldSystem,
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
@@ -142,6 +143,7 @@ impl GameState {
         enemy_elite_sprite: Sprite,
         boundary_shield_sprite: Sprite,
         shot_sprite: Sprite,
+        burst_shot_sprite: Sprite,
         orb_sprite_damage: Sprite,
         orb_sprite_shield: Sprite,
         orb_sprite_drone: Sprite,
@@ -172,6 +174,7 @@ impl GameState {
             enemy_elite_sprite,
             boundary_shield_sprite,
             shot_sprite,
+            burst_shot_sprite,
             shields: ShieldSystem::new(config.player_starting_shields),
             enemies: Vec::new(),
             projectiles: Vec::new(),
@@ -887,6 +890,7 @@ impl GameState {
         self.orb_sprite_pierce.update(dt);
         self.orb_sprite_stagger.update(dt);
         self.shot_sprite.update(dt);
+        self.burst_shot_sprite.update(dt);
         self.player_sprite.update(dt);
         self.enemy_small_sprite.update(dt);
         self.enemy_medium_sprite.update(dt);
@@ -914,7 +918,8 @@ impl GameState {
         self.player_sprite
             .draw(self.player.x + self.player.shake.offset_x(), self.player.y);
         for p in &self.projectiles {
-            self.shot_sprite.draw(p.x, p.y - 0.5);
+            let sprite = if p.is_burst { &self.burst_shot_sprite } else { &self.shot_sprite };
+            sprite.draw(p.x, p.y - 0.5);
         }
         for e in &self.enemies {
             let sprite = match e.kind {

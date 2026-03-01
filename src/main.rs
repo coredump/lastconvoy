@@ -65,6 +65,10 @@ async fn main() {
     let shot_sprite = Sprite::from_json("assets/sprites/objects/shot.json")
         .await
         .expect("Failed to load shot sprite");
+    let mut burst_shot_sprite = Sprite::from_json("assets/sprites/objects/shot.json")
+        .await
+        .expect("Failed to load shot sprite (burst)");
+    burst_shot_sprite.set_animation(1);
 
     // Load one Sprite per OrbType, each pre-locked to its animation tag index.
     // Tag indices in upgrades.json (0-based): 0=seal, 1=damage, 2=rate, 3=burst,
@@ -124,6 +128,7 @@ async fn main() {
         enemy_elite_sprite,
         boundary_shield_sprite,
         shot_sprite,
+        burst_shot_sprite,
         orb_sprite_damage,
         orb_sprite_shield,
         orb_sprite_drone,
