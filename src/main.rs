@@ -120,6 +120,20 @@ async fn main() {
         .expect("Failed to load orb sprite (seal)");
     orb_sprite_seal.set_animation(0);
 
+    // Tag 7 = detacheddrone (remote drone orb).
+    let mut orb_sprite_drone_remote = Sprite::from_json("assets/sprites/objects/upgrades.json")
+        .await
+        .expect("Failed to load orb sprite (drone_remote)");
+    orb_sprite_drone_remote.set_animation(7);
+
+    let drone_sprite = Sprite::from_json("assets/sprites/player/drone.json")
+        .await
+        .expect("Failed to load drone sprite");
+
+    let drone_remote_sprite = Sprite::from_json("assets/sprites/player/drone_remote.json")
+        .await
+        .expect("Failed to load drone_remote sprite");
+
     let ui_font = BitmapFont::load(
         "assets/fonts/monogram-bitmap.png",
         "assets/fonts/monogram-bitmap.json",
@@ -147,6 +161,9 @@ async fn main() {
         orb_sprite_pierce,
         orb_sprite_stagger,
         orb_sprite_seal,
+        orb_sprite_drone_remote,
+        drone_sprite,
+        drone_remote_sprite,
         ui_font,
     );
     let pipeline = RenderPipeline::new();

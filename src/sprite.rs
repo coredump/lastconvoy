@@ -232,6 +232,23 @@ impl Sprite {
         self.draw_tinted(x, y, WHITE);
     }
 
+    /// Draw the current frame at (x, y) flipped vertically.
+    pub fn draw_flipped_y(&self, x: f32, y: f32) {
+        let f = self.anim.frame();
+        draw_texture_ex(
+            &self.texture,
+            x,
+            y,
+            WHITE,
+            DrawTextureParams {
+                source: Some(f.source_rect),
+                dest_size: Some(f.dest_size),
+                flip_y: true,
+                ..Default::default()
+            },
+        );
+    }
+
     /// Draw the current frame at (x, y) with a color tint.
     pub fn draw_tinted(&self, x: f32, y: f32, tint: Color) {
         let f = self.anim.frame();

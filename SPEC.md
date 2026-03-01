@@ -133,8 +133,8 @@ Drone types:
 Shot-type modifiers apply to **all** shooting entities (player + drones).
 
 Critical orb-interaction rules:
-- **Drone shots do not affect upgrade orbs in any way** (no activation HP damage, no cycling).
-- Upgrade-lane drones (cross-lane) despawn immediately on any orb activation event; they do not interact with orbs.
+- All shots (player, attached drone, remote drone) interact with orbs equally — any shot can activate a sealed orb.
+- **Remote (upgrade-lane) drones** are stationary in the upgrade lane. They fire rightward continuously, hitting incoming inactive orbs to accelerate activation. They despawn immediately when any orb activates.
 
 ## 8. Boundary breach & queuing
 - Only one enemy may wind up at the boundary at a time (**breach lock**).
@@ -163,24 +163,17 @@ Orbs are interactive and require deliberate time/aim.
 - Orbs move right → left in upgrade lane.
 
 ### Two-phase interaction
-Orbs spawn as generic.
+Orbs spawn sealed (inactive).
 
 **Phase 1 — Activation**
 - Orb has HP.
 - Player must shoot orb until HP reaches 0.
-- Shots used to reduce HP **do not cycle type**.
-- Drone shots do not interact with orbs.
+- All shots interact with orbs equally.
 
-At HP = 0, orb becomes **activated** (clear visual state).
-
-**Phase 2 — Type cycling (only after activation)**
-- Only activated orbs can be type-cycled.
-- Shooting an activated orb cycles its type.
-- Only shots connected to the **main ship** can cycle type.
-- Each valid hit advances to next type.
+At HP = 0, orb becomes **activated** (clear visual state). Its upgrade type is fixed at spawn.
 
 **Collect**
-- Player must physically collect orb to gain the selected upgrade.
+- Player must physically collect the activated orb to gain its upgrade.
 
 ## 10. Upgrade tracks (in-run)
 
@@ -191,9 +184,8 @@ Upgrades are collected by physically touching an activated orb. Each OrbType is 
 - **Explosive Shield**: implemented as a shield modifier. It converts a normal segment to explosive when possible; if no segments exist and cap allows, it grants a new explosive segment. See §6 for behavior rules.
 
 ### (B) Drones
-- **Drone**: adds one attached drone. Drone fires in the same lane as the player and moves with the player. *(Collection wired; drone firing not yet implemented.)*
-- Until drone behavior is implemented, Drone is excluded from the normal orb spawn pool to avoid dead-value pickups (still force-testable via debug config).
-- Upgrade-lane drones (cross-lane, temporary) are deferred to a later expansion.
+- **Drone**: adds one attached drone. Drone fires in the same lane as the player and moves with the player.
+- **DroneRemote**: spawns a temporary drone in the upgrade lane that seeks and fires leftward at inactive orbs to accelerate their activation (Phase 1 only). Despawns after TTL (`DRONE_REMOTE_TTL`).
 
 ### (C) Offense — Shot modifiers
 All shot modifiers apply to player shots only at present; drone interaction is tracked per modifier.

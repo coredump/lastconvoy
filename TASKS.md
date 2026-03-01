@@ -126,15 +126,10 @@ If anything conflicts:
 - Orbs move right → left in upgrade lane.
 - **Phase 1 — Activation:**
   - Orb spawns with HP > 0, not yet activated.
-  - Only projectiles with `source: Player` (not drones) reduce orb HP.
-  - Hits during activation do NOT cycle type.
-  - At HP = 0 → orb becomes activated (visual change).
-- **Phase 2 — Cycling:**
-  - Only activated orbs can be cycled.
-  - Only `source: Player` projectiles cycle type (one step per hit).
-  - Drone projectiles never interact with orbs.
+  - All shots (player + drone) reduce orb HP.
+  - At HP = 0 → orb becomes activated (visual change). Type is fixed at spawn.
 - **Collection:**
-  - Player hitbox overlaps orb → collect, apply selected upgrade.
+  - Player hitbox overlaps activated orb → collect, apply upgrade.
 - Orbs that exit left edge despawn.
 - Orb spawning continues during elite events.
 - **Implementation status**: Orb struct with OrbPhase::Inactive/Active; take_hit() logic correct; spawning, movement, collision, Active-only collection all implemented. Needs gameplay verification.
@@ -147,7 +142,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - **Burst** (3 levels): periodic double-damage shot on separate cooldown; burst multiplier 2.0 f32. ✓
 - **Pierce** (3 levels): shot passes through N additional enemies; same-enemy double-hit bug fixed. ✓
 - **Stagger** (1 level): on hit, knocks back Small/Medium/Heavy (including breaching enemies). ✓
-- **Drone**: temporarily gated out of normal orb spawn pool until P1.10 is implemented (can still be forced via debug config). ⚠
+- **Drone**: in normal orb spawn pool; attached drone implemented and active. ✓
 - **Explosive Shield**: core behavior implemented; remaining polish/verification tracked in P1.9b. ⚠
 - **Weighted orb pool**: orb type chosen by weight = remaining upgrade levels (leveled types) or 1 (single-level). Replaces uniform random. ✓
 
@@ -157,12 +152,12 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - `OrbType::Explosive` collection wired to `convert_to_explosive()`. ✓
 - **Remaining**: visual/audio for explosion (flash, particle hints); gameplay verification that detonation + stall reads correctly in play.
 
-### P1.10 Drone system ⚠ STUB ONLY
+### P1.10 Drone system ✓ DONE
 - Attached drones: persist for the run, positioned relative to player.
-- Each drone auto-fires on same timer as player.
-- Drone projectiles tagged `source: Drone` — they damage enemies but do NOT interact with orbs.
+- Each drone auto-fires on the same timer as player.
+- Drone projectiles damage enemies and interact with orbs equally to player shots.
 - (Detached / cross-lane drones deferred to later upgrade pool expansion.)
-- **Status**: Drone struct exists with x/y/fire_timer/attached/ttl. GameState has drones: Vec<Drone> but drones are never updated, fired, or positioned in game loop.
+- **Status**: Fully implemented — Drone struct with x/y/fire_timer; drones updated, positioned, and fire each frame in game loop. Drone orb track active in pool.
 
 ### P1.11 Time-based scaling baseline ⚠ PARTIAL
 - All scaling curves defined in `config.rs`.
@@ -210,7 +205,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 **Phase 1 DoD (Definition of Done)**
 - Playable loop: start instantly → survive → die → restart. ✓ WORKING
 - Touch input works (at least in WASM build). ⚠ Touch stub only
-- Orbs work exactly as specified (activate then cycle then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
+- Orbs work exactly as specified (activate then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
 - Elites and Mini-Bosses work with enemy spawn pause (orbs continue). ⚠ NOT STARTED (no event pause logic)
 - Boundary slots and jam work. ✓ COMPLETE
 - No menus required. ✓
@@ -255,8 +250,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 
 ### P2.6 Tests (optional but allowed in Phase 2)
 - Add integration/unit tests for:
-  - Orb activation vs cycling (activation hits do not cycle).
-  - Drone shots never affect orbs.
+  - Orb activation: shots reduce HP → orb activates → player collects.
   - Breach lock: only one enemy breaches at a time; queued enemies wait.
   - Elite pauses enemy spawns but not orb spawns.
   - Input mapping toggle correctness.

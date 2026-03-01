@@ -5,7 +5,10 @@ use crate::config::{BURST_PROJECTILE_H, BURST_PROJECTILE_W, PROJECTILE_H, PROJEC
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProjectileSource {
     Player,
+    /// Attached drone following the player — does not interact with orbs.
     Drone,
+    /// Upgrade-lane remote drone — activates orbs (Phase 1 only; no cycling).
+    RemoteDrone,
 }
 
 pub struct Projectile {
@@ -45,7 +48,7 @@ impl Projectile {
     }
 
     pub fn is_off_screen(&self) -> bool {
-        self.x > SCREEN_W as f32
+        self.x > SCREEN_W as f32 || self.x < -(PROJECTILE_W.max(BURST_PROJECTILE_W) + 2.0)
     }
 
     pub fn should_remove(&self) -> bool {

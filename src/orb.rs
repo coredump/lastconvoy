@@ -6,6 +6,7 @@ pub enum OrbType {
     Damage,
     Shield,
     Drone,
+    DroneRemote,
     Explosive,
     FireRate,
     Pierce,

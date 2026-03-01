@@ -56,8 +56,8 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - Single-axis player movement (vertical).
 - Two lanes: enemies top (rows 16–119), upgrades bottom (rows 124–163).
 - Time-based scaling only. No rubber-banding.
-- Orbs: two-phase (activate THEN cycle). Activation hits do NOT cycle.
-- Drone shots NEVER interact with orbs.
+- Orbs: two-phase (activate THEN collect). Type is fixed at spawn; no cycling mechanic.
+- Drone shots interact with orbs equally to player shots (activation only; no cycling mechanic).
 - Boundary uses breach-lock + wind-up + re-breach cooldown (no slot occupancy model). Enemies stack behind slower/stopped ones (no overlapping). `BOUNDARY_X` = 36.0 (in front of player), `PLAYER_X` = 8.0.
 - EnemyElite1 and MiniBoss: event-only, never in regular spawn pool.
 
@@ -81,7 +81,7 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - No tests in Phase 1. Tests allowed Phase 2+.
 
 ## Phase 1 status
-P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 MOSTLY DONE (Shield/Damage/FireRate/Burst/Pierce/Stagger implemented; Explosive core logic implemented with polish/verification pending; Drone track temporarily gated out of normal orb pool until behavior exists). P1.10 remains STUB ONLY. HP scaling bug fixed (`.ceil()` → `.round().max(1.0)`).
+P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 MOSTLY DONE (Shield/Damage/FireRate/Burst/Pierce/Stagger implemented; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). HP scaling bug fixed (`.ceil()` → `.round().max(1.0)`).
 
 Recent additions (balance + UI pass):
 - **Damage type**: enemy damage is now `f32` (fractional). Damage levels: [1.0, 1.5, 1.8]; burst multiplier: 2.0 (f32). Converted to `i32` via `.round() as i32` at hit time.
@@ -94,7 +94,7 @@ Recent additions (balance + UI pass):
 
 Source files now include: `main.rs`, `config.rs`, `game.rs`, `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, **`text.rs`**.
 
-Next priorities: (1) Verify P1.8 and explosive shield gameplay feel in practice; (2) Implement P1.10 drone update/firing; (3) Continue Phase 1 scaling/event verification in `TASKS.md`.
+Next priorities: (1) Verify P1.8 and explosive shield gameplay feel in practice; (2) Verify P1.10 drone behavior in-game; (3) Continue Phase 1 scaling/event verification in `TASKS.md`.
 
 ## Before writing code
 1. Check **memory** for prior decisions and context on this area.
