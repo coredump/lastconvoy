@@ -423,6 +423,73 @@ impl Sprite {
             cursor += tile_h;
         }
     }
+
+    /// Draw the sprite using 3-slice vertical scaling with HSL color-blend tint.
+    ///
+    /// Applies H+S from `tint`, L from the sprite texture — preserving shading
+    /// while recoloring (Aseprite "Color" blend mode equivalent).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_3slice_vertical_hsl(
+        &self,
+        x: f32,
+        y: f32,
+        total_h: f32,
+        top: &str,
+        mid: &str,
+        bot: &str,
+        tint: Color,
+        material: &Material,
+    ) {
+        gl_use_material(material);
+        self.draw_3slice_vertical(x, y, total_h, top, mid, bot, tint);
+        gl_use_default_material();
+    }
+
+    /// Draw a horizontal 2-slice: `front` slice drawn once at (x, y), then
+    /// `tile` slice repeated rightward to fill `total_w` pixels.
+    /// If `flip_y` is true the sprite is flipped vertically.
+    /// Slice rects are frame-local (relative to the top-left of the frame).
+    pub fn draw_front_tiled_h(
+        &self,
+        x: f32,
+        y: f32,
+        total_w: f32,
+        front: &str,
+        tile: &str,
+        flip_y: bool,
+    ) {
+        let frame_x = self.anim.frame().source_rect.x;
+
+        let draw_slice = |sx: f32, slice: &Rect, clip_w: f32| {
+            draw_texture_ex(
+                &self.texture,
+                sx,
+                y,
+                WHITE,
+                DrawTextureParams {
+                    source: Some(Rect::new(frame_x + slice.x, slice.y, clip_w, slice.h)),
+                    dest_size: Some(vec2(clip_w, slice.h)),
+                    flip_y,
+                    ..Default::default()
+                },
+            );
+        };
+
+        let front_r = self.slices.get(front).copied().unwrap_or_default();
+        let tile_r = self.slices.get(tile).copied().unwrap_or_default();
+
+        draw_slice(x, &front_r, front_r.w);
+
+        let tile_start = x + front_r.w;
+        let tile_end = x + total_w;
+        let mut cursor = tile_start;
+        while cursor < tile_end {
+            let available = tile_end - cursor;
+            let tile_w = tile_r.w.min(available);
+            draw_slice(cursor, &tile_r, tile_w);
+            cursor += tile_w;
+        }
+    }
 }
 
 // --- Aseprite JSON deserialization ---

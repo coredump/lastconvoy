@@ -3,7 +3,7 @@ use macroquad::prelude::*;
 use crate::config::SHAKE_DURATION;
 use crate::config::SHAKE_INTENSITY;
 use crate::config::{
-    BASE_DAMAGE_VALUE, BIG_INJECT_BASE_INTERVAL, BOTTOM_BORDER_BOTTOM, BOTTOM_BORDER_TOP,
+    BASE_DAMAGE_VALUE, BIG_INJECT_BASE_INTERVAL,
     BOUNDARY_X, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH,
     Config, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT, DRONE_REMOTE_WIDTH,
     DRONE_Y_OFFSETS, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP,
@@ -114,10 +114,10 @@ pub struct GameState {
     pub enemy_elite_sprite: Sprite,
     pub boundary_shield_sprite: Sprite,
     pub rail_wall_sprite: Sprite,
+    pub upgrade_track_sprite: Sprite,
     pub bg_texture: Texture2D,
     pub bg_scroll_offsets: [f32; 3],
     pub shot_sprite: Sprite,
-    pub burst_shot_sprite: Sprite,
     pub shields: ShieldSystem,
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
@@ -158,6 +158,7 @@ pub struct GameState {
     pub balance_log_timer: f32,
     pub debug_log: Option<crate::debug_log::DebugLog>,
     pub additive_material: Material,
+    pub color_blend_material: Material,
     pub ui_font: BitmapFont,
     pub floating_texts: Vec<FloatingText>,
 }
@@ -174,7 +175,6 @@ impl GameState {
         enemy_elite_sprite: Sprite,
         boundary_shield_sprite: Sprite,
         shot_sprite: Sprite,
-        burst_shot_sprite: Sprite,
         orb_sprite_damage: Sprite,
         orb_sprite_shield: Sprite,
         orb_sprite_drone: Sprite,
@@ -188,6 +188,7 @@ impl GameState {
         drone_sprite: Sprite,
         drone_remote_sprite: Sprite,
         rail_wall_sprite: Sprite,
+        upgrade_track_sprite: Sprite,
         bg_texture: Texture2D,
         ui_font: BitmapFont,
     ) -> Self {
@@ -211,7 +212,6 @@ impl GameState {
             enemy_elite_sprite,
             boundary_shield_sprite,
             shot_sprite,
-            burst_shot_sprite,
             shields: ShieldSystem::new(config.player_starting_shields),
             enemies: Vec::new(),
             projectiles: Vec::new(),
@@ -229,6 +229,7 @@ impl GameState {
             drone_sprite,
             drone_remote_sprite,
             rail_wall_sprite,
+            upgrade_track_sprite,
             bg_texture,
             bg_scroll_offsets: [0.0; 3],
             damage_buff_t: 0.0,
@@ -302,6 +303,74 @@ impl GameState {
                     },
                 )
                 .expect("additive material")
+            },
+            color_blend_material: {
+                load_material(
+                    ShaderSource::Glsl {
+                        vertex: r#"#version 100
+                            attribute vec3 position;
+                            attribute vec2 texcoord;
+                            attribute vec4 color0;
+                            attribute vec4 normal;
+                            varying lowp vec2 uv;
+                            varying lowp vec4 color;
+                            uniform mat4 Model;
+                            uniform mat4 Projection;
+                            void main() {
+                                gl_Position = Projection * Model * vec4(position, 1);
+                                color = color0 / 255.0;
+                                uv = texcoord;
+                            }"#,
+                        fragment: r#"#version 100
+                            precision mediump float;
+                            varying lowp vec4 color;
+                            varying lowp vec2 uv;
+                            uniform sampler2D Texture;
+
+                            // RGB -> HSL
+                            vec3 rgb2hsl(vec3 c) {
+                                float maxc = max(c.r, max(c.g, c.b));
+                                float minc = min(c.r, min(c.g, c.b));
+                                float l = (maxc + minc) * 0.5;
+                                float d = maxc - minc;
+                                if (d < 0.0001) return vec3(0.0, 0.0, l);
+                                float s = d / (1.0 - abs(2.0 * l - 1.0));
+                                float h;
+                                if (maxc == c.r)      h = mod((c.g - c.b) / d, 6.0);
+                                else if (maxc == c.g) h = (c.b - c.r) / d + 2.0;
+                                else                  h = (c.r - c.g) / d + 4.0;
+                                h /= 6.0;
+                                return vec3(h, s, l);
+                            }
+
+                            // HSL -> RGB
+                            vec3 hsl2rgb(vec3 hsl) {
+                                float h = hsl.x, s = hsl.y, l = hsl.z;
+                                float c = (1.0 - abs(2.0 * l - 1.0)) * s;
+                                float x = c * (1.0 - abs(mod(h * 6.0, 2.0) - 1.0));
+                                float m = l - c * 0.5;
+                                vec3 rgb;
+                                float h6 = h * 6.0;
+                                if      (h6 < 1.0) rgb = vec3(c, x, 0.0);
+                                else if (h6 < 2.0) rgb = vec3(x, c, 0.0);
+                                else if (h6 < 3.0) rgb = vec3(0.0, c, x);
+                                else if (h6 < 4.0) rgb = vec3(0.0, x, c);
+                                else if (h6 < 5.0) rgb = vec3(x, 0.0, c);
+                                else               rgb = vec3(c, 0.0, x);
+                                return rgb + m;
+                            }
+
+                            void main() {
+                                vec4 texel = texture2D(Texture, uv);
+                                vec3 hsl_base = rgb2hsl(texel.rgb);
+                                vec3 hsl_tint = rgb2hsl(color.rgb);
+                                vec3 blended = hsl2rgb(vec3(hsl_tint.x, hsl_tint.y, hsl_base.z));
+                                gl_FragColor = vec4(blended, texel.a);
+                            }"#,
+                    },
+                    MaterialParams::default(),
+                )
+                .expect("color_blend material")
             },
         };
         state.log_run_start("boot");
@@ -608,18 +677,28 @@ impl GameState {
         if self.player.should_fire() {
             let proj_x = self.player.x + self.player.width;
             let proj_y = self.player.y + (self.player.height - PROJECTILE_H) / 2.0;
-            let is_burst = self.burst_ready;
-            if is_burst {
+            if self.burst_ready {
                 self.burst_ready = false;
+                // Burst: two shots side-by-side vertically.
+                let offset = 4.0;
+                for dy in [-offset, offset] {
+                    self.projectiles.push(Projectile::new(
+                        proj_x,
+                        proj_y + dy,
+                        self.config.projectile_speed,
+                        ProjectileSource::Player,
+                        self.current_pierce(),
+                    ));
+                }
+            } else {
+                self.projectiles.push(Projectile::new(
+                    proj_x,
+                    proj_y,
+                    self.config.projectile_speed,
+                    ProjectileSource::Player,
+                    self.current_pierce(),
+                ));
             }
-            self.projectiles.push(Projectile::new(
-                proj_x,
-                proj_y,
-                self.config.projectile_speed,
-                ProjectileSource::Player,
-                is_burst,
-                self.current_pierce(),
-            ));
         }
 
         // Update projectiles
@@ -651,12 +730,7 @@ impl GameState {
             } else {
                 base_dmg
             };
-            let proj_dmg = (if p.is_burst {
-                proj_dmg_base * self.config.burst_damage_multiplier
-            } else {
-                proj_dmg_base
-            })
-            .round() as i32;
+            let proj_dmg = proj_dmg_base.round() as i32;
             for (ei, e) in self.enemies.iter_mut().enumerate() {
                 if e.is_dead() || p.hit_enemies.contains(&e.id) {
                     continue;
@@ -1224,7 +1298,6 @@ impl GameState {
                     proj_y,
                     self.config.projectile_speed,
                     ProjectileSource::Drone,
-                    false,
                     drone_pierce,
                 ));
             }
@@ -1246,7 +1319,6 @@ impl GameState {
                         rd.y + DRONE_REMOTE_HEIGHT / 2.0 - PROJECTILE_H / 2.0,
                         PROJECTILE_SPEED,
                         ProjectileSource::RemoteDrone,
-                        false,
                         0,
                     ));
                 }
@@ -1277,7 +1349,6 @@ impl GameState {
         self.drone_sprite.update(dt);
         self.drone_remote_sprite.update(dt);
         self.shot_sprite.update(dt);
-        self.burst_shot_sprite.update(dt);
         self.player_sprite.update(dt);
         self.enemy_small_sprite.update(dt);
         self.enemy_medium_sprite.update(dt);
@@ -1286,29 +1357,41 @@ impl GameState {
         self.enemy_elite_sprite.update(dt);
         self.boundary_shield_sprite.update(dt);
         self.rail_wall_sprite.update(dt);
+        self.upgrade_track_sprite.update(dt);
         self.shields.update(dt);
     }
 
     pub fn draw(&mut self) {
         self.draw_background();
         if self.shields.count() > 0 {
-            let shield_tint = if self.shields.has_explosive() {
-                Color::from_rgba(255, 140, 0, 255) // orange tint for explosive
+            let shield_x = BOUNDARY_X - 3.0 + self.shields.shake.offset_x();
+            let shield_y = ENEMY_LANE_TOP as f32; // 43.0
+            let shield_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32; // 94.0
+            if self.shields.has_explosive() {
+                let orange = Color::from_rgba(255, 140, 0, 255);
+                self.boundary_shield_sprite.draw_3slice_vertical_hsl(
+                    shield_x,
+                    shield_y,
+                    shield_h,
+                    "top",
+                    "mid",
+                    "bot",
+                    orange,
+                    &self.color_blend_material,
+                );
             } else {
-                WHITE
-            };
-            let shield_y = TOP_UPGRADE_LANE_TOP as f32; // 21.0
-            let shield_h = UPGRADE_LANE_BOTTOM as f32 - shield_y + 1.0; // 138.0
-            self.boundary_shield_sprite.draw_3slice_vertical(
-                BOUNDARY_X - 3.0 + self.shields.shake.offset_x(),
-                shield_y,
-                shield_h,
-                "top",
-                "mid",
-                "bot",
-                shield_tint,
-            );
+                self.boundary_shield_sprite.draw_3slice_vertical(
+                    shield_x,
+                    shield_y,
+                    shield_h,
+                    "top",
+                    "mid",
+                    "bot",
+                    WHITE,
+                );
+            }
         }
+        self.draw_orbs();
         self.player_sprite
             .draw(self.player.x + self.player.shake.offset_x(), self.player.y);
         for (i, drone) in self.drones.iter().enumerate() {
@@ -1326,12 +1409,7 @@ impl GameState {
             }
         }
         for p in &self.projectiles {
-            let sprite = if p.is_burst {
-                &self.burst_shot_sprite
-            } else {
-                &self.shot_sprite
-            };
-            sprite.draw(p.x, p.y - 0.5);
+            self.shot_sprite.draw(p.x, p.y - 0.5);
         }
         for e in &self.enemies {
             let sprite = match e.kind {
@@ -1353,8 +1431,6 @@ impl GameState {
                 sprite.draw_additive(draw_x, e.y, flash_color, 0.7, &self.additive_material);
             }
         }
-
-        self.draw_orbs();
 
         self.draw_shield_hud();
         self.draw_upgrade_hud();
@@ -1940,12 +2016,6 @@ impl GameState {
             teal_very_dark,
         );
 
-        // Bottom border (rows 159–179): Steel Dark fill + Steel Mid accent on inner edge
-        let bb_y = BOTTOM_BORDER_TOP as f32;
-        let bb_h = (BOTTOM_BORDER_BOTTOM - BOTTOM_BORDER_TOP + 1) as f32;
-        draw_rectangle(0.0, bb_y, w, bb_h, steel_dark);
-        draw_rectangle(0.0, bb_y, w, 1.0, steel_mid);
-
         // Parallax background layers (blue.png: 284×480, 3 layers of 160px stacked vertically).
         // Layer 0 (back): static — drawn once at BOUNDARY_X, no scroll.
         // Layers 1 (stars) and 2 (props): tiled horizontally with wrapping scroll.
@@ -1996,10 +2066,10 @@ impl GameState {
 
         // Rail wall: tile the animated sprite (36×36) from x=0; right edge aligns with BOUNDARY_X.
         // Only draw within the non-border area (y=21–158); clip the last partial tile.
-        let rail_x = 0.0_f32; // left-aligned to screen edge
+        let rail_x = 0.0_f32;
         let tile_h = 36.0_f32;
         let rail_start = TOP_UPGRADE_LANE_TOP as f32; // 21.0
-        let rail_end = UPGRADE_LANE_BOTTOM as f32 + 1.0; // 159.0 (exclusive)
+        let rail_end = UPGRADE_LANE_BOTTOM as f32 + 1.0; // 180.0 (exclusive)
         let mut cursor = rail_start;
         while cursor < rail_end {
             let available = rail_end - cursor;
@@ -2011,6 +2081,16 @@ impl GameState {
             }
             cursor += tile_h;
         }
+
+        // Upgrade track: drawn over rail wall. Front slice left/bottom-aligned per lane,
+        // rail slice tiled to right edge. Sprite h=21; lane h=22 → y = lane_bottom + 1 - 21.
+        let track_h = 21.0_f32;
+        let top_track_y = TOP_UPGRADE_LANE_TOP as f32; // 21.0
+        let bot_track_y = UPGRADE_LANE_BOTTOM as f32 + 1.0 - track_h; // 159.0
+        self.upgrade_track_sprite
+            .draw_front_tiled_h(0.0, top_track_y, SCREEN_W as f32, "front", "rail", true);
+        self.upgrade_track_sprite
+            .draw_front_tiled_h(0.0, bot_track_y, SCREEN_W as f32, "front", "rail", false);
     }
 }
 

@@ -1,7 +1,6 @@
 use crate::enemy::EnemyKind;
 use crate::orb::OrbType;
 use serde::{Deserialize, Serialize};
-use std::fs;
 
 // ---------------------------------------------------------------------------
 // Compile-time defaults
@@ -24,18 +23,14 @@ pub const TOP_BORDER_BOTTOM: u32 = 20;
 pub const TOP_UPGRADE_LANE_TOP: u32 = 21;
 pub const TOP_UPGRADE_LANE_BOTTOM: u32 = 42;
 pub const ENEMY_LANE_TOP: u32 = 43;
-pub const ENEMY_LANE_BOTTOM: u32 = 136;
-pub const UPGRADE_LANE_TOP: u32 = 137;
-pub const UPGRADE_LANE_BOTTOM: u32 = 158;
-pub const BOTTOM_BORDER_TOP: u32 = 159;
-pub const BOTTOM_BORDER_BOTTOM: u32 = 179;
+pub const ENEMY_LANE_BOTTOM: u32 = 157;
+pub const UPGRADE_LANE_TOP: u32 = 158;
+pub const UPGRADE_LANE_BOTTOM: u32 = 179;
 
 // Projectile
 pub const PROJECTILE_SPEED: f32 = 200.0;
 pub const PROJECTILE_W: f32 = 7.0;
 pub const PROJECTILE_H: f32 = 3.0;
-pub const BURST_PROJECTILE_W: f32 = 7.0;
-pub const BURST_PROJECTILE_H: f32 = 3.0;
 /// Shots crossing lane boundaries are blocked except within this left-side corridor.
 pub const SHOT_BARRIER_GATE_X_MAX: f32 = 32.0;
 /// 1px shot barrier on the upgrade-lane side of the top enemy/upgrade boundary.
@@ -184,7 +179,6 @@ pub const DAMAGE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 pub const BASE_FIRE_RATE_VALUE: f32 = 0.18;
 pub const FIRE_RATE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 
-pub const BURST_DAMAGE_MULTIPLIER: f32 = 2.0;
 pub const STAGGER_KNOCKBACK_PX: f32 = 12.0;
 
 pub const MAX_ATTACHED_DRONES: usize = 2;
@@ -283,8 +277,6 @@ pub struct RuntimeConfig {
 
     pub fire_rate_upgrade_applies_to_drones: Option<bool>,
 
-    pub burst_damage_multiplier: Option<f32>,
-
     pub bg_parallax_speed_back: Option<f32>,
     pub bg_parallax_speed_stars: Option<f32>,
     pub bg_parallax_speed_props: Option<f32>,
@@ -375,8 +367,6 @@ pub struct Config {
     pub damage_upgrade_applies_to_drones: bool,
 
     pub fire_rate_upgrade_applies_to_drones: bool,
-
-    pub burst_damage_multiplier: f32,
 
     pub bg_parallax_speed_back: f32,
     pub bg_parallax_speed_stars: f32,
@@ -482,10 +472,6 @@ impl Config {
                 .fire_rate_upgrade_applies_to_drones
                 .unwrap_or(FIRE_RATE_UPGRADE_APPLIES_TO_DRONES),
 
-            burst_damage_multiplier: rt
-                .burst_damage_multiplier
-                .unwrap_or(BURST_DAMAGE_MULTIPLIER),
-
             explosive_shield_clear_distance: rt
                 .explosive_shield_clear_distance
                 .unwrap_or(EXPLOSIVE_SHIELD_CLEAR_DISTANCE),
@@ -534,16 +520,29 @@ impl Config {
 // load_runtime_config
 // ---------------------------------------------------------------------------
 
+/// Config values baked in at compile time from `config.toml`.
+/// This ensures release builds use the same tuned values as the developer's local setup.
+const BAKED_CONFIG: &str = include_str!("../config.toml");
+
+fn baked_default() -> RuntimeConfig {
+    toml::from_str::<RuntimeConfig>(BAKED_CONFIG)
+        .expect("[config] config.toml embedded at compile time failed to parse")
+}
+
 pub fn load_runtime_config() -> RuntimeConfig {
-    match fs::read_to_string("config.toml") {
-        Ok(text) => match toml::from_str::<RuntimeConfig>(&text) {
-            Ok(cfg) => cfg,
-            Err(e) => panic!(
-                "[config] Failed to parse config.toml: {e}\nFix the file or delete it to regenerate defaults."
-            ),
-        },
-        Err(_) => RuntimeConfig::default(),
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        match std::fs::read_to_string("config.toml") {
+            Ok(text) => match toml::from_str::<RuntimeConfig>(&text) {
+                Ok(cfg) => return cfg,
+                Err(e) => panic!(
+                    "[config] Failed to parse config.toml: {e}\nFix the file or delete it to regenerate defaults."
+                ),
+            },
+            Err(_) => {}
+        }
     }
+    baked_default()
 }
 
 // ---------------------------------------------------------------------------
@@ -551,18 +550,21 @@ pub fn load_runtime_config() -> RuntimeConfig {
 // ---------------------------------------------------------------------------
 
 pub fn save_default_config_if_missing() {
-    if fs::metadata("config.toml").is_ok() {
-        return;
-    }
-    let default = RuntimeConfig::default();
-    match toml::to_string_pretty(&default) {
-        Ok(text) => {
-            if let Err(e) = fs::write("config.toml", text) {
-                eprintln!("[config] Could not write config.toml: {e}");
-            }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if std::fs::metadata("config.toml").is_ok() {
+            return;
         }
-        Err(e) => {
-            eprintln!("[config] Could not serialize default config: {e}");
+        let default = RuntimeConfig::default();
+        match toml::to_string_pretty(&default) {
+            Ok(text) => {
+                if let Err(e) = std::fs::write("config.toml", text) {
+                    eprintln!("[config] Could not write config.toml: {e}");
+                }
+            }
+            Err(e) => {
+                eprintln!("[config] Could not serialize default config: {e}");
+            }
         }
     }
 }
