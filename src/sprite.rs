@@ -206,6 +206,25 @@ impl Sprite {
             },
         );
     }
+
+    /// Draw frame 0 of the current animation with a color tint (animation frozen).
+    pub fn draw_tinted_frozen(&mut self, x: f32, y: f32, tint: Color) {
+        let saved = self.current_frame;
+        self.anim.set_frame(0);
+        let f = self.anim.frame();
+        draw_texture_ex(
+            &self.texture,
+            x,
+            y,
+            tint,
+            DrawTextureParams {
+                source: Some(f.source_rect),
+                dest_size: Some(f.dest_size),
+                ..Default::default()
+            },
+        );
+        self.anim.set_frame(saved);
+    }
 }
 
 // --- Aseprite JSON deserialization ---

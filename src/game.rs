@@ -95,6 +95,84 @@ pub struct GameState {
     pub debug_log: Option<crate::debug_log::DebugLog>,
 }
 
+/// Draws a 1px border outside the 20×20 orb sprite that retracts counter-clockwise
+/// as `activation_progress` increases (full border at 0.0, none at 1.0).
+fn draw_orb_border(x: f32, y: f32, activation_progress: f32) {
+    let remaining = 1.0 - activation_progress.clamp(0.0, 1.0);
+    if remaining <= 0.0 {
+        return;
+    }
+    let mut budget = (remaining * 84.0).round() as i32;
+    let color = crate::config::ORB_BORDER_COLOR;
+
+    // Segments CCW from top-center (x+10, y-1):
+    // 1. Top-left:  (x+10, y-1) → (x-1, y-1)   — 11 px
+    // 2. Left:      (x-1,  y-1) → (x-1, y+20)  — 21 px
+    // 3. Bottom:    (x-1, y+20) → (x+20, y+20) — 21 px
+    // 4. Right:     (x+20, y+20) → (x+20, y-1) — 21 px
+    // 5. Top-right: (x+20, y-1) → (x+10, y-1) — 10 px
+
+    // Seg 1 — top-left half (11 px, x from x+10 down to x-1)
+    {
+        let len = 11_i32;
+        let draw = budget.min(len);
+        for i in 0..draw {
+            draw_rectangle(x + 10.0 - i as f32, y - 1.0, 1.0, 1.0, color);
+        }
+        budget -= draw;
+        if budget <= 0 {
+            return;
+        }
+    }
+
+    // Seg 2 — left side (21 px, y from y-1 to y+19)
+    {
+        let len = 21_i32;
+        let draw = budget.min(len);
+        for i in 0..draw {
+            draw_rectangle(x - 1.0, y - 1.0 + i as f32, 1.0, 1.0, color);
+        }
+        budget -= draw;
+        if budget <= 0 {
+            return;
+        }
+    }
+
+    // Seg 3 — bottom side (21 px, x from x-1 to x+19)
+    {
+        let len = 21_i32;
+        let draw = budget.min(len);
+        for i in 0..draw {
+            draw_rectangle(x - 1.0 + i as f32, y + 20.0, 1.0, 1.0, color);
+        }
+        budget -= draw;
+        if budget <= 0 {
+            return;
+        }
+    }
+
+    // Seg 4 — right side (21 px, y from y+20 to y+0)
+    {
+        let len = 21_i32;
+        let draw = budget.min(len);
+        for i in 0..draw {
+            draw_rectangle(x + 20.0, y + 20.0 - i as f32, 1.0, 1.0, color);
+        }
+        budget -= draw;
+        if budget <= 0 {
+            return;
+        }
+    }
+
+    // Seg 5 — top-right half (10 px, x from x+20 to x+11)
+    {
+        let draw = budget.min(10);
+        for i in 0..draw {
+            draw_rectangle(x + 20.0 - i as f32, y - 1.0, 1.0, 1.0, color);
+        }
+    }
+}
+
 impl GameState {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -809,21 +887,20 @@ impl GameState {
         // Each OrbType has a dedicated Sprite pre-locked to its animation tag,
         // so we never call set_animation() here.
         // Tag indices in upgrades.json: 0=damage, 7=shield, 5=extradrone, 4=stagger
-        let draw_list: Vec<(f32, f32, OrbType, Color)> = self
+        let draw_list: Vec<(f32, f32, OrbType, Color, bool, f32)> = self
             .orbs
             .iter()
             .map(|o| {
-                let tint = if o.phase == OrbPhase::Inactive {
-                    let p = o.activation_progress;
-                    let v = (100.0 + 155.0 * p) as u8;
-                    Color::from_rgba(v, v, v, v)
+                let inactive = o.phase == OrbPhase::Inactive;
+                let tint = if inactive {
+                    Color::from_rgba(180, 180, 180, 160)
                 } else {
                     WHITE
                 };
-                (o.x, o.y, o.orb_type, tint)
+                (o.x, o.y, o.orb_type, tint, inactive, o.activation_progress)
             })
             .collect();
-        for (sx, sy, orb_type, tint) in draw_list {
+        for (sx, sy, orb_type, tint, inactive, activation_progress) in draw_list {
             let sprite = match orb_type {
                 OrbType::Burst => &mut self.orb_sprite_burst,
                 OrbType::Damage => &mut self.orb_sprite_damage,
@@ -834,7 +911,12 @@ impl GameState {
                 OrbType::Pierce => &mut self.orb_sprite_pierce,
                 OrbType::Stagger => &mut self.orb_sprite_stagger,
             };
-            sprite.draw_tinted(sx, sy, tint);
+            if inactive {
+                sprite.draw_tinted_frozen(sx, sy, tint);
+                draw_orb_border(sx, sy, activation_progress);
+            } else {
+                sprite.draw_tinted(sx, sy, tint);
+            }
         }
     }
 

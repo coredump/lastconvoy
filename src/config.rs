@@ -86,6 +86,8 @@ pub const ORB_ACTIVATION_DECAY_PER_SEC: f32 = 0.35;
 pub const ORB_SPEED: f32 = 25.0;
 pub const ORB_W: f32 = 20.0;
 pub const ORB_H: f32 = 20.0;
+pub const ORB_BORDER_COLOR: macroquad::color::Color =
+    macroquad::color::Color::new(227.0 / 255.0, 122.0 / 255.0, 31.0 / 255.0, 1.0);
 
 // Elite / MiniBoss
 pub const ELITE_INTERVAL: f32 = 60.0;
