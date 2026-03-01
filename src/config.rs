@@ -20,14 +20,14 @@ pub const TOUCH_STRIP_WIDTH_FRAC: f32 = 0.20;
 
 // Lane row bounds (inclusive)
 pub const TOP_BORDER_TOP: u32 = 0;
-pub const TOP_BORDER_BOTTOM: u32 = 15;
-pub const ENEMY_LANE_TOP: u32 = 16;
-pub const ENEMY_LANE_BOTTOM: u32 = 119;
-pub const DIVIDER_TOP: u32 = 120;
-pub const DIVIDER_BOTTOM: u32 = 123;
-pub const UPGRADE_LANE_TOP: u32 = 124;
-pub const UPGRADE_LANE_BOTTOM: u32 = 163;
-pub const BOTTOM_BORDER_TOP: u32 = 164;
+pub const TOP_BORDER_BOTTOM: u32 = 20;
+pub const TOP_UPGRADE_LANE_TOP: u32 = 21;
+pub const TOP_UPGRADE_LANE_BOTTOM: u32 = 42;
+pub const ENEMY_LANE_TOP: u32 = 43;
+pub const ENEMY_LANE_BOTTOM: u32 = 136;
+pub const UPGRADE_LANE_TOP: u32 = 137;
+pub const UPGRADE_LANE_BOTTOM: u32 = 158;
+pub const BOTTOM_BORDER_TOP: u32 = 159;
 pub const BOTTOM_BORDER_BOTTOM: u32 = 179;
 
 // Projectile
@@ -36,6 +36,12 @@ pub const PROJECTILE_W: f32 = 7.0;
 pub const PROJECTILE_H: f32 = 3.0;
 pub const BURST_PROJECTILE_W: f32 = 7.0;
 pub const BURST_PROJECTILE_H: f32 = 3.0;
+/// Shots crossing lane boundaries are blocked except within this left-side corridor.
+pub const SHOT_BARRIER_GATE_X_MAX: f32 = 32.0;
+/// 1px shot barrier on the upgrade-lane side of the top enemy/upgrade boundary.
+pub const SHOT_BARRIER_TOP_Y: f32 = TOP_UPGRADE_LANE_BOTTOM as f32;
+/// 1px shot barrier on the upgrade-lane side of the bottom enemy/upgrade boundary.
+pub const SHOT_BARRIER_BOTTOM_Y: f32 = UPGRADE_LANE_TOP as f32;
 
 // Player
 pub const PLAYER_X: f32 = 8.0;
@@ -86,8 +92,8 @@ pub const ENEMY_HEAVY_SPEED: f32 = 25.0;
 pub const ENEMY_LARGE_SPEED: f32 = 20.0;
 
 // Spawn intervals (seconds)
-pub const ORB_SPAWN_INTERVAL: f32 = 5.0;
-pub const MAX_ACTIVE_ORBS: usize = 1;
+pub const ORB_SPAWN_INTERVAL: f32 = 4.0;
+pub const MAX_ACTIVE_ORBS: usize = 2;
 
 // Boundary / breach
 /// Wind-up duration (seconds) before each enemy kind resolves its breach event.
@@ -195,6 +201,11 @@ pub const PLAYER_LANE_PADDING: f32 = 2.0;
 
 pub const EXPLOSIVE_SHIELD_CLEAR_DISTANCE: f32 = 80.0;
 
+/// Parallax background scroll speeds (px/s) for each layer (back, stars, props).
+pub const BG_PARALLAX_SPEED_BACK: f32 = 0.0;
+pub const BG_PARALLAX_SPEED_STARS: f32 = 8.0;
+pub const BG_PARALLAX_SPEED_PROPS: f32 = 0.0;
+
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides
 // ---------------------------------------------------------------------------
@@ -273,6 +284,10 @@ pub struct RuntimeConfig {
     pub fire_rate_upgrade_applies_to_drones: Option<bool>,
 
     pub burst_damage_multiplier: Option<f32>,
+
+    pub bg_parallax_speed_back: Option<f32>,
+    pub bg_parallax_speed_stars: Option<f32>,
+    pub bg_parallax_speed_props: Option<f32>,
 
     // Debug flags
     pub explosive_shield_clear_distance: Option<f32>,
@@ -362,6 +377,10 @@ pub struct Config {
     pub fire_rate_upgrade_applies_to_drones: bool,
 
     pub burst_damage_multiplier: f32,
+
+    pub bg_parallax_speed_back: f32,
+    pub bg_parallax_speed_stars: f32,
+    pub bg_parallax_speed_props: f32,
 
     /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
     pub debug_all_enemies: bool,
@@ -470,6 +489,14 @@ impl Config {
             explosive_shield_clear_distance: rt
                 .explosive_shield_clear_distance
                 .unwrap_or(EXPLOSIVE_SHIELD_CLEAR_DISTANCE),
+
+            bg_parallax_speed_back: rt.bg_parallax_speed_back.unwrap_or(BG_PARALLAX_SPEED_BACK),
+            bg_parallax_speed_stars: rt
+                .bg_parallax_speed_stars
+                .unwrap_or(BG_PARALLAX_SPEED_STARS),
+            bg_parallax_speed_props: rt
+                .bg_parallax_speed_props
+                .unwrap_or(BG_PARALLAX_SPEED_PROPS),
 
             debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
             debug_log_gameplay: rt.debug_log_gameplay.unwrap_or(DEBUG_LOG_GAMEPLAY),

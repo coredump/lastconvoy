@@ -1,6 +1,6 @@
 use crate::config::{
-    BOTTOM_BORDER_TOP, DRONE_HEIGHT, DRONE_Y_OFFSETS, ENEMY_LANE_TOP, PLAYER_HEIGHT,
-    PLAYER_LANE_PADDING,
+    BOTTOM_BORDER_TOP, DRONE_HEIGHT, DRONE_Y_OFFSETS, PLAYER_HEIGHT, PLAYER_LANE_PADDING,
+    TOP_UPGRADE_LANE_TOP,
 };
 use crate::sprite::ShakeEffect;
 
@@ -40,7 +40,7 @@ impl Player {
         } else {
             0.0
         };
-        let y_min = ENEMY_LANE_TOP as f32 + top_drone_overhang + PLAYER_LANE_PADDING;
+        let y_min = TOP_UPGRADE_LANE_TOP as f32 + top_drone_overhang + PLAYER_LANE_PADDING;
         let y_max =
             BOTTOM_BORDER_TOP as f32 - PLAYER_HEIGHT - bottom_drone_overhang - PLAYER_LANE_PADDING;
         self.y = (self.y + axis * self.speed * dt).clamp(y_min, y_max);

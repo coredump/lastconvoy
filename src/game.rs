@@ -114,6 +114,8 @@ pub struct GameState {
     pub enemy_elite_sprite: Sprite,
     pub boundary_shield_sprite: Sprite,
     pub rail_wall_sprite: Sprite,
+    pub bg_texture: Texture2D,
+    pub bg_scroll_offsets: [f32; 3],
     pub shot_sprite: Sprite,
     pub burst_shot_sprite: Sprite,
     pub shields: ShieldSystem,
@@ -186,6 +188,7 @@ impl GameState {
         drone_sprite: Sprite,
         drone_remote_sprite: Sprite,
         rail_wall_sprite: Sprite,
+        bg_texture: Texture2D,
         ui_font: BitmapFont,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
@@ -226,6 +229,8 @@ impl GameState {
             drone_sprite,
             drone_remote_sprite,
             rail_wall_sprite,
+            bg_texture,
+            bg_scroll_offsets: [0.0; 3],
             damage_buff_t: 0.0,
             fire_rate_buff_t: 0.0,
             burst_buff_t: 0.0,
@@ -1190,9 +1195,8 @@ impl GameState {
             }
         }
 
-        self.orbs.retain(|o| {
-            o.x + o.width > 0.0 && !o.is_collected()
-        });
+        self.orbs
+            .retain(|o| o.x + o.width > 0.0 && !o.is_collected());
 
         // Update attached drones: follow player, fire into enemy lane.
         let drone_fire_rate = if self.config.fire_rate_upgrade_applies_to_drones {
@@ -1248,6 +1252,16 @@ impl GameState {
                 }
             }
             self.projectiles.extend(rd_shots);
+        }
+
+        // Advance parallax scroll offsets
+        let bg_speeds = [
+            self.config.bg_parallax_speed_back,
+            self.config.bg_parallax_speed_stars,
+            self.config.bg_parallax_speed_props,
+        ];
+        for (off, &spd) in self.bg_scroll_offsets.iter_mut().zip(bg_speeds.iter()) {
+            *off += spd * dt;
         }
 
         // Advance sprite animations
@@ -1932,6 +1946,54 @@ impl GameState {
         draw_rectangle(0.0, bb_y, w, bb_h, steel_dark);
         draw_rectangle(0.0, bb_y, w, 1.0, steel_mid);
 
+        // Parallax background layers (blue.png: 284×480, 3 layers of 160px stacked vertically).
+        // Layer 0 (back): static — drawn once at BOUNDARY_X, no scroll.
+        // Layers 1 (stars) and 2 (props): tiled horizontally with wrapping scroll.
+        {
+            let lane_top = ENEMY_LANE_TOP as f32;
+            let lane_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32; // 94.0
+            let layer_h = 160.0_f32;
+            let clip_y = (layer_h - lane_h) / 2.0; // 33.0
+            let tex_w = 284.0_f32;
+            for (i, &offset) in self.bg_scroll_offsets.iter().enumerate() {
+                let src_y = i as f32 * layer_h + clip_y;
+                let src = DrawTextureParams {
+                    source: Some(Rect::new(0.0, src_y, tex_w, lane_h)),
+                    dest_size: Some(vec2(tex_w, lane_h)),
+                    ..Default::default()
+                };
+                if i == 0 {
+                    // Back layer: single static copy
+                    draw_texture_ex(&self.bg_texture, BOUNDARY_X, lane_top, WHITE, src);
+                } else {
+                    // Stars / props: tiled with seamless wrap; skip if speed is 0 (disabled)
+                    let speeds = [
+                        self.config.bg_parallax_speed_back,
+                        self.config.bg_parallax_speed_stars,
+                        self.config.bg_parallax_speed_props,
+                    ];
+                    if speeds[i] == 0.0 {
+                        continue;
+                    }
+                    let wrapped = offset.rem_euclid(tex_w);
+                    draw_texture_ex(
+                        &self.bg_texture,
+                        BOUNDARY_X + wrapped - tex_w,
+                        lane_top,
+                        WHITE,
+                        src.clone(),
+                    );
+                    draw_texture_ex(
+                        &self.bg_texture,
+                        BOUNDARY_X + wrapped,
+                        lane_top,
+                        WHITE,
+                        src,
+                    );
+                }
+            }
+        }
+
         // Rail wall: tile the animated sprite (36×36) from x=0; right edge aligns with BOUNDARY_X.
         // Only draw within the non-border area (y=21–158); clip the last partial tile.
         let rail_x = 0.0_f32; // left-aligned to screen edge
@@ -1944,7 +2006,8 @@ impl GameState {
             if available >= tile_h {
                 self.rail_wall_sprite.draw(rail_x, cursor);
             } else {
-                self.rail_wall_sprite.draw_clipped_h(rail_x, cursor, available);
+                self.rail_wall_sprite
+                    .draw_clipped_h(rail_x, cursor, available);
             }
             cursor += tile_h;
         }

@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 
 pub struct DebugLog {
@@ -10,7 +10,7 @@ impl DebugLog {
         let writer: BufWriter<Box<dyn Write>> = if path.is_empty() {
             BufWriter::new(Box::new(std::io::stderr()))
         } else {
-            match File::create(path) {
+            match OpenOptions::new().create(true).append(true).open(path) {
                 Ok(f) => BufWriter::new(Box::new(f)),
                 Err(e) => {
                     eprintln!("[debug_log] Failed to open '{}': {}", path, e);

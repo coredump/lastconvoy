@@ -31,14 +31,10 @@
   "format": "RGBA8888",
   "size": { "w": 284, "h": 480 },
   "scale": "1",
-  "frameTags": [
-  ],
   "layers": [
    { "name": "Back", "opacity": 255, "blendMode": "normal" },
    { "name": "Stars", "opacity": 255, "blendMode": "normal" },
    { "name": "Props", "opacity": 255, "blendMode": "normal" }
-  ],
-  "slices": [
   ]
  }
 }

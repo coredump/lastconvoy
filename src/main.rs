@@ -138,6 +138,11 @@ async fn main() {
         .await
         .expect("Failed to load rail_wall sprite");
 
+    let bg_texture = load_texture("assets/sprites/backgrounds/blue.png")
+        .await
+        .expect("Failed to load background texture (blue)");
+    bg_texture.set_filter(FilterMode::Nearest);
+
     let ui_font = BitmapFont::load(
         "assets/fonts/monogram-bitmap.png",
         "assets/fonts/monogram-bitmap.json",
@@ -169,6 +174,7 @@ async fn main() {
         drone_sprite,
         drone_remote_sprite,
         rail_wall_sprite,
+        bg_texture,
         ui_font,
     );
     let pipeline = RenderPipeline::new();
