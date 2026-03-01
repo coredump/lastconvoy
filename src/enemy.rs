@@ -1,7 +1,12 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::config::{SHAKE_DURATION, SHAKE_INTENSITY};
-use crate::sprite::ShakeEffect;
+use macroquad::prelude::{Color, WHITE};
+
+use crate::config::{
+    DAMAGE_FLASH_COLOR, DAMAGE_FLASH_COOLDOWN, DAMAGE_FLASH_DURATION, SHAKE_DURATION,
+    SHAKE_INTENSITY, WINDUP_FLASH_COLOR, WINDUP_FLASH_FREQ_MAX, WINDUP_FLASH_FREQ_MIN,
+};
+use crate::sprite::{FlashEffect, ShakeEffect};
 
 static NEXT_ENEMY_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -38,6 +43,9 @@ pub struct Enemy {
     pub shielded: bool,
     pub shield_hp: i32,
     pub shake: ShakeEffect,
+    pub flash: FlashEffect,
+    /// Oscillator phase for windup flash (0..1 cycles).
+    pub windup_phase: f32,
     pub shots_taken: i32,
     pub damage_taken: i32,
     /// True once this enemy has been knocked back; prevents repeated knockback.
@@ -72,6 +80,8 @@ impl Enemy {
             shielded: false,
             shield_hp: 0,
             shake: ShakeEffect::new(),
+            flash: FlashEffect::new(),
+            windup_phase: 0.0,
             shots_taken: 0,
             damage_taken: 0,
             stagger_immune: false,
@@ -83,6 +93,12 @@ impl Enemy {
             self.x -= self.speed * dt;
         }
         self.shake.update(dt);
+        self.flash.update(dt);
+        if self.state == EnemyState::Breaching && self.windup_time > 0.0 {
+            let t = (self.windup_elapsed / self.windup_time).clamp(0.0, 1.0);
+            let freq = WINDUP_FLASH_FREQ_MIN + (WINDUP_FLASH_FREQ_MAX - WINDUP_FLASH_FREQ_MIN) * t;
+            self.windup_phase = (self.windup_phase + freq * dt) % 1.0;
+        }
     }
 
     pub fn take_damage(&mut self, amount: i32) {
@@ -98,6 +114,21 @@ impl Enemy {
         }
         if self.kind != EnemyKind::Small {
             self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
+        }
+        self.flash.trigger(
+            DAMAGE_FLASH_COLOR,
+            DAMAGE_FLASH_DURATION,
+            DAMAGE_FLASH_COOLDOWN,
+        );
+    }
+
+    /// Returns the windup flash tint based on the current oscillator phase.
+    pub fn windup_tint(&self) -> Color {
+        use std::f32::consts::TAU;
+        if (self.windup_phase * TAU).sin() > 0.0 {
+            WINDUP_FLASH_COLOR
+        } else {
+            WHITE
         }
     }
 

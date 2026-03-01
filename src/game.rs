@@ -857,7 +857,12 @@ impl GameState {
                 EnemyKind::Large => &self.enemy_large_sprite,
                 EnemyKind::Elite => &self.enemy_elite_sprite,
             };
-            sprite.draw(e.x + e.shake.offset_x(), e.y);
+            let tint = if e.state == EnemyState::Breaching {
+                e.windup_tint()
+            } else {
+                e.flash.tint()
+            };
+            sprite.draw_tinted(e.x + e.shake.offset_x(), e.y, tint);
         }
 
         self.draw_orbs();

@@ -51,6 +51,56 @@ impl ShakeEffect {
     }
 }
 
+/// Per-entity color flash effect for hit and windup feedback.
+pub struct FlashEffect {
+    timer: f32,
+    duration: f32,
+    cooldown_timer: f32,
+    color: Color,
+}
+
+impl FlashEffect {
+    pub fn new() -> Self {
+        Self {
+            timer: 0.0,
+            duration: 1.0,
+            cooldown_timer: 0.0,
+            color: WHITE,
+        }
+    }
+
+    /// Start a flash if the cooldown has expired.
+    pub fn trigger(&mut self, color: Color, duration: f32, cooldown: f32) {
+        if self.cooldown_timer > 0.0 {
+            return;
+        }
+        self.color = color;
+        self.duration = duration;
+        self.timer = duration;
+        self.cooldown_timer = cooldown;
+    }
+
+    /// Advance timers by `dt` seconds.
+    pub fn update(&mut self, dt: f32) {
+        self.timer = (self.timer - dt).max(0.0);
+        self.cooldown_timer = (self.cooldown_timer - dt).max(0.0);
+    }
+
+    /// Returns the tint color for this frame. WHITE when inactive.
+    pub fn tint(&self) -> Color {
+        if self.timer <= 0.0 || self.duration <= 0.0 {
+            return WHITE;
+        }
+        let t = self.timer / self.duration;
+        Color::new(
+            1.0 - t + self.color.r * t,
+            1.0 - t + self.color.g * t,
+            1.0 - t + self.color.b * t,
+            1.0,
+        )
+    }
+}
+
 /// A sprite with one or more named animations, loaded from an Aseprite JSON export.
 ///
 /// Layout contract: each animation tag occupies its own row in the sheet, with frames

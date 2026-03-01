@@ -49,6 +49,16 @@ pub const PLAYER_STARTING_SHIELDS: u32 = 0;
 pub const SHAKE_INTENSITY: f32 = 2.0; // max pixel offset
 pub const SHAKE_DURATION: f32 = 0.15; // seconds
 
+// Enemy flash colors and timing
+pub const DAMAGE_FLASH_COLOR: macroquad::prelude::Color =
+    macroquad::prelude::Color::new(1.0, 0.3, 0.3, 1.0);
+pub const DAMAGE_FLASH_DURATION: f32 = 0.12;
+pub const DAMAGE_FLASH_COOLDOWN: f32 = 0.08;
+pub const WINDUP_FLASH_COLOR: macroquad::prelude::Color =
+    macroquad::prelude::Color::new(1.0, 0.85, 0.85, 1.0);
+pub const WINDUP_FLASH_FREQ_MIN: f32 = 2.0;
+pub const WINDUP_FLASH_FREQ_MAX: f32 = 10.0;
+
 // Enemy sizes (w, h)
 pub const ENEMY_SMALL_W: f32 = 16.0;
 pub const ENEMY_SMALL_H: f32 = 16.0;
