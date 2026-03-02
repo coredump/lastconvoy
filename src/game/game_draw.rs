@@ -1,0 +1,563 @@
+// All drawing methods: world, HUD, orbs, overlays, background.
+// super::GameState, macroquad, crate::config, crate::enemy, crate::orb
+use crate::config::{
+    BOUNDARY_X, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, SCREEN_W, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
+    TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
+};
+use crate::drone::RemoteDroneLane;
+use crate::enemy::{EnemyKind, EnemyState};
+use crate::orb::{OrbPhase, OrbType};
+use macroquad::prelude::*;
+
+use super::{EXPLOSION_FRAME_COUNT, EXPLOSION_FRAME_DUR, GameState};
+
+impl GameState {
+    pub fn draw(&mut self) {
+        self.draw_background();
+        if self.shields.count() > 0 {
+            let shield_x = BOUNDARY_X - 3.0 + self.shields.shake.offset_x();
+            let shield_y = ENEMY_LANE_TOP as f32;
+            let shield_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32;
+            if self.shields.has_explosive() {
+                let orange = Color::from_rgba(255, 140, 0, 255);
+                self.boundary_shield_sprite.draw_3slice_vertical_hsl(
+                    shield_x,
+                    shield_y,
+                    shield_h,
+                    "top",
+                    "mid",
+                    "bot",
+                    orange,
+                    &self.color_blend_material,
+                );
+            } else {
+                self.boundary_shield_sprite
+                    .draw_3slice_vertical(shield_x, shield_y, shield_h, "top", "mid", "bot", WHITE);
+            }
+        }
+        self.draw_orbs();
+        self.player_sprite
+            .draw(self.player.x + self.player.shake.offset_x(), self.player.y);
+        for (i, drone) in self.drones.iter().enumerate() {
+            if i == 1 {
+                self.drone_sprite.draw_flipped_y(drone.x, drone.y);
+            } else {
+                self.drone_sprite.draw(drone.x, drone.y);
+            }
+        }
+        for rd in &self.remote_drones {
+            if rd.lane == RemoteDroneLane::Top {
+                self.drone_remote_sprite.draw_flipped_y(rd.x, rd.y);
+            } else {
+                self.drone_remote_sprite.draw(rd.x, rd.y);
+            }
+        }
+        for p in &self.projectiles {
+            self.shot_sprite.draw(p.x, p.y - 0.5);
+        }
+        for e in &self.enemies {
+            let sprite = match e.kind {
+                EnemyKind::Small => &self.enemy_small_sprite,
+                EnemyKind::Medium => &self.enemy_medium_sprite,
+                EnemyKind::Heavy => &self.enemy_heavy_sprite,
+                EnemyKind::Large => &self.enemy_large_sprite,
+                EnemyKind::Elite => &self.enemy_elite_sprite,
+            };
+            let tint = if e.state == EnemyState::Breaching {
+                e.windup_tint()
+            } else {
+                WHITE
+            };
+            let draw_x = e.x + e.shake.offset_x();
+            sprite.draw_tinted(draw_x, e.y, tint);
+            let flash_color = e.flash.tint();
+            if flash_color != WHITE {
+                sprite.draw_additive(draw_x, e.y, flash_color, 0.7, &self.additive_material);
+            }
+        }
+
+        let explosion_positions: Vec<(f32, f32, u32)> = self
+            .explosions
+            .iter()
+            .map(|exp| {
+                let frame =
+                    ((exp.timer / EXPLOSION_FRAME_DUR) as u32).min(EXPLOSION_FRAME_COUNT - 1);
+                (exp.x, exp.y, frame)
+            })
+            .collect();
+        for (x, y, frame) in explosion_positions {
+            self.explosion_sprite.draw_frame(x, y, frame, WHITE);
+        }
+
+        self.draw_shield_hud();
+        self.draw_upgrade_hud();
+        self.draw_run_timer_hud();
+        self.draw_floating_texts();
+
+        if self.game_over {
+            self.draw_game_over();
+        }
+
+        if self.at_title || self.paused {
+            self.draw_title_pause_screen();
+        }
+    }
+
+    fn draw_orbs(&mut self) {
+        let draw_list: Vec<(f32, f32, OrbType, Color, bool, f32, f32)> = self
+            .orbs
+            .iter()
+            .map(|o| {
+                let inactive = o.phase == OrbPhase::Inactive;
+                let tint = if inactive {
+                    Color::from_rgba(180, 180, 180, 160)
+                } else {
+                    WHITE
+                };
+                (
+                    o.x,
+                    o.y,
+                    o.orb_type,
+                    tint,
+                    inactive,
+                    o.activation_progress,
+                    o.decay_blink_timer,
+                )
+            })
+            .collect();
+        for (sx, sy, orb_type, tint, inactive, activation_progress, decay_blink_timer) in draw_list
+        {
+            let sprite = match orb_type {
+                OrbType::Burst => &mut self.orb_sprite_burst,
+                OrbType::Damage => &mut self.orb_sprite_damage,
+                OrbType::Shield => &mut self.orb_sprite_shield,
+                OrbType::Drone => &mut self.orb_sprite_drone,
+                OrbType::DroneRemote => &mut self.orb_sprite_drone_remote,
+                OrbType::Explosive => &mut self.orb_sprite_explosive,
+                OrbType::FireRate => &mut self.orb_sprite_fire_rate,
+                OrbType::Pierce => &mut self.orb_sprite_pierce,
+                OrbType::Stagger => &mut self.orb_sprite_stagger,
+            };
+            if inactive {
+                sprite.draw_tinted_frozen(sx, sy, WHITE);
+                draw_rectangle(sx, sy, 20.0, 20.0, Color::from_rgba(0, 0, 0, 130));
+                if activation_progress < 1.0 {
+                    let frame = (activation_progress * 4.0).floor().clamp(0.0, 3.0) as u32;
+                    if frame < 3 {
+                        self.orb_sprite_seal.draw_frame(sx, sy, frame + 1, WHITE);
+                    }
+                    let blink_visible = if activation_progress == 0.0 {
+                        true
+                    } else {
+                        let delay = crate::config::SEAL_BLINK_DELAY;
+                        let rate = crate::config::SEAL_BLINK_RATE;
+                        decay_blink_timer < delay
+                            || (((decay_blink_timer - delay) / rate) as u32).is_multiple_of(2)
+                    };
+                    if blink_visible {
+                        self.orb_sprite_seal.draw_frame(sx, sy, frame, WHITE);
+                    }
+                }
+            } else {
+                sprite.draw_tinted(sx, sy, tint);
+            }
+        }
+    }
+
+    fn draw_game_over(&self) {
+        let overlay = Color::from_rgba(0, 0, 0, 160);
+        draw_rectangle(0.0, 0.0, SCREEN_W as f32, 180.0, overlay);
+        let title = "GAME OVER";
+        let time_line = format!("TIME {}", self.format_run_timer());
+        let kb_line = format!(
+            "KILLS {}  BREACHES {}",
+            self.kills_total, self.breaches_total
+        );
+        let restart = "PRESS SPACE/ENTER/R";
+        let restart2 = "TO RESTART";
+
+        let title_size = self.logo_font.measure(title, 1, 1);
+        let title_x = (SCREEN_W as f32 - title_size.x) * 0.5;
+        self.logo_font.draw(
+            title,
+            title_x,
+            60.0,
+            1,
+            Color::from_rgba(220, 30, 30, 255),
+            1,
+        );
+
+        let time_size = self.ui_font.measure(&time_line, 2, 1);
+        let time_x = (SCREEN_W as f32 - time_size.x) * 0.5;
+        self.ui_font.draw(
+            &time_line,
+            time_x,
+            88.0,
+            2,
+            Color::from_rgba(245, 245, 245, 255),
+            1,
+        );
+
+        let kb_size = self.ui_font.measure(&kb_line, 1, 1);
+        let kb_x = (SCREEN_W as f32 - kb_size.x) * 0.5;
+        self.ui_font.draw(
+            &kb_line,
+            kb_x,
+            116.0,
+            1,
+            Color::from_rgba(220, 220, 220, 255),
+            1,
+        );
+
+        let restart_size = self.ui_font.measure(restart, 1, 1);
+        let restart_x = (SCREEN_W as f32 - restart_size.x) * 0.5;
+        self.ui_font.draw(
+            restart,
+            restart_x,
+            134.0,
+            1,
+            Color::from_rgba(240, 240, 180, 255),
+            1,
+        );
+        let restart2_size = self.ui_font.measure(restart2, 1, 1);
+        let restart2_x = (SCREEN_W as f32 - restart2_size.x) * 0.5;
+        self.ui_font.draw(
+            restart2,
+            restart2_x,
+            150.0,
+            1,
+            Color::from_rgba(240, 240, 180, 255),
+            1,
+        );
+    }
+
+    fn draw_title_pause_screen(&self) {
+        let overlay = Color::from_rgba(0, 0, 0, 200);
+        draw_rectangle(0.0, 0.0, SCREEN_W as f32, 180.0, overlay);
+
+        let name1 = "LCDSHOOTSYSTEM";
+        let name2 = "LAST CONVOY SHOOT SYSTEM";
+        let name1_sz = self.logo_font.measure(name1, 1, 1);
+        let name2_sz = self.ui_font.measure(name2, 1, 1);
+        let name1_x = (SCREEN_W as f32 - name1_sz.x) * 0.5;
+        let name2_x = (SCREEN_W as f32 - name2_sz.x) * 0.5;
+        self.logo_font.draw(
+            name1,
+            name1_x,
+            22.0,
+            1,
+            Color::from_rgba(255, 220, 80, 255),
+            1,
+        );
+        self.ui_font.draw(
+            name2,
+            name2_x,
+            42.0,
+            1,
+            Color::from_rgba(200, 200, 200, 255),
+            1,
+        );
+
+        let controls: &[(&str, &str)] = &[
+            ("UP / DOWN", "MOVE"),
+            ("SHOOT", "AUTO-FIRES"),
+            ("COLLECT ORB", "PASS THROUGH ORB"),
+            ("PAUSE", "P  /  ESC"),
+        ];
+        let label_col = Color::from_rgba(180, 220, 255, 255);
+        let value_col = Color::from_rgba(230, 230, 230, 255);
+        let mut y = 62.0_f32;
+        for (label, value) in controls {
+            let lsz = self.ui_font.measure(label, 1, 1);
+            let mid = SCREEN_W as f32 * 0.5;
+            self.ui_font
+                .draw(label, mid - lsz.x - 4.0, y, 1, label_col, 1);
+            self.ui_font.draw(value, mid + 4.0, y, 1, value_col, 1);
+            y += 13.0;
+        }
+
+        let prompt = if self.paused {
+            "P / ESC  RESUME"
+        } else {
+            "ANY KEY  START"
+        };
+        let psz = self.ui_font.measure(prompt, 1, 1);
+        let px = (SCREEN_W as f32 - psz.x) * 0.5;
+        self.ui_font.draw(
+            prompt,
+            px,
+            155.0,
+            1,
+            Color::from_rgba(240, 240, 180, 255),
+            1,
+        );
+    }
+
+    fn draw_shield_hud(&self) {
+        let size = 8.0_f32;
+        let height = 7.0_f32;
+        let gap = 2.0_f32;
+        let start_x = 5.0_f32;
+        let y = 7.0_f32;
+        let dark = Color::from_rgba(40, 40, 40, 255);
+        for i in 0..crate::shield::MAX_SHIELD_SEGMENTS {
+            let x = start_x + i as f32 * (size + gap);
+            draw_rectangle(x, y, size, height, dark);
+        }
+        for (i, seg) in self.shields.segments.iter().enumerate() {
+            let x = start_x + i as f32 * (size + gap);
+            let color = if seg.explosive {
+                Color::from_rgba(255, 140, 0, 255)
+            } else {
+                Color::from_rgba(0, 200, 80, 255)
+            };
+            draw_rectangle(x, y, size, height, color);
+        }
+    }
+
+    fn draw_upgrade_hud(&mut self) {
+        let shield_area_end = 5.0 + crate::shield::MAX_SHIELD_SEGMENTS as f32 * (8.0 + 2.0) + 2.0;
+        let icon_size = 10.0_f32;
+        let icon_gap = 2.0_f32;
+        let y = 5.0_f32;
+        let mut x = shield_area_end;
+        let bar_dark = Color::from_rgba(40, 40, 40, 255);
+        let teal_placeholder = Color::from_rgba(0, 50, 44, 255);
+        let teal_fill = Color::from_rgba(79, 217, 195, 255);
+
+        if !self.drones.is_empty() {
+            self.orb_sprite_drone
+                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+        } else {
+            draw_rectangle(x, y, icon_size, icon_size, teal_placeholder);
+        }
+        x += icon_size + icon_gap;
+
+        {
+            let ratio = if self.config.buff_damage_duration > 0.0 {
+                (self.damage_buff_t / self.config.buff_damage_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.damage_buff_active() {
+                self.orb_sprite_damage
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
+                draw_rectangle(
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
+                );
+                x += icon_size + 2.0 + icon_gap;
+            }
+        }
+        {
+            let ratio = if self.config.buff_fire_rate_duration > 0.0 {
+                (self.fire_rate_buff_t / self.config.buff_fire_rate_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.fire_rate_buff_active() {
+                self.orb_sprite_fire_rate
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
+                draw_rectangle(
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
+                );
+                x += icon_size + 2.0 + icon_gap;
+            }
+        }
+        {
+            let ratio = if self.config.buff_burst_duration > 0.0 {
+                (self.burst_buff_t / self.config.buff_burst_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.burst_buff_active() {
+                self.orb_sprite_burst
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
+                draw_rectangle(
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
+                );
+                x += icon_size + 2.0 + icon_gap;
+            }
+        }
+        {
+            let ratio = if self.config.buff_pierce_duration > 0.0 {
+                (self.pierce_buff_t / self.config.buff_pierce_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.pierce_buff_active() {
+                self.orb_sprite_pierce
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
+                draw_rectangle(
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
+                );
+                x += icon_size + 2.0 + icon_gap;
+            }
+        }
+        {
+            let ratio = if self.config.buff_stagger_duration > 0.0 {
+                (self.stagger_buff_t / self.config.buff_stagger_duration).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if self.stagger_buff_active() {
+                self.orb_sprite_stagger
+                    .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
+                draw_rectangle(
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
+                );
+                #[allow(unused_assignments)]
+                {
+                    x += icon_size + 2.0 + icon_gap;
+                }
+            }
+        }
+    }
+
+    fn draw_run_timer_hud(&self) {
+        let timer = self.format_run_timer();
+        let size = self.ui_font.measure(&timer, 1, 1);
+        let x = SCREEN_W as f32 - 7.0 - size.x;
+        self.ui_font
+            .draw(&timer, x, 4.0, 1, Color::from_rgba(220, 220, 220, 255), 1);
+    }
+
+    fn draw_floating_texts(&self) {
+        for t in &self.floating_texts {
+            let alpha = (t.life / t.ttl).clamp(0.0, 1.0);
+            let mut color = t.color;
+            color.a *= alpha;
+            self.ui_font.draw(&t.text, t.x, t.y, 1, color, 1);
+        }
+    }
+
+    fn draw_background(&self) {
+        let w = SCREEN_W as f32;
+
+        let space_very_dark = Color::from_rgba(10, 14, 22, 255);
+        let teal_very_dark = Color::from_rgba(0, 50, 44, 255);
+
+        let tb_h = (TOP_BORDER_BOTTOM - TOP_BORDER_TOP + 1) as f32;
+        self.top_bar_sprite.draw_9slice(0.0, 0.0, w, tb_h, WHITE);
+
+        draw_rectangle(
+            0.0,
+            TOP_UPGRADE_LANE_TOP as f32,
+            w,
+            (TOP_UPGRADE_LANE_BOTTOM - TOP_UPGRADE_LANE_TOP + 1) as f32,
+            teal_very_dark,
+        );
+
+        draw_rectangle(
+            0.0,
+            ENEMY_LANE_TOP as f32,
+            w,
+            (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32,
+            space_very_dark,
+        );
+        draw_rectangle(
+            0.0,
+            UPGRADE_LANE_TOP as f32,
+            w,
+            (UPGRADE_LANE_BOTTOM - UPGRADE_LANE_TOP + 1) as f32,
+            teal_very_dark,
+        );
+
+        {
+            let lane_top = ENEMY_LANE_TOP as f32;
+            let lane_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32;
+            let layer_h = 160.0_f32;
+            let clip_y = (layer_h - lane_h) / 2.0;
+            let tex_w = 284.0_f32;
+            for (i, &offset) in self.bg_scroll_offsets.iter().enumerate() {
+                let src_y = i as f32 * layer_h + clip_y;
+                let src = DrawTextureParams {
+                    source: Some(Rect::new(0.0, src_y, tex_w, lane_h)),
+                    dest_size: Some(vec2(tex_w, lane_h)),
+                    ..Default::default()
+                };
+                if i == 0 {
+                    draw_texture_ex(&self.bg_texture, BOUNDARY_X, lane_top, WHITE, src);
+                } else {
+                    let speeds = [
+                        self.config.bg_parallax_speed_back,
+                        self.config.bg_parallax_speed_stars,
+                        self.config.bg_parallax_speed_props,
+                    ];
+                    if speeds[i] == 0.0 {
+                        continue;
+                    }
+                    let wrapped = offset.rem_euclid(tex_w);
+                    draw_texture_ex(
+                        &self.bg_texture,
+                        BOUNDARY_X + wrapped - tex_w,
+                        lane_top,
+                        WHITE,
+                        src.clone(),
+                    );
+                    draw_texture_ex(&self.bg_texture, BOUNDARY_X + wrapped, lane_top, WHITE, src);
+                }
+            }
+        }
+
+        let rail_x = 0.0_f32;
+        let tile_h = 36.0_f32;
+        let rail_start = TOP_UPGRADE_LANE_TOP as f32;
+        let rail_end = UPGRADE_LANE_BOTTOM as f32 + 1.0;
+        let mut cursor = rail_start;
+        while cursor < rail_end {
+            let available = rail_end - cursor;
+            if available >= tile_h {
+                self.rail_wall_sprite.draw(rail_x, cursor);
+            } else {
+                self.rail_wall_sprite
+                    .draw_clipped_h(rail_x, cursor, available);
+            }
+            cursor += tile_h;
+        }
+
+        let track_h = 21.0_f32;
+        let top_track_y = TOP_UPGRADE_LANE_TOP as f32;
+        let bot_track_y = UPGRADE_LANE_BOTTOM as f32 + 1.0 - track_h;
+        self.upgrade_track_sprite.draw_front_tiled_h(
+            0.0,
+            top_track_y,
+            SCREEN_W as f32,
+            "front",
+            "rail",
+            true,
+        );
+        self.upgrade_track_sprite.draw_front_tiled_h(
+            0.0,
+            bot_track_y,
+            SCREEN_W as f32,
+            "front",
+            "rail",
+            false,
+        );
+    }
+}
