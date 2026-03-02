@@ -117,6 +117,8 @@ pub struct Sprite {
     /// Tile dimensions (pixels per frame).
     pub tile_w: u32,
     pub tile_h: u32,
+    /// 9-slice center rect (from Aseprite slice `center` field), in frame-local coordinates.
+    pub nine_slice_center: Option<Rect>,
 }
 
 impl Sprite {
@@ -183,12 +185,18 @@ impl Sprite {
         texture.set_filter(FilterMode::Nearest);
 
         let mut slices = HashMap::new();
+        let mut nine_slice_center = None;
         for s in &parsed.meta.slices {
             if let Some(key) = s.keys.first() {
                 slices.insert(
                     s.name.clone(),
                     Rect::new(key.bounds.x, key.bounds.y, key.bounds.w, key.bounds.h),
                 );
+                if nine_slice_center.is_none()
+                    && let Some(c) = &key.center
+                {
+                    nine_slice_center = Some(Rect::new(c.x, c.y, c.w, c.h));
+                }
             }
         }
 
@@ -204,6 +212,7 @@ impl Sprite {
             slices,
             tile_w,
             tile_h,
+            nine_slice_center,
         })
     }
 
@@ -495,6 +504,83 @@ impl Sprite {
             cursor += tile_w;
         }
     }
+
+    /// Draw the sprite using 9-slice scaling, tiling edges and center to fill
+    /// `(total_w, total_h)`. Uses the `nine_slice_center` parsed from the
+    /// Aseprite JSON; does nothing if the sprite has no 9-slice data.
+    pub fn draw_9slice(&self, x: f32, y: f32, total_w: f32, total_h: f32, color: Color) {
+        let Some(center) = self.nine_slice_center else {
+            return;
+        };
+        let fw = self.tile_w as f32;
+        let fh = self.tile_h as f32;
+        let frame_x = self.anim.frame().source_rect.x;
+        let frame_y = self.anim.frame().source_rect.y;
+
+        // Margins from center rect
+        let lm = center.x; // left margin
+        let tm = center.y; // top margin
+        let rm = fw - center.x - center.w; // right margin
+        let bm = fh - center.y - center.h; // bottom margin
+
+        // Draw one rectangular region tiling src_rect into dest (dx,dy,dw,dh).
+        let draw_tiled = |dx: f32, dy: f32, dw: f32, dh: f32, src: Rect| {
+            if dw <= 0.0 || dh <= 0.0 {
+                return;
+            }
+            let mut cy = dy;
+            while cy < dy + dh {
+                let clip_h = src.h.min(dy + dh - cy);
+                let mut cx = dx;
+                while cx < dx + dw {
+                    let clip_w = src.w.min(dx + dw - cx);
+                    draw_texture_ex(
+                        &self.texture,
+                        cx,
+                        cy,
+                        color,
+                        DrawTextureParams {
+                            source: Some(Rect::new(
+                                frame_x + src.x,
+                                frame_y + src.y,
+                                clip_w,
+                                clip_h,
+                            )),
+                            dest_size: Some(vec2(clip_w, clip_h)),
+                            ..Default::default()
+                        },
+                    );
+                    cx += clip_w;
+                }
+                cy += clip_h;
+            }
+        };
+
+        // Source rects for each of the 9 regions (frame-local)
+        let src_tl = Rect::new(0.0, 0.0, lm, tm);
+        let src_t = Rect::new(lm, 0.0, center.w, tm);
+        let src_tr = Rect::new(lm + center.w, 0.0, rm, tm);
+        let src_l = Rect::new(0.0, tm, lm, center.h);
+        let src_c = Rect::new(lm, tm, center.w, center.h);
+        let src_r = Rect::new(lm + center.w, tm, rm, center.h);
+        let src_bl = Rect::new(0.0, tm + center.h, lm, bm);
+        let src_b = Rect::new(lm, tm + center.h, center.w, bm);
+        let src_br = Rect::new(lm + center.w, tm + center.h, rm, bm);
+
+        // Destination regions
+        let inner_w = total_w - lm - rm;
+        let inner_h = total_h - tm - bm;
+
+        draw_tiled(x, y, lm, tm, src_tl);
+        draw_tiled(x + lm, y, inner_w, tm, src_t);
+        draw_tiled(x + lm + inner_w, y, rm, tm, src_tr);
+        draw_tiled(x, y + tm, lm, inner_h, src_l);
+        draw_tiled(x + lm, y + tm, inner_w, inner_h, src_c);
+        draw_tiled(x + lm + inner_w, y + tm, rm, inner_h, src_r);
+        draw_tiled(x, y + tm + inner_h, lm, bm, src_bl);
+        draw_tiled(x + lm, y + tm + inner_h, inner_w, bm, src_b);
+        draw_tiled(x + lm + inner_w, y + tm + inner_h, rm, bm, src_br);
+    }
 }
 
 // --- Aseprite JSON deserialization ---
@@ -528,6 +614,8 @@ struct AseSliceBounds {
 #[derive(Deserialize)]
 struct AseSliceKey {
     bounds: AseSliceBounds,
+    #[serde(default)]
+    center: Option<AseSliceBounds>,
 }
 
 #[derive(Deserialize)]
@@ -539,6 +627,7 @@ struct AseSlice {
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct AseMeta {
+    #[serde(default)]
     frameTags: Vec<AseFrameTag>,
     #[serde(default)]
     slices: Vec<AseSlice>,

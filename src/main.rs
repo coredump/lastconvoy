@@ -145,6 +145,10 @@ async fn main() {
         .await
         .expect("Failed to load explosion_2 sprite");
 
+    let top_bar_sprite = Sprite::from_json("assets/sprites/ui/top_bar.json")
+        .await
+        .expect("Failed to load top_bar sprite");
+
     let bg_texture = load_texture("assets/sprites/backgrounds/blue.png")
         .await
         .expect("Failed to load background texture (blue)");
@@ -189,6 +193,7 @@ async fn main() {
         rail_wall_sprite,
         upgrade_track_sprite,
         explosion_sprite,
+        top_bar_sprite,
         bg_texture,
         ui_font,
         logo_font,

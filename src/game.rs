@@ -31,8 +31,6 @@ use crate::text::BitmapFont;
 
 const FLOATING_TEXT_TTL: f32 = 0.8;
 const FLOATING_TEXT_VY: f32 = -18.0;
-const HUD_TIMER_BAR_W: f32 = 12.0;
-const HUD_TIMER_BAR_H: f32 = 2.0;
 
 pub struct FloatingText {
     pub text: String,
@@ -124,6 +122,7 @@ pub struct GameState {
     pub boundary_shield_sprite: Sprite,
     pub rail_wall_sprite: Sprite,
     pub upgrade_track_sprite: Sprite,
+    pub top_bar_sprite: Sprite,
     pub bg_texture: Texture2D,
     pub bg_scroll_offsets: [f32; 3],
     pub shot_sprite: Sprite,
@@ -204,6 +203,7 @@ impl GameState {
         rail_wall_sprite: Sprite,
         upgrade_track_sprite: Sprite,
         explosion_sprite: Sprite,
+        top_bar_sprite: Sprite,
         bg_texture: Texture2D,
         ui_font: BitmapFont,
         logo_font: BitmapFont,
@@ -246,6 +246,7 @@ impl GameState {
             drone_remote_sprite,
             rail_wall_sprite,
             upgrade_track_sprite,
+            top_bar_sprite,
             bg_texture,
             bg_scroll_offsets: [0.0; 3],
             damage_buff_t: 0.0,
@@ -1716,14 +1717,15 @@ impl GameState {
     /// Draw shield segment count in the top-left corner as small squares.
     /// Dark backdrop squares are drawn first for all MAX_SHIELD_SEGMENTS slots.
     fn draw_shield_hud(&self) {
-        let size = 4.0_f32;
+        let size = 8.0_f32;
+        let height = 7.0_f32;
         let gap = 2.0_f32;
-        let start_x = 2.0_f32;
-        let y = 2.0_f32;
+        let start_x = 5.0_f32;
+        let y = 7.0_f32;
         let dark = Color::from_rgba(40, 40, 40, 255);
         for i in 0..crate::shield::MAX_SHIELD_SEGMENTS {
             let x = start_x + i as f32 * (size + gap);
-            draw_rectangle(x, y, size, size, dark);
+            draw_rectangle(x, y, size, height, dark);
         }
         for (i, seg) in self.shields.segments.iter().enumerate() {
             let x = start_x + i as f32 * (size + gap);
@@ -1732,17 +1734,34 @@ impl GameState {
             } else {
                 Color::from_rgba(0, 200, 80, 255) // green for normal
             };
-            draw_rectangle(x, y, size, size, color);
+            draw_rectangle(x, y, size, height, color);
         }
     }
 
     /// Draw collected upgrade icons in the HUD after the shield area.
     fn draw_upgrade_hud(&mut self) {
-        let shield_area_end = 2.0 + crate::shield::MAX_SHIELD_SEGMENTS as f32 * (4.0 + 2.0) + 2.0;
-        let icon_size = 12.0_f32;
+        let shield_area_end = 5.0 + crate::shield::MAX_SHIELD_SEGMENTS as f32 * (8.0 + 2.0) + 2.0;
+        let icon_size = 10.0_f32;
         let icon_gap = 2.0_f32;
-        let y = 2.0_f32;
+        let y = 5.0_f32;
         let mut x = shield_area_end;
+        let bar_dark = Color::from_rgba(40, 40, 40, 255);
+        let teal_placeholder = Color::from_rgba(0, 50, 44, 255); // Upgrade Teal Very Dark
+        let teal_fill = Color::from_rgba(79, 217, 195, 255); // Upgrade Teal Light
+
+        // --- Non-expiring slot ---
+
+        // Drone
+        if !self.drones.is_empty() {
+            self.orb_sprite_drone
+                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+        } else {
+            draw_rectangle(x, y, icon_size, icon_size, teal_placeholder);
+        }
+        x += icon_size + icon_gap;
+
+        // --- Expiring buffs (only rendered when active, timer bar to the right, shrinks downward) ---
+
         {
             let ratio = if self.config.buff_damage_duration > 0.0 {
                 (self.damage_buff_t / self.config.buff_damage_duration).clamp(0.0, 1.0)
@@ -1752,21 +1771,15 @@ impl GameState {
             if self.damage_buff_active() {
                 self.orb_sprite_damage
                     .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
                 draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(40, 40, 40, 255),
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
                 );
-                draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W * ratio,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(150, 255, 190, 255),
-                );
-                x += icon_size + icon_gap;
+                x += icon_size + 2.0 + icon_gap;
             }
         }
         {
@@ -1778,21 +1791,15 @@ impl GameState {
             if self.fire_rate_buff_active() {
                 self.orb_sprite_fire_rate
                     .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
                 draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(40, 40, 40, 255),
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
                 );
-                draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W * ratio,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(150, 255, 190, 255),
-                );
-                x += icon_size + icon_gap;
+                x += icon_size + 2.0 + icon_gap;
             }
         }
         {
@@ -1804,21 +1811,15 @@ impl GameState {
             if self.burst_buff_active() {
                 self.orb_sprite_burst
                     .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
                 draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(40, 40, 40, 255),
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
                 );
-                draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W * ratio,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(150, 255, 190, 255),
-                );
-                x += icon_size + icon_gap;
+                x += icon_size + 2.0 + icon_gap;
             }
         }
         {
@@ -1830,21 +1831,15 @@ impl GameState {
             if self.pierce_buff_active() {
                 self.orb_sprite_pierce
                     .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
                 draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(40, 40, 40, 255),
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
                 );
-                draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W * ratio,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(150, 255, 190, 255),
-                );
-                x += icon_size + icon_gap;
+                x += icon_size + 2.0 + icon_gap;
             }
         }
         {
@@ -1856,37 +1851,19 @@ impl GameState {
             if self.stagger_buff_active() {
                 self.orb_sprite_stagger
                     .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
+                draw_rectangle(x + icon_size, y, 2.0, icon_size, bar_dark);
                 draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(40, 40, 40, 255),
+                    x + icon_size,
+                    y + icon_size * (1.0 - ratio),
+                    2.0,
+                    icon_size * ratio,
+                    teal_fill,
                 );
-                draw_rectangle(
-                    x,
-                    y + icon_size + 1.0,
-                    HUD_TIMER_BAR_W * ratio,
-                    HUD_TIMER_BAR_H,
-                    Color::from_rgba(150, 255, 190, 255),
-                );
-                x += icon_size + icon_gap;
+                #[allow(unused_assignments)]
+                {
+                    x += icon_size + 2.0 + icon_gap;
+                }
             }
-        }
-
-        if self.shields.count() > self.config.player_starting_shields as usize {
-            self.orb_sprite_shield
-                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
-            x += icon_size + icon_gap;
-        }
-        if self.shields.segments.iter().any(|s| s.explosive) {
-            self.orb_sprite_explosive
-                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
-            x += icon_size + icon_gap;
-        }
-        if !self.drones.is_empty() {
-            self.orb_sprite_drone
-                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
         }
     }
 
@@ -1919,9 +1896,9 @@ impl GameState {
     fn draw_run_timer_hud(&self) {
         let timer = self.format_run_timer();
         let size = self.ui_font.measure(&timer, 1, 1);
-        let x = SCREEN_W as f32 - 2.0 - size.x;
+        let x = SCREEN_W as f32 - 7.0 - size.x;
         self.ui_font
-            .draw(&timer, x, 2.0, 1, Color::from_rgba(220, 220, 220, 255), 1);
+            .draw(&timer, x, 4.0, 1, Color::from_rgba(220, 220, 220, 255), 1);
     }
 
     fn spawn_upgrade_floating_text(&mut self, tag: &str, x: f32, y: f32) {
@@ -2113,15 +2090,11 @@ impl GameState {
 
         // Palette colors (from lcdss_palette.gpl)
         let space_very_dark = Color::from_rgba(10, 14, 22, 255);
-        let steel_dark = Color::from_rgba(30, 38, 51, 255);
-        let steel_mid = Color::from_rgba(58, 70, 90, 255);
         let teal_very_dark = Color::from_rgba(0, 50, 44, 255);
 
-        // Top border (rows 0–20): Steel Dark fill + Steel Mid accent on inner edge
-        let tb_y = TOP_BORDER_TOP as f32;
+        // Top border (rows 0–20): 9-slice sprite, flush to top and sides
         let tb_h = (TOP_BORDER_BOTTOM - TOP_BORDER_TOP + 1) as f32;
-        draw_rectangle(0.0, tb_y, w, tb_h, steel_dark);
-        draw_rectangle(0.0, tb_y + tb_h - 1.0, w, 1.0, steel_mid);
+        self.top_bar_sprite.draw_9slice(0.0, 0.0, w, tb_h, WHITE);
 
         // Top upgrade lane (rows 21–42): Upgrade Teal Very Dark
         draw_rectangle(
