@@ -20,7 +20,7 @@ impl DebugLog {
                     }
                 }
             };
-            return Self { writer };
+            Self { writer }
         }
         #[cfg(target_arch = "wasm32")]
         {

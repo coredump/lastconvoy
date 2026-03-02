@@ -152,7 +152,7 @@ impl BitmapFont {
                 let y = oy + py as u32;
                 for px in 0..glyph_w_bits {
                     if (row_bits & (1 << px)) != 0 {
-                        image.set_pixel((ox + px) as u32, y as u32, WHITE);
+                        image.set_pixel(ox + px, y, WHITE);
                     }
                 }
             }

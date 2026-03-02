@@ -216,7 +216,7 @@ impl GameState {
             config.player_fire_rate,
         );
 
-        let state = Self {
+        Self {
             player,
             player_sprite,
             enemy_small_sprite,
@@ -390,8 +390,7 @@ impl GameState {
                 )
                 .expect("color_blend material")
             },
-        };
-        state
+        }
     }
 
     /// Reset all mutable game state for a new run (keeps config and sprites).

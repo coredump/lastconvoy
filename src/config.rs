@@ -532,14 +532,13 @@ fn baked_default() -> RuntimeConfig {
 pub fn load_runtime_config() -> RuntimeConfig {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        match std::fs::read_to_string("config.toml") {
-            Ok(text) => match toml::from_str::<RuntimeConfig>(&text) {
+        if let Ok(text) = std::fs::read_to_string("config.toml") {
+            match toml::from_str::<RuntimeConfig>(&text) {
                 Ok(cfg) => return cfg,
                 Err(e) => panic!(
                     "[config] Failed to parse config.toml: {e}\nFix the file or delete it to regenerate defaults."
                 ),
-            },
-            Err(_) => {}
+            }
         }
     }
     baked_default()
