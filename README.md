@@ -70,7 +70,7 @@ All original sprites were made by hand in [Aseprite](https://github.com/aseprite
 
 The parallax background is from the [Ultimate Warped Collection](https://ansimuz.itch.io/ultimate-warped-collection) by [Ansimuz](https://ansimuz.itch.io/), used under its asset license.
 
-Original sprites are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Original sprites are licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
 
 ### Contributing
 
@@ -100,3 +100,17 @@ Roughly in order:
 - [ ] Visual polish — shield loss feedback, enemy destruction particles, elite arrival cues
 - [ ] Roguelike meta-progression — saves, meta points, permanent upgrades, unlocks
 - [ ] Story layer — pixel/comic panels, character unlocks, story runs
+
+---
+
+## Licenses
+
+| Asset | License |
+|---|---|
+| Source code | [MIT](LICENSE) |
+| Original sprites | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) |
+| Monogram font (datagoblin) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) — public domain |
+| Edunline font (Brian Kent) | Freeware — personal and commercial use permitted; no resale or modification without permission |
+| Ansimuz parallax background | Personal and commercial use permitted; redistribution/resale as standalone assets not permitted |
+
+See [`assets/LICENSE`](assets/LICENSE) for full third-party asset terms.

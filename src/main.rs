@@ -157,6 +157,13 @@ async fn main() {
     .await
     .expect("Failed to load Monogram bitmap font");
 
+    let logo_font = BitmapFont::load(
+        "assets/fonts/edunline-bitmap.png",
+        "assets/fonts/edunline-bitmap.json",
+    )
+    .await
+    .expect("Failed to load Edunline bitmap font");
+
     let mut state = GameState::new(
         config,
         player_sprite,
@@ -184,6 +191,7 @@ async fn main() {
         explosion_sprite,
         bg_texture,
         ui_font,
+        logo_font,
     );
     let pipeline = RenderPipeline::new();
 

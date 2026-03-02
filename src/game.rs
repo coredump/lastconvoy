@@ -171,6 +171,7 @@ pub struct GameState {
     pub additive_material: Material,
     pub color_blend_material: Material,
     pub ui_font: BitmapFont,
+    pub logo_font: BitmapFont,
     pub floating_texts: Vec<FloatingText>,
     pub explosion_sprite: Sprite,
     pub explosions: Vec<Explosion>,
@@ -205,6 +206,7 @@ impl GameState {
         explosion_sprite: Sprite,
         bg_texture: Texture2D,
         ui_font: BitmapFont,
+        logo_font: BitmapFont,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
         let player = Player::new(
@@ -279,6 +281,7 @@ impl GameState {
             },
             config,
             ui_font,
+            logo_font,
             floating_texts: Vec::new(),
             explosion_sprite,
             explosions: Vec::new(),
@@ -1589,14 +1592,14 @@ impl GameState {
         let restart = "PRESS SPACE/ENTER/R";
         let restart2 = "TO RESTART";
 
-        let title_size = self.ui_font.measure(title, 2, 1);
+        let title_size = self.logo_font.measure(title, 1, 1);
         let title_x = (SCREEN_W as f32 - title_size.x) * 0.5;
-        self.ui_font.draw(
+        self.logo_font.draw(
             title,
             title_x,
             60.0,
-            2,
-            Color::from_rgba(255, 90, 90, 255),
+            1,
+            Color::from_rgba(220, 30, 30, 255),
             1,
         );
 
@@ -1651,15 +1654,15 @@ impl GameState {
         // Game name — two lines
         let name1 = "LCDSHOOTSYSTEM";
         let name2 = "LAST CONVOY SHOOT SYSTEM";
-        let name1_sz = self.ui_font.measure(name1, 2, 1);
+        let name1_sz = self.logo_font.measure(name1, 1, 1);
         let name2_sz = self.ui_font.measure(name2, 1, 1);
         let name1_x = (SCREEN_W as f32 - name1_sz.x) * 0.5;
         let name2_x = (SCREEN_W as f32 - name2_sz.x) * 0.5;
-        self.ui_font.draw(
+        self.logo_font.draw(
             name1,
             name1_x,
             22.0,
-            2,
+            1,
             Color::from_rgba(255, 220, 80, 255),
             1,
         );
