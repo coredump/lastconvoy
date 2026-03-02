@@ -114,6 +114,9 @@ pub struct Sprite {
     pp_dir: i8, // +1 forward, -1 reverse (pingpong only)
     /// Named slices from Aseprite export, in frame-local coordinates.
     pub slices: HashMap<String, Rect>,
+    /// Tile dimensions (pixels per frame).
+    pub tile_w: u32,
+    pub tile_h: u32,
 }
 
 impl Sprite {
@@ -199,6 +202,8 @@ impl Sprite {
             current_frame: 0,
             pp_dir: 1,
             slices,
+            tile_w,
+            tile_h,
         })
     }
 

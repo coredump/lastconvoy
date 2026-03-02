@@ -141,6 +141,10 @@ async fn main() {
         .await
         .expect("Failed to load upgrade_track sprite");
 
+    let explosion_sprite = Sprite::from_json("assets/sprites/objects/explosion_2.json")
+        .await
+        .expect("Failed to load explosion_2 sprite");
+
     let bg_texture = load_texture("assets/sprites/backgrounds/blue.png")
         .await
         .expect("Failed to load background texture (blue)");
@@ -177,6 +181,7 @@ async fn main() {
         drone_remote_sprite,
         rail_wall_sprite,
         upgrade_track_sprite,
+        explosion_sprite,
         bg_texture,
         ui_font,
     );

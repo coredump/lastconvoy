@@ -285,8 +285,9 @@ Purpose: rare punctuation events distinct from Elite events.
 - Opposing inputs cancel; analog deadzone applies.
 
 ## 15. Touch controls & menus
-- Touch movement: vertical touch strip on left; drag up/down; release stops.
-- All menus/settings must be fully operable via touch (no keyboard-only flows).
+- **Touch controls need rework** — current implementation is broken and not ready for use. See TASKS.md for the redesign task.
+- Intended design (to be implemented): vertical touch strip on left; drag up/down; release stops.
+- All menus/settings must be fully operable via touch (no keyboard-only flows) once reworked.
 
 ## 16. Meta progression & story (phase-gated)
 - Meta progression is not part of MVP.

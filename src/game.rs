@@ -102,6 +102,16 @@ impl BoundaryController {
     }
 }
 
+const EXPLOSION_FRAME_DUR: f32 = 0.04; // 40ms per frame
+const EXPLOSION_FRAME_COUNT: u32 = 5;
+const EXPLOSION_TOTAL_DUR: f32 = EXPLOSION_FRAME_DUR * EXPLOSION_FRAME_COUNT as f32;
+
+pub struct Explosion {
+    pub x: f32,
+    pub y: f32,
+    pub timer: f32, // elapsed time; alive while < EXPLOSION_TOTAL_DUR
+}
+
 pub struct GameState {
     pub config: Config,
     pub player: Player,
@@ -151,6 +161,8 @@ pub struct GameState {
     pub miniboss_timer: f32,
     pub run_id: u32,
     pub run_time: f32,
+    pub at_title: bool,
+    pub paused: bool,
     pub game_over: bool,
     pub kills_total: u32,
     pub breaches_total: u32,
@@ -160,6 +172,8 @@ pub struct GameState {
     pub color_blend_material: Material,
     pub ui_font: BitmapFont,
     pub floating_texts: Vec<FloatingText>,
+    pub explosion_sprite: Sprite,
+    pub explosions: Vec<Explosion>,
 }
 
 impl GameState {
@@ -188,6 +202,7 @@ impl GameState {
         drone_remote_sprite: Sprite,
         rail_wall_sprite: Sprite,
         upgrade_track_sprite: Sprite,
+        explosion_sprite: Sprite,
         bg_texture: Texture2D,
         ui_font: BitmapFont,
     ) -> Self {
@@ -201,7 +216,7 @@ impl GameState {
             config.player_fire_rate,
         );
 
-        let mut state = Self {
+        let state = Self {
             player,
             player_sprite,
             enemy_small_sprite,
@@ -249,6 +264,8 @@ impl GameState {
             miniboss_timer: config.miniboss_interval,
             run_id: 1,
             run_time: 0.0,
+            at_title: true,
+            paused: false,
             game_over: false,
             kills_total: 0,
             breaches_total: 0,
@@ -263,6 +280,8 @@ impl GameState {
             config,
             ui_font,
             floating_texts: Vec::new(),
+            explosion_sprite,
+            explosions: Vec::new(),
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -372,7 +391,6 @@ impl GameState {
                 .expect("color_blend material")
             },
         };
-        state.log_run_start("boot");
         state
     }
 
@@ -409,11 +427,14 @@ impl GameState {
         self.miniboss_timer = self.config.miniboss_interval;
         self.run_id = self.run_id.saturating_add(1);
         self.run_time = 0.0;
+        self.at_title = false;
+        self.paused = false;
         self.game_over = false;
         self.kills_total = 0;
         self.breaches_total = 0;
         self.balance_log_timer = 0.0;
         self.floating_texts.clear();
+        self.explosions.clear();
         self.log_run_start("restart");
     }
 
@@ -628,6 +649,15 @@ impl GameState {
     }
 
     pub fn update(&mut self, dt: f32) {
+        // Title screen: any key starts the game.
+        if self.at_title {
+            if get_keys_pressed().into_iter().next().is_some() {
+                self.at_title = false;
+                self.log_run_start("new_game");
+            }
+            return;
+        }
+
         // On death: wait for any key then restart.
         if self.game_over {
             if is_key_pressed(KeyCode::Space)
@@ -639,8 +669,20 @@ impl GameState {
             return;
         }
 
+        // Pause toggle.
+        if is_key_pressed(KeyCode::P) || is_key_pressed(KeyCode::Escape) {
+            self.paused = !self.paused;
+        }
+        if self.paused {
+            return;
+        }
+
         self.run_time += dt;
         self.update_floating_texts(dt);
+        for exp in &mut self.explosions {
+            exp.timer += dt;
+        }
+        self.explosions.retain(|e| e.timer < EXPLOSION_TOTAL_DUR);
         self.tick_buff_timers(dt);
         self.player.fire_rate = self.current_fire_rate();
 
@@ -849,6 +891,20 @@ impl GameState {
             self.boundary_ctrl.breach_locked = false;
         }
 
+        // Spawn explosion at center of each enemy that is about to be removed.
+        let exp_hw = self.explosion_sprite.tile_w as f32 * 0.5;
+        let exp_hh = self.explosion_sprite.tile_h as f32 * 0.5;
+        let new_explosions: Vec<Explosion> = self
+            .enemies
+            .iter()
+            .filter(|e| e.is_dead() && !e.shake.is_active())
+            .map(|e| Explosion {
+                x: e.x + e.width * 0.5 - exp_hw,
+                y: e.y + e.height * 0.5 - exp_hh,
+                timer: 0.0,
+            })
+            .collect();
+        self.explosions.extend(new_explosions);
         self.enemies.retain(|e| !e.is_dead() || e.shake.is_active());
 
         // Coverage-based enemy spawning
@@ -1424,6 +1480,19 @@ impl GameState {
             }
         }
 
+        let explosion_positions: Vec<(f32, f32, u32)> = self
+            .explosions
+            .iter()
+            .map(|exp| {
+                let frame =
+                    ((exp.timer / EXPLOSION_FRAME_DUR) as u32).min(EXPLOSION_FRAME_COUNT - 1);
+                (exp.x, exp.y, frame)
+            })
+            .collect();
+        for (x, y, frame) in explosion_positions {
+            self.explosion_sprite.draw_frame(x, y, frame, WHITE);
+        }
+
         self.draw_shield_hud();
         self.draw_upgrade_hud();
         self.draw_run_timer_hud();
@@ -1431,6 +1500,10 @@ impl GameState {
 
         if self.game_over {
             self.draw_game_over();
+        }
+
+        if self.at_title || self.paused {
+            self.draw_title_pause_screen();
         }
     }
 
@@ -1566,6 +1639,72 @@ impl GameState {
             restart2,
             restart2_x,
             150.0,
+            1,
+            Color::from_rgba(240, 240, 180, 255),
+            1,
+        );
+    }
+
+    fn draw_title_pause_screen(&self) {
+        let overlay = Color::from_rgba(0, 0, 0, 200);
+        draw_rectangle(0.0, 0.0, SCREEN_W as f32, 180.0, overlay);
+
+        // Game name — two lines
+        let name1 = "LCDSHOOTSYSTEM";
+        let name2 = "LAST CONVOY SHOOT SYSTEM";
+        let name1_sz = self.ui_font.measure(name1, 2, 1);
+        let name2_sz = self.ui_font.measure(name2, 1, 1);
+        let name1_x = (SCREEN_W as f32 - name1_sz.x) * 0.5;
+        let name2_x = (SCREEN_W as f32 - name2_sz.x) * 0.5;
+        self.ui_font.draw(
+            name1,
+            name1_x,
+            22.0,
+            2,
+            Color::from_rgba(255, 220, 80, 255),
+            1,
+        );
+        self.ui_font.draw(
+            name2,
+            name2_x,
+            42.0,
+            1,
+            Color::from_rgba(200, 200, 200, 255),
+            1,
+        );
+
+        // Controls
+        let controls: &[(&str, &str)] = &[
+            ("UP / DOWN", "MOVE"),
+            ("SHOOT", "AUTO-FIRES"),
+            ("COLLECT ORB", "PASS THROUGH ORB"),
+            ("PAUSE", "P  /  ESC"),
+        ];
+        let label_col = Color::from_rgba(180, 220, 255, 255);
+        let value_col = Color::from_rgba(230, 230, 230, 255);
+        let mut y = 62.0_f32;
+        for (label, value) in controls {
+            let lsz = self.ui_font.measure(label, 1, 1);
+            // Right-align label at mid, left-align value at mid+4
+            let mid = SCREEN_W as f32 * 0.5;
+            self.ui_font
+                .draw(label, mid - lsz.x - 4.0, y, 1, label_col, 1);
+            self.ui_font.draw(value, mid + 4.0, y, 1, value_col, 1);
+            y += 13.0;
+        }
+
+        // Prompt
+        let prompt = if self.paused {
+            "P / ESC  RESUME"
+        } else {
+            "ANY KEY  START"
+        };
+        let psz = self.ui_font.measure(prompt, 1, 1);
+        let px = (SCREEN_W as f32 - psz.x) * 0.5;
+        self.ui_font.draw(
+            prompt,
+            px,
+            155.0,
             1,
             Color::from_rgba(240, 240, 180, 255),
             1,

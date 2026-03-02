@@ -215,6 +215,13 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 
 ## Phase 2 — UX + summaries + tests allowed
 
+### P2.0 Touch controls rework ⚠ NEEDS DESIGN
+- Current touch input implementation is broken / not fit for use.
+- Intended model (per SPEC §15): vertical touch strip on left side of screen; drag up/down maps to movement axis; release → 0.
+- Requires testing in a mobile browser (WASM build).
+- All menus/settings must be touch-operable once complete.
+- Do not advertise touch controls in any in-game UI until this is done.
+
 ### P2.1 Start screen
 - Add a start screen state with "Start Run" button (touch/click/key).
 - Minimal styled screen consistent with game aesthetic.
