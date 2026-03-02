@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-native:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: lastconvoy-linux-x86_64
+            ext: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: lastconvoy-macos-arm64
+            ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: lastconvoy-windows-x86_64
+            ext: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Generate default config.toml
+        shell: bash
+        run: |
+          if [ -f config.toml ]; then
+            cp config.toml config.toml.release
+          else
+            touch config.toml.release
+          fi
+
+      - name: Package (Linux/macOS)
+        if: matrix.ext == 'tar.gz'
+        run: |
+          mkdir -p dist/${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/lastconvoy dist/${{ matrix.artifact }}/
+          cp -r assets dist/${{ matrix.artifact }}/
+          cp config.toml.release dist/${{ matrix.artifact }}/config.toml
+          cd dist && tar czf ${{ matrix.artifact }}.tar.gz ${{ matrix.artifact }}
+
+      - name: Package (Windows)
+        if: matrix.ext == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/${{ matrix.artifact }}
+          Copy-Item target/${{ matrix.target }}/release/lastconvoy.exe dist/${{ matrix.artifact }}/
+          Copy-Item -Recurse assets dist/${{ matrix.artifact }}/
+          Copy-Item config.toml.release dist/${{ matrix.artifact }}/config.toml
+          Compress-Archive -Path dist/${{ matrix.artifact }} -DestinationPath dist/${{ matrix.artifact }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.${{ matrix.ext }}
+
+  build-wasm:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build WASM
+        run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Package WASM
+        run: |
+          mkdir -p dist/lastconvoy-wasm
+          cp assets/web/index.html dist/lastconvoy-wasm/
+          cp assets/web/mq_js_bundle.js dist/lastconvoy-wasm/
+          cp target/wasm32-unknown-unknown/release/lastconvoy.wasm dist/lastconvoy-wasm/
+          cp -r assets/fonts dist/lastconvoy-wasm/
+          cp -r assets/sprites dist/lastconvoy-wasm/
+          cd dist && zip -r lastconvoy-wasm.zip lastconvoy-wasm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lastconvoy-wasm
+          path: dist/lastconvoy-wasm.zip
+
+  release:
+    name: Create Release
+    needs: [build-native, build-wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
