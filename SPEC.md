@@ -277,19 +277,24 @@ Purpose: rare punctuation events distinct from Elite events.
 - Resume normal enemy spawning.
 - Apply a small global scaling bump consistent with controlled growth.
 
-## 14. Inputs (gameplay requirements)
+## 14. UI screens (title, pause, game over)
+- **Title screen**: displayed on startup; shows game name and "Press any key to start" prompt; pressing any key or clicking anywhere begins a new run (enters game state with `at_title = false`).
+- **Pause screen**: toggled with P key or ESC key during gameplay; displays a semi-transparent overlay with controls list and prompt to press P or ESC to resume; pause gate gates all gameplay updates (no enemies/projectiles/orbs move while paused).
+- **Game over screen**: (Phase 2+) shown on player death; displays run summary (time survived, enemies killed, breaches suffered); provides buttons to start a new run or return to title.
+
+## 15. Inputs (gameplay requirements)
 - Single-axis movement only.
 - Default bindings: **W/S**, Up/Down arrows, controller stick **Y**, D-pad Up/Down.
 - Provide a single setting: **Rotate Input**:
   - When enabled: A/D, Left/Right arrows, stick **X**, D-pad Left/Right.
 - Opposing inputs cancel; analog deadzone applies.
 
-## 15. Touch controls & menus
+## 16. Touch controls & menus
 - **Touch controls need rework** — current implementation is broken and not ready for use. See TASKS.md for the redesign task.
 - Intended design (to be implemented): vertical touch strip on left; drag up/down; release stops.
 - All menus/settings must be fully operable via touch (no keyboard-only flows) once reworked.
 
-## 16. Meta progression & story (phase-gated)
+## 17. Meta progression & story (phase-gated)
 - Meta progression is not part of MVP.
 - When implemented (Phase 3+), meta can:
   - Increase starting stats
@@ -298,7 +303,7 @@ Purpose: rare punctuation events distinct from Elite events.
   - Add optional difficulty modifiers for better rewards
 - Story is Phase 4+ and must not reshape core mechanics.
 
-## 17. Tuning constants & runtime configuration
+## 18. Tuning constants & runtime configuration
 - All tuning constants and scaling curves must have **compile-time defaults** in `src/config.rs`.
 - Avoid magic numbers scattered across systems.
 
@@ -317,14 +322,14 @@ Purpose: rare punctuation events distinct from Elite events.
 - The settings screen must be fully touch-operable (consistent with §15).
 - Minimal viable settings for MVP: player speed, starting shields, enemy spawn rate modifier, fire rate. Expand in later phases.
 
-## 18. Tooling pointers (non-authoritative)
+## 19. Tooling pointers (non-authoritative)
 - The repo uses macroquad + Rust + Cargo.
 - Native builds for development; WASM (wasm32-unknown-unknown) for browser release.
 - Prefer official macroquad docs and examples:
   - https://macroquad.rs
   - https://github.com/not-fl3/macroquad
 
-## 19. Visual Specification
+## 20. Visual Specification
 
 ### Palette (v3)
 - Outline: Pure Black (#000000). Outline is NOT part of any material ramp.
@@ -377,6 +382,9 @@ Steel must remain visible. Enemies cannot be fully magenta.
 - Infection must change shape (not just color).
 - No internal shade equals outline value.
 If silhouette fails at 1×, redesign.
+
+### Enemy destruction visual effect
+When an enemy is destroyed (HP reduced to 0 by projectile damage, not by breach), an animated explosion sprite is rendered at the enemy's center position. The explosion sprite is a short 5-frame animation (40 ms per frame) that plays once and despawns. This provides visual feedback that the enemy was successfully killed rather than despawned silently.
 
 ### Upgrade Lane Framing
 Top and bottom upgrade lanes mirror each other in height and color, and both remain gameplay-active orb lanes.

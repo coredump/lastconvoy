@@ -261,7 +261,7 @@ explosive_shield_clear_distance = 80.0
 # Back layer is the deepest (slowest); props layer is the nearest (fastest).
 # Set to 0.0 to freeze a layer.
 bg_parallax_speed_back = 0.0
-bg_parallax_speed_stars = 8.0
+bg_parallax_speed_stars = 14.0
 bg_parallax_speed_props = 0.0
 
 # Force a specific orb type to be the only one that spawns, bypassing normal

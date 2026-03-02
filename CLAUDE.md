@@ -82,9 +82,9 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - No tests in Phase 1. Tests allowed Phase 2+.
 
 ## Phase 1 status
-P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 UPDATED (offense tracks converted from permanent levels to temporary refreshable buffs; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). HP scaling bug fixed (`.ceil()` → `.round().max(1.0)`).
+P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 UPDATED (offense tracks converted from permanent levels to temporary refreshable buffs; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). P1.14 PARTIAL (explosion effect on enemy death, title screen, pause overlay implemented; touch controls marked broken for P2.0 redesign). All clippy warnings resolved (2026-03-01).
 
-Recent additions (balance + UI pass):
+Recent additions (balance + UI + state management):
 - **Offense buff model**: Damage/FireRate/Burst/Pierce/Stagger are now temporary buffs with per-type durations and fixed magnitudes; collecting an active buff refreshes timer (no tier stacking).
 - **HP scaling**: tripled (0.001 → 0.003 per second); heavy/large multipliers increased.
 - **Orb pool gating**: active offense buff types are excluded from spawn pool until expiry (Shield/Explosive/Drone rules unchanged).
@@ -102,6 +102,10 @@ Recent additions (balance + UI pass):
 - **Boundary shield 3-slice rendering**: `sprite.rs` now parses Aseprite JSON `slices` into `Sprite.slices: HashMap<String, Rect>` and exposes `draw_3slice_vertical()`. Shield drawn at `BOUNDARY_X - 3.0`, spans y=43–157 (115 px, enemy lane only). Slice data: top h=15, mid h=12, bot h=15. Also exposes `draw_clipped_h()` for partial-height tile drawing.
 - **Rail wall background**: `rail_wall` animated sprite (36×36, single frame) tiled vertically in the player column (x=0, y=21–158), drawn first in `draw_background()` so it sits behind all entities. Boundary marker line removed.
 - **Orb despawn fix**: orbs now only despawn when fully off the left screen edge (`o.x + o.width <= 0`), not when passing the player column.
+- **Explosion effect** (P1.14, 2026-03-01): `Explosion` struct in `GameState` (x, y, timer); spawned at enemy center on death; drawn as `explosion_2` sprite (5 frames, 40ms per frame).
+- **Title & pause screens** (P1.14, 2026-03-01): `at_title` and `paused` flags in `GameState`; any key starts game from title; P+ESC toggles pause overlay with controls list and game name; pause state gates gameplay updates.
+- **Sprite::tile_w/tile_h fields** (2026-03-01): added to `Sprite` struct for frame-rect computation support for animated explosions.
+- **Touch controls flagged** (2026-03-01): current touch input marked broken and not ready for use; SPEC §15 updated; P2.0 task created for touch redesign.
 
 Source files now include: `main.rs`, `config.rs`, `game.rs`, `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, **`text.rs`**.
 
