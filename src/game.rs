@@ -3,20 +3,19 @@ use macroquad::prelude::*;
 use crate::config::SHAKE_DURATION;
 use crate::config::SHAKE_INTENSITY;
 use crate::config::{
-    BASE_DAMAGE_VALUE, BIG_INJECT_BASE_INTERVAL,
-    BOUNDARY_X, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH,
-    Config, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT, DRONE_REMOTE_WIDTH,
-    DRONE_Y_OFFSETS, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP,
-    ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
-    ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
-    ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
-    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MAX_ATTACHED_DRONES, MEDIUM_INTRO_TIME,
-    ORB_H, ORB_W, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H,
-    PROJECTILE_SPEED, PROJECTILE_W, SCREEN_W, SHIELDED_FREQ_SCALE, SHOT_BARRIER_BOTTOM_Y,
-    SHOT_BARRIER_GATE_X_MAX, SHOT_BARRIER_TOP_Y, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES,
-    SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH, SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX,
-    TOP_BORDER_BOTTOM, TOP_BORDER_TOP, TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP,
-    UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
+    BASE_DAMAGE_VALUE, BIG_INJECT_BASE_INTERVAL, BOUNDARY_X, COVERAGE_HYSTERESIS,
+    COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH, Config, DRONE_FIRE_RATE,
+    DRONE_HEIGHT, DRONE_REMOTE_HEIGHT, DRONE_REMOTE_WIDTH, DRONE_Y_OFFSETS, ENEMY_ELITE_H,
+    ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W,
+    ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H, ENEMY_LARGE_HP, ENEMY_LARGE_SPEED,
+    ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W,
+    ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED, ENEMY_SMALL_W, HEAVY_INTRO_TIME,
+    LARGE_INTRO_TIME, MAX_ATTACHED_DRONES, MEDIUM_INTRO_TIME, ORB_H, ORB_W, PLAYER_HEIGHT,
+    PLAYER_WIDTH, PLAYER_X, PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_SPEED, PROJECTILE_W,
+    SCREEN_W, SHIELDED_FREQ_SCALE, SHOT_BARRIER_BOTTOM_Y, SHOT_BARRIER_GATE_X_MAX,
+    SHOT_BARRIER_TOP_Y, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
+    SPAWN_TICK_INTERVAL, STAGGER_KNOCKBACK_PX, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
+    TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
 use crate::drone::{Drone, RemoteDrone, RemoteDroneLane};
 use crate::elite::EliteEvent;
@@ -1380,15 +1379,8 @@ impl GameState {
                     &self.color_blend_material,
                 );
             } else {
-                self.boundary_shield_sprite.draw_3slice_vertical(
-                    shield_x,
-                    shield_y,
-                    shield_h,
-                    "top",
-                    "mid",
-                    "bot",
-                    WHITE,
-                );
+                self.boundary_shield_sprite
+                    .draw_3slice_vertical(shield_x, shield_y, shield_h, "top", "mid", "bot", WHITE);
             }
         }
         self.draw_orbs();
@@ -2053,13 +2045,7 @@ impl GameState {
                         WHITE,
                         src.clone(),
                     );
-                    draw_texture_ex(
-                        &self.bg_texture,
-                        BOUNDARY_X + wrapped,
-                        lane_top,
-                        WHITE,
-                        src,
-                    );
+                    draw_texture_ex(&self.bg_texture, BOUNDARY_X + wrapped, lane_top, WHITE, src);
                 }
             }
         }
@@ -2087,10 +2073,22 @@ impl GameState {
         let track_h = 21.0_f32;
         let top_track_y = TOP_UPGRADE_LANE_TOP as f32; // 21.0
         let bot_track_y = UPGRADE_LANE_BOTTOM as f32 + 1.0 - track_h; // 159.0
-        self.upgrade_track_sprite
-            .draw_front_tiled_h(0.0, top_track_y, SCREEN_W as f32, "front", "rail", true);
-        self.upgrade_track_sprite
-            .draw_front_tiled_h(0.0, bot_track_y, SCREEN_W as f32, "front", "rail", false);
+        self.upgrade_track_sprite.draw_front_tiled_h(
+            0.0,
+            top_track_y,
+            SCREEN_W as f32,
+            "front",
+            "rail",
+            true,
+        );
+        self.upgrade_track_sprite.draw_front_tiled_h(
+            0.0,
+            bot_track_y,
+            SCREEN_W as f32,
+            "front",
+            "rail",
+            false,
+        );
     }
 }
 
