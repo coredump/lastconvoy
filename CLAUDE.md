@@ -55,7 +55,7 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 ## Non-negotiables (do not look these up — memorize)
 - Internal resolution: 320×180, landscape always, integer scaling only.
 - Single-axis player movement (vertical).
-- Five fixed vertical bands: top border (0–20), top upgrade lane (21–42), enemy lane (43–136), bottom upgrade lane (137–158), bottom border (159–179).
+- Four fixed vertical bands: top border (0–20), top upgrade lane (21–42), enemy lane (43–157), bottom upgrade lane (158–179). No bottom border.
 - Time-based scaling only. No rubber-banding.
 - Orbs: two-phase (activate THEN collect). Type is fixed at spawn; no cycling mechanic.
 - Drone shots interact with orbs equally to player shots (activation only; no cycling mechanic).
@@ -93,8 +93,13 @@ Recent additions (balance + UI pass):
 - **Balance telemetry**: `dps_estimate()` + `large_ttk()` logged every 30 s; kills/breaches counters tracked in `GameState`.
 - **Log analysis**: debug log now appends to file and emits `RUN_START`/`RUN_END` markers; `scripts/analyze_balance_log.sh` parses multiple runs in one log and outputs per-run + aggregate reports (`--last`, `--run N`, `--no-aggregate`).
 - **Lane crossing gate**: shots are blocked by invisible 1px barriers at enemy/upgrade boundaries except through a left-side gate corridor; DroneRemote pickup now spawns one remote drone per upgrade lane (top sprite mirrored).
+- **Explosive shield HSL tint**: `color_blend_material` (GLSL ES HSL shader) in `GameState` recolors shield by taking H+S from orange tint and L from sprite texture, preserving shading (Aseprite "Color" blend mode). `Sprite::draw_3slice_vertical_hsl()` wraps the draw with material bind/unbind.
+- **config.toml baked at compile time**: `BAKED_CONFIG = include_str!("../config.toml")` in `config.rs`; release/WASM builds use these as defaults. Native dev still layers runtime overrides on top.
+- **WASM compat**: `debug_log.rs` fs ops are cfg-gated on `not(target_arch = "wasm32")`; `window_conf()` sets `WebGLVersion::WebGL2`; vite COOP/COEP headers commented out.
+- **upgrade_track sprite**: asset added (`assets/sprites/objects/upgrade_track.json/png`), loaded in `main.rs`, passed to `GameState`. Slices: `front` (40×21) and `rail` (10×21).
+- **is_burst removed**: `Projectile.is_burst` field and burst-specific draw path removed; burst shots use the same sprite/color as normal shots.
 - **Orb spawn sync**: each orb spawn tick now attempts spawns on both upgrade lanes simultaneously, with independent per-lane type rolls and a global orb cap fallback when only one slot remains.
-- **Boundary shield 3-slice rendering**: `sprite.rs` now parses Aseprite JSON `slices` into `Sprite.slices: HashMap<String, Rect>` and exposes `draw_3slice_vertical()`. Shield drawn at `BOUNDARY_X - 3.0` (right edge aligns with boundary), spans y=21–158 (138 px, flush with upgrade lane edges). Slice data: top h=15, mid h=12, bot h=15. Also exposes `draw_clipped_h()` for partial-height tile drawing.
+- **Boundary shield 3-slice rendering**: `sprite.rs` now parses Aseprite JSON `slices` into `Sprite.slices: HashMap<String, Rect>` and exposes `draw_3slice_vertical()`. Shield drawn at `BOUNDARY_X - 3.0`, spans y=43–157 (115 px, enemy lane only). Slice data: top h=15, mid h=12, bot h=15. Also exposes `draw_clipped_h()` for partial-height tile drawing.
 - **Rail wall background**: `rail_wall` animated sprite (36×36, single frame) tiled vertically in the player column (x=0, y=21–158), drawn first in `draw_background()` so it sits behind all entities. Boundary marker line removed.
 - **Orb despawn fix**: orbs now only despawn when fully off the left screen edge (`o.x + o.width <= 0`), not when passing the player column.
 

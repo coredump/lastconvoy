@@ -36,9 +36,8 @@ Coordinate ranges (locked):
 |---------------|----------|--------|
 | Top Border    | 0–20     | 21 px  |
 | Top Upgrade Lane | 21–42 | 22 px  |
-| Enemy Lane    | 43–136   | 94 px |
-| Bottom Upgrade Lane | 137–158 | 22 px |
-| Bottom Border | 159–179  | 21 px  |
+| Enemy Lane    | 43–157   | 115 px |
+| Bottom Upgrade Lane | 158–179 | 22 px |
 
 ## 4. Player
 - Fixed on left side.
@@ -67,7 +66,7 @@ Canonical enemy size table:
 | Mini-Boss | 64×48      | event-based only; 2–3 px padding |
 | Boss      | 72×72 max  | reserved; no gameplay rules yet |
 
-Enemy lane height 94 px; max standard enemy height 48 px; boss hard cap 72 px.
+Enemy lane height 115 px; max standard enemy height 48 px; boss hard cap 72 px.
 
 Enemy classes:
 - **Small:** 1 HP. On reaching the left boundary: winds up, triggers **one** breach event, then despawns.
@@ -382,15 +381,15 @@ If silhouette fails at 1×, redesign.
 Top and bottom upgrade lanes mirror each other in height and color, and both remain gameplay-active orb lanes.
 
 ### Boundary Shield Visual
-The boundary shield sprite spans vertically from 2 px inside the top border bottom edge to 2 px inside the bottom border top edge:
-- Top of shield: y = TOP_BORDER_BOTTOM + 2 = 22
-- Bottom of shield: y = BOTTOM_BORDER_TOP − 2 = 157 (inclusive)
-- Total height: 136 px
+The boundary shield sprite spans vertically across the enemy lane:
+- Top of shield: y = ENEMY_LANE_TOP = 43
+- Bottom of shield: y = ENEMY_LANE_BOTTOM = 157 (inclusive)
+- Total height: 115 px
 
-Rendered using 3-slice vertical repeat: `top` and `bot` slices drawn at natural height (15 px each); `mid` slice (12 px) tiled to fill the remainder. The current animation frame's x-offset is applied to all slice source rects. Orange tint applied when an explosive segment is present.
+Rendered using 3-slice vertical repeat: `top` and `bot` slices drawn at natural height (15 px each); `mid` slice (12 px) tiled to fill the remainder. The current animation frame's x-offset is applied to all slice source rects. When an explosive segment is present, the shield is recolored using an HSL color-blend shader (H+S from orange tint, L from sprite texture) to preserve shading detail.
 
 ### Border Design
-Top and Bottom Borders: 21 px each.
+Top Border: 21 px. No bottom border — the bottom upgrade lane extends to the screen edge.
 Must feel part of world (biome enclosure, structural framing) — not UI bars.
 
 ### Hard Constraints
