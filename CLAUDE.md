@@ -71,6 +71,7 @@ cargo fmt                          # format (run before commit)
 cargo clippy -- -W clippy::all     # lint (must pass before commit)
 cargo test                         # tests (Phase 2+ only)
 cargo build --target wasm32-unknown-unknown --release  # WASM
+cargo deny check                   # license + advisory check
 ```
 
 ## Non-negotiables (do not look these up — memorize)

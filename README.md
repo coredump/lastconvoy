@@ -84,7 +84,9 @@ Art contributions are very welcome — the developer is a programmer, not an art
 - [serde](https://serde.rs/) + TOML for runtime config
 - GitHub Actions for CI, WASM deploy (GitHub Pages), and native releases
 
-Most of the code was written with heavy assistance from [Claude](https://claude.ai/) (Anthropic).
+Dependency licenses are checked with [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny).
+
+Most of the code was written with assistance from [Claude](https://claude.ai/) (Anthropic).
 
 ---
 

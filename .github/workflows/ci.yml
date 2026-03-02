@@ -39,3 +39,14 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - run: cargo audit
+
+  deny:
+    name: Dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - run: cargo deny check
