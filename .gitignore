@@ -11,5 +11,7 @@ config.ron
 .claude/
 .serena/
 .playright-mcp
+.mcp_data
 wasm-check*
 console-*
+hubs/
