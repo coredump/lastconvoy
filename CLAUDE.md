@@ -19,6 +19,7 @@
 
 ### Rules
 - Prefer plugin/MCP lookups over reading files or guessing. This saves context.
+- **contextplus when better** — prefer contextplus tools over alternatives when they provide a clearer or more direct answer: use `get_blast_radius` instead of grep for cross-file usages; use `semantic_code_search` / `semantic_identifier_search` for intent-based searches; use `run_static_analysis` for inline cargo checks; use `get_context_tree` / `get_file_skeleton` for structural overviews. Fall back to Serena + ripgrep for precise symbol edits and exact-match searches.
 - **Serena & ripgrep MCPs first** — always use these for code navigation, file search, and content search before Bash/shell tools.
 - **Context7 first** — always query Context7 for library docs before relying on training knowledge.
 - **commit-commands skills first** — use `/commit-commands:commit` for git commits. Commit directly to main (no PRs/branches for now).
@@ -29,7 +30,7 @@
 - **Always sync after any change** — after ANY code or design change, immediately update: (1) memory MCP with decisions/findings, (2) SPEC.md if gameplay rules changed, (3) TASKS.md if task status changed, (4) CLAUDE.md if architecture/status/conventions changed. Do not defer. Keep sync state always current.
 
 ### MCP usage — detailed rules
-- **Priority order:** (1) Serena + ripgrep for code/files, (2) Context7 for API docs, (3) memory MCP for decisions/state, (4) filesystem MCP for file reads/writes/directory ops, (5) Bash only as last resort.
+- **Priority order:** (1) contextplus when it's the best tool (blast radius, semantic search, static analysis, structural overview), (2) Serena + ripgrep for precise symbol lookup/editing and exact-match search, (3) Context7 for API docs, (4) memory MCP for decisions/state, (5) filesystem MCP for file reads/writes/directory ops, (6) Bash only as last resort.
 - **Serena** — code navigation only. Use `find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`. Do NOT use Serena `write_memory`/`read_memory` — use memory MCP instead.
 - **memory MCP** — primary persistent store. Call `read_graph` at session start. MEMORY.md is a concise index only; details live in the graph. Always store architecture decisions, resolved ambiguities, and key findings here.
 - **Context7** — always call `resolve-library-id` first, then `query-docs`. Never skip for macroquad/crate API questions.
@@ -37,6 +38,26 @@
 - Do NOT memorize project structure across sessions — query Serena fresh each time.
 - Do NOT read files speculatively — use symbolic tools to retrieve only what's needed.
 - Do NOT re-derive decisions already in the memory graph — check it first.
+
+### contextplus — strict workflow rules
+- **`get_context_tree` at every task start — mandatory, no exceptions.** Run before any other exploration.
+- **`get_file_skeleton` before reading any unfamiliar file.** Skip only when the exact symbol/line is already known.
+- **`get_blast_radius` before deleting or modifying any symbol.** Never remove code without checking impact first.
+- **`run_static_analysis` after writing any code.** Catch unused imports, dead code, type errors before moving on.
+- **Batch independent tool calls in parallel.** Never make sequential calls that could run simultaneously.
+- **`propose_commit` is SKIPPED as a file-writing tool** — use filesystem MCP / Edit / Write instead. Its formatting rules apply to NEW files only (do not retroactively reformat existing Rust files).
+
+### contextplus — new file formatting rules (apply to NEW files only)
+- Every new file starts with a 2-line header comment: line 1 = file purpose, line 2 = key dependencies or blank.
+- No inline comments. Logic must be self-evident from naming; add a header comment if explanation is needed.
+- Code ordering within a file: imports → enums → type aliases → constants → functions.
+- Abstraction thresholds: inline code used once and <20 lines; extract to function if >30 lines or used 2+ times.
+
+### contextplus — anti-patterns (STRICT — never do these)
+- Never read a full file without calling `get_file_skeleton` first.
+- Never delete or rename a symbol without calling `get_blast_radius` first.
+- Never leave unused imports or variables after a refactor.
+- Never retry a failing operation in a loop — diagnose root cause or ask the user.
 
 ## Toolchain
 - Rust (stable), Cargo, macroquad, serde + toml, rustfmt, clippy.
