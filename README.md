@@ -1,4 +1,4 @@
-# Last Convoy
+# LCDShootSystem: Last Convoy Defense
 
 Minimalist systemic roguelite shooter. Endless run. You hold the line or you die.
 
