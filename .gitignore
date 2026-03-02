@@ -2,6 +2,7 @@
 /node_modules
 /deploy
 .idea
+.mcp.json
 *.swp
 *.swo
 *~
