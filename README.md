@@ -68,7 +68,7 @@ After a WASM build, copy `assets/web/index.html`, `assets/web/mq_js_bundle.js`, 
 
 All original sprites were made by hand in [Aseprite](https://github.com/aseprite/aseprite). No AI image generation was used for the original art.
 
-The parallax background is from the [Ultimate Warped Collection](https://ansimuz.itch.io/ultimate-warped-collection) by [Ansimuz](https://ansimuz.itch.io/), used under its asset license.
+The parallax background and explosion sprites are from the [Ultimate Warped Collection](https://ansimuz.itch.io/ultimate-warped-collection) by [Ansimuz](https://ansimuz.itch.io/), used under its asset license.
 
 Original sprites are licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
 
@@ -111,6 +111,6 @@ Roughly in order:
 | Original sprites | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) |
 | Monogram font (datagoblin) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) — public domain |
 | Edunline font (Brian Kent) | Freeware — personal and commercial use permitted; no resale or modification without permission |
-| Ansimuz parallax background | Personal and commercial use permitted; redistribution/resale as standalone assets not permitted |
+| Ansimuz parallax background + explosions | Personal and commercial use permitted; redistribution/resale as standalone assets not permitted |
 
 See [`assets/LICENSE`](assets/LICENSE) for full third-party asset terms.
