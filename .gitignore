@@ -1,7 +1,6 @@
 /target
 /node_modules
 /deploy
-config.toml
 .idea
 *.swp
 *.swo
