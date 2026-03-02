@@ -192,7 +192,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - On death: resume spawning, apply small scaling bump.
 - **Status**: miniboss_timer exists in GameState but no spawn or event logic implemented.
 
-### P1.14 MVP polish (still Phase 1) ⚠ PARTIAL → IN PROGRESS
+### P1.14 MVP polish (still Phase 1) ✓ COMPLETE
 - Visual feedback for:
   - Shield loss (segment flash/pop). ⚠ Needs Vec<ShieldSegment> implementation
   - Orb activation state change (color/glow shift). ✓ Color tint changes per phase in draw_orbs()
@@ -201,11 +201,13 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - Object pooling for projectiles and enemies if needed for performance. ✓ Using Vec<T> with retain()
 - Frame-rate independence: all movement/timers use `get_frame_time()` delta. ✓ Implemented throughout
 - Title & pause screens: ✓ Implemented (at_title state, any-key-to-start; paused state, P+ESC toggle; controls overlay)
+- Upgrade HUD redesign: ✓ Drone placeholder always visible; Shield/Explosive removed from HUD; expiring buffs shown with vertical timer bars only when active
 
 **Phase 1 DoD (Definition of Done)**
 - Playable loop: start → title screen → any-key-to-start → survive → die → restart. ✓ WORKING
 - Pause overlay (P+ESC) with controls list implemented. ✓ WORKING
 - Explosion effect on enemy death visible. ✓ WORKING
+- Upgrade HUD with drone placeholder and vertical timer bars. ✓ COMPLETE
 - Touch input works (at least in WASM build). ⚠ **BROKEN — see P2.0**
 - Orbs work exactly as specified (activate then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
 - Elites and Mini-Bosses work with enemy spawn pause (orbs continue). ⚠ NOT STARTED (no event pause logic)

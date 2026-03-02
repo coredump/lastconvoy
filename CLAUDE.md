@@ -82,7 +82,7 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - No tests in Phase 1. Tests allowed Phase 2+.
 
 ## Phase 1 status
-P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 UPDATED (offense tracks converted from permanent levels to temporary refreshable buffs; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). P1.14 PARTIAL (explosion effect on enemy death, title screen, pause overlay implemented; touch controls marked broken for P2.0 redesign). All clippy warnings resolved (2026-03-01).
+P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 UPDATED (offense tracks converted from permanent levels to temporary refreshable buffs; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). P1.14 COMPLETE (explosion effect on enemy death, title/pause screens, upgrade HUD redesign with drone placeholder + vertical timer bars, touch controls marked broken for P2.0 redesign). All clippy warnings resolved (2026-03-01).
 
 Recent additions (balance + UI + state management):
 - **Offense buff model**: Damage/FireRate/Burst/Pierce/Stagger are now temporary buffs with per-type durations and fixed magnitudes; collecting an active buff refreshes timer (no tier stacking).
@@ -104,8 +104,10 @@ Recent additions (balance + UI + state management):
 - **Orb despawn fix**: orbs now only despawn when fully off the left screen edge (`o.x + o.width <= 0`), not when passing the player column.
 - **Explosion effect** (P1.14, 2026-03-01): `Explosion` struct in `GameState` (x, y, timer); spawned at enemy center on death; drawn as `explosion_2` sprite (5 frames, 40ms per frame).
 - **Title & pause screens** (P1.14, 2026-03-01): `at_title` and `paused` flags in `GameState`; any key starts game from title; P+ESC toggles pause overlay with controls list and game name; pause state gates gameplay updates.
+- **Upgrade HUD redesign** (P1.14, 2026-03-01): Shield/Explosive slots removed from HUD; drone slot shown as permanent placeholder (Upgrade Teal Very Dark box when inactive); expiring buff icons (Damage, FireRate, Burst, Pierce, Stagger) only shown when active; vertical timer bars (2px wide, Upgrade Teal Light, shrinks downward); new `top_bar` sprite asset for background.
 - **Sprite::tile_w/tile_h fields** (2026-03-01): added to `Sprite` struct for frame-rect computation support for animated explosions.
 - **Touch controls flagged** (2026-03-01): current touch input marked broken and not ready for use; SPEC §15 updated; P2.0 task created for touch redesign.
+- **Release workflow rule** (v0.1.0): always bump `Cargo.toml` version first, commit, then tag+push+GitHub release with changelog from previous tag.
 
 Source files now include: `main.rs`, `config.rs`, `game.rs`, `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, **`text.rs`**.
 
