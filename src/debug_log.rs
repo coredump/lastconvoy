@@ -1,3 +1,5 @@
+// Debug log writer with run-start/end markers (native only).
+// std::fs (cfg-gated)
 pub struct DebugLog {
     #[cfg(not(target_arch = "wasm32"))]
     writer: std::io::BufWriter<Box<dyn std::io::Write>>,

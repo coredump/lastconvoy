@@ -1,3 +1,5 @@
+// Keyboard and touch input aggregation into a vertical axis.
+// macroquad, crate::config
 use macroquad::input::{KeyCode, TouchPhase, is_key_down, touches};
 use macroquad::window::screen_width;
 

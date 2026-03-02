@@ -1,3 +1,5 @@
+// Compile-time defaults and runtime config loading from TOML.
+// serde, toml, crate types
 use crate::enemy::EnemyKind;
 use crate::orb::OrbType;
 use serde::{Deserialize, Serialize};
@@ -8,7 +10,8 @@ use serde::{Deserialize, Serialize};
 
 pub const SCREEN_W: u32 = 320;
 pub const SCREEN_H: u32 = 180;
-pub const WINDOW_SCALE: u32 = 3; // default window: 960×540
+// Default window size is 960×540.
+pub const WINDOW_SCALE: u32 = 3;
 pub const MIN_SCALE: u32 = 1;
 pub const MAX_SCALE: u32 = 6;
 
@@ -41,7 +44,7 @@ pub const SHOT_BARRIER_BOTTOM_Y: f32 = UPGRADE_LANE_TOP as f32;
 // Player
 pub const PLAYER_X: f32 = 8.0;
 pub const PLAYER_SPEED: f32 = 90.0;
-pub const PLAYER_FIRE_RATE: f32 = 0.18; // seconds between shots
+pub const PLAYER_FIRE_RATE: f32 = 0.18;
 pub const PLAYER_WIDTH: f32 = 24.0;
 pub const PLAYER_HEIGHT: f32 = 16.0;
 /// X coordinate where enemies stop (just in front of the player's right edge).
@@ -49,8 +52,8 @@ pub const BOUNDARY_X: f32 = PLAYER_X + PLAYER_WIDTH + 4.0;
 pub const PLAYER_STARTING_SHIELDS: u32 = 0;
 
 // Hit shake
-pub const SHAKE_INTENSITY: f32 = 2.0; // max pixel offset
-pub const SHAKE_DURATION: f32 = 0.15; // seconds
+pub const SHAKE_INTENSITY: f32 = 2.0;
+pub const SHAKE_DURATION: f32 = 0.15;
 
 // Enemy flash colors and timing
 pub const DAMAGE_FLASH_COLOR: macroquad::prelude::Color =
@@ -128,9 +131,10 @@ pub const MINIBOSS_SPEED: f32 = 14.0;
 // Coverage-based spawn system
 pub const COVERAGE_ZONE_LEFT: f32 = 96.0;
 pub const COVERAGE_ZONE_RIGHT: f32 = 320.0;
-pub const COVERAGE_ZONE_WIDTH: f32 = 224.0; // COVERAGE_ZONE_RIGHT - COVERAGE_ZONE_LEFT
+pub const COVERAGE_ZONE_WIDTH: f32 = 224.0;
 pub const COVERAGE_HYSTERESIS: f32 = 0.03;
-pub const SPAWN_TICK_INTERVAL: f32 = 0.1; // 10 Hz
+// Spawn tick rate: 10 Hz.
+pub const SPAWN_TICK_INTERVAL: f32 = 0.1;
 pub const SPAWN_SLOT_WIDTH: f32 = 20.0;
 pub const SPAWN_SLOT_COUNT: usize = 11;
 pub const SPAWN_LEAD_PX: f32 = 12.0;
@@ -140,10 +144,13 @@ pub const BIG_INJECT_BASE_INTERVAL: f32 = 2.2;
 // Scaling rates (fractional increase per second)
 pub const ENEMY_HP_SCALE: f32 = 0.003;
 pub const SHIELDED_FREQ_SCALE: f32 = 0.001;
-pub const SPEED_SCALE_PER_SEC: f32 = 0.0003; // +0.03%/s → 1.18× at 10min
-pub const SPEED_SCALE_CAP: f32 = 1.5; // speed never exceeds 1.5× base
-pub const HP_SCALE_HEAVY_MULT: f32 = 2.0; // heavy enemies scale HP 2× faster
-pub const HP_SCALE_LARGE_MULT: f32 = 3.0; // large enemies scale HP 3× faster
+// +0.03%/s → 1.18× speed multiplier at 10 min.
+pub const SPEED_SCALE_PER_SEC: f32 = 0.0003;
+pub const SPEED_SCALE_CAP: f32 = 1.5;
+// Heavy enemies scale HP 2× faster than small.
+pub const HP_SCALE_HEAVY_MULT: f32 = 2.0;
+// Large enemies scale HP 3× faster than small.
+pub const HP_SCALE_LARGE_MULT: f32 = 3.0;
 
 // Medium/Large introduction times (seconds into run)
 pub const MEDIUM_INTRO_TIME: f32 = 30.0;
@@ -151,8 +158,10 @@ pub const HEAVY_INTRO_TIME: f32 = 90.0;
 pub const LARGE_INTRO_TIME: f32 = 150.0;
 
 // Spawn ramp-up: ease into full density over the first few seconds
-pub const SPAWN_RAMP_DURATION: f32 = 8.0; // seconds to reach full coverage target
-pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15; // initial coverage target at t=0
+// Seconds to ease from SPAWN_RAMP_START_COVERAGE to full density.
+pub const SPAWN_RAMP_DURATION: f32 = 8.0;
+// Coverage target at run start (t=0), before ramp completes.
+pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15;
 
 // ---------------------------------------------------------------------------
 // Debug
@@ -509,7 +518,7 @@ impl Config {
                     "medium" => Some(EnemyKind::Medium),
                     "heavy" => Some(EnemyKind::Heavy),
                     "large" => Some(EnemyKind::Large),
-                    _ => None, // Elite is event-only; not allowed here
+                    _ => None,
                 }
             }),
         }

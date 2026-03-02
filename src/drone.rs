@@ -1,3 +1,5 @@
+// Drone and RemoteDrone entities: position and lane tracking.
+//
 pub struct Drone {
     pub x: f32,
     pub y: f32,

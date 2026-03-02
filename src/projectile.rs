@@ -1,3 +1,5 @@
+// Projectile entity: movement, lifetime, and rendering.
+// macroquad
 use macroquad::prelude::*;
 
 use crate::config::{PROJECTILE_H, PROJECTILE_W, SCREEN_W};

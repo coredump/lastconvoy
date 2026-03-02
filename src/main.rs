@@ -1,3 +1,5 @@
+// Window setup, asset loading, and game loop entry point.
+// macroquad, all game modules
 // Phase 1: stub modules are intentionally incomplete — suppress dead_code warnings.
 #![allow(dead_code)]
 

@@ -1,3 +1,5 @@
+// Core game state, update loop, drawing, and spawn logic.
+// macroquad, all entity modules
 use macroquad::prelude::*;
 
 use crate::config::SHAKE_DURATION;
@@ -100,14 +102,16 @@ impl BoundaryController {
     }
 }
 
-const EXPLOSION_FRAME_DUR: f32 = 0.04; // 40ms per frame
+// 40ms per frame.
+const EXPLOSION_FRAME_DUR: f32 = 0.04;
 const EXPLOSION_FRAME_COUNT: u32 = 5;
 const EXPLOSION_TOTAL_DUR: f32 = EXPLOSION_FRAME_DUR * EXPLOSION_FRAME_COUNT as f32;
 
 pub struct Explosion {
     pub x: f32,
     pub y: f32,
-    pub timer: f32, // elapsed time; alive while < EXPLOSION_TOTAL_DUR
+    /// Elapsed time; alive while < EXPLOSION_TOTAL_DUR.
+    pub timer: f32,
 }
 
 pub struct GameState {
@@ -1423,8 +1427,8 @@ impl GameState {
         self.draw_background();
         if self.shields.count() > 0 {
             let shield_x = BOUNDARY_X - 3.0 + self.shields.shake.offset_x();
-            let shield_y = ENEMY_LANE_TOP as f32; // 43.0
-            let shield_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32; // 94.0
+            let shield_y = ENEMY_LANE_TOP as f32;
+            let shield_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32;
             if self.shields.has_explosive() {
                 let orange = Color::from_rgba(255, 140, 0, 255);
                 self.boundary_shield_sprite.draw_3slice_vertical_hsl(
@@ -1730,9 +1734,9 @@ impl GameState {
         for (i, seg) in self.shields.segments.iter().enumerate() {
             let x = start_x + i as f32 * (size + gap);
             let color = if seg.explosive {
-                Color::from_rgba(255, 140, 0, 255) // orange for explosive
+                Color::from_rgba(255, 140, 0, 255)
             } else {
-                Color::from_rgba(0, 200, 80, 255) // green for normal
+                Color::from_rgba(0, 200, 80, 255)
             };
             draw_rectangle(x, y, size, height, color);
         }
@@ -1746,8 +1750,9 @@ impl GameState {
         let y = 5.0_f32;
         let mut x = shield_area_end;
         let bar_dark = Color::from_rgba(40, 40, 40, 255);
-        let teal_placeholder = Color::from_rgba(0, 50, 44, 255); // Upgrade Teal Very Dark
-        let teal_fill = Color::from_rgba(79, 217, 195, 255); // Upgrade Teal Light
+        // Upgrade Teal Very Dark / Upgrade Teal Light (lcdss palette).
+        let teal_placeholder = Color::from_rgba(0, 50, 44, 255);
+        let teal_fill = Color::from_rgba(79, 217, 195, 255);
 
         // --- Non-expiring slot ---
 
@@ -1978,8 +1983,9 @@ impl GameState {
                 EnemyKind::Small
             };
             // Ramp big-inject cadence over time so late runs keep must-react enemies.
-            let late_pressure = (self.run_time / 600.0).clamp(0.0, 1.0); // full effect by 10 min
-            let interval_scale = 1.0 - 0.25 * late_pressure; // up to 25% faster
+            // Reaches full effect (1.0) at 10 min; reduces inject interval up to 25%.
+            let late_pressure = (self.run_time / 600.0).clamp(0.0, 1.0);
+            let interval_scale = 1.0 - 0.25 * late_pressure;
             // Reset timer with small jitter
             let jitter = rand::gen_range(-0.3_f32, 0.3);
             self.spawn_ctrl.inject_timer = BIG_INJECT_BASE_INTERVAL * interval_scale + jitter;
@@ -2127,9 +2133,9 @@ impl GameState {
         // Layers 1 (stars) and 2 (props): tiled horizontally with wrapping scroll.
         {
             let lane_top = ENEMY_LANE_TOP as f32;
-            let lane_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32; // 94.0
+            let lane_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32;
             let layer_h = 160.0_f32;
-            let clip_y = (layer_h - lane_h) / 2.0; // 33.0
+            let clip_y = (layer_h - lane_h) / 2.0;
             let tex_w = 284.0_f32;
             for (i, &offset) in self.bg_scroll_offsets.iter().enumerate() {
                 let src_y = i as f32 * layer_h + clip_y;
@@ -2168,8 +2174,8 @@ impl GameState {
         // Only draw within the non-border area (y=21–158); clip the last partial tile.
         let rail_x = 0.0_f32;
         let tile_h = 36.0_f32;
-        let rail_start = TOP_UPGRADE_LANE_TOP as f32; // 21.0
-        let rail_end = UPGRADE_LANE_BOTTOM as f32 + 1.0; // 180.0 (exclusive)
+        let rail_start = TOP_UPGRADE_LANE_TOP as f32;
+        let rail_end = UPGRADE_LANE_BOTTOM as f32 + 1.0;
         let mut cursor = rail_start;
         while cursor < rail_end {
             let available = rail_end - cursor;
@@ -2185,8 +2191,8 @@ impl GameState {
         // Upgrade track: drawn over rail wall. Front slice left/bottom-aligned per lane,
         // rail slice tiled to right edge. Sprite h=21; lane h=22 → y = lane_bottom + 1 - 21.
         let track_h = 21.0_f32;
-        let top_track_y = TOP_UPGRADE_LANE_TOP as f32; // 21.0
-        let bot_track_y = UPGRADE_LANE_BOTTOM as f32 + 1.0 - track_h; // 159.0
+        let top_track_y = TOP_UPGRADE_LANE_TOP as f32;
+        let bot_track_y = UPGRADE_LANE_BOTTOM as f32 + 1.0 - track_h;
         self.upgrade_track_sprite.draw_front_tiled_h(
             0.0,
             top_track_y,
@@ -2245,7 +2251,8 @@ fn compute_coverage(enemies: &[Enemy]) -> f32 {
 
 fn coverage_target(run_time: f32, cfg: &Config) -> f32 {
     let t = (run_time / 720.0).min(1.0);
-    let full_target = 0.72 + t * 0.18; // 0.72 → 0.90 over 12 minutes
+    // Coverage target ramps 0.72 → 0.90 over 12 minutes.
+    let full_target = 0.72 + t * 0.18;
     if cfg.spawn_ramp_duration <= 0.0 {
         return full_target;
     }

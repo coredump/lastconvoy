@@ -1,3 +1,5 @@
+// Sprite loader from Aseprite JSON, animation, slicing, and tinted drawing.
+// macroquad, serde
 use macroquad::experimental::animation::{AnimatedSprite, Animation};
 use macroquad::prelude::*;
 use serde::Deserialize;
@@ -111,7 +113,8 @@ pub struct Sprite {
     // Animation state — managed manually to support pingpong + external dt.
     timer: f32,
     current_frame: u32,
-    pp_dir: i8, // +1 forward, -1 reverse (pingpong only)
+    // +1 = forward, -1 = reverse (pingpong only).
+    pp_dir: i8,
     /// Named slices from Aseprite export, in frame-local coordinates.
     pub slices: HashMap<String, Rect>,
     /// Tile dimensions (pixels per frame).
@@ -517,11 +520,11 @@ impl Sprite {
         let frame_x = self.anim.frame().source_rect.x;
         let frame_y = self.anim.frame().source_rect.y;
 
-        // Margins from center rect
-        let lm = center.x; // left margin
-        let tm = center.y; // top margin
-        let rm = fw - center.x - center.w; // right margin
-        let bm = fh - center.y - center.h; // bottom margin
+        // Margins from center rect: left, top, right, bottom.
+        let lm = center.x;
+        let tm = center.y;
+        let rm = fw - center.x - center.w;
+        let bm = fh - center.y - center.h;
 
         // Draw one rectangular region tiling src_rect into dest (dx,dy,dw,dh).
         let draw_tiled = |dx: f32, dy: f32, dw: f32, dh: f32, src: Rect| {

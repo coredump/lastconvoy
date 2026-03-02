@@ -1,3 +1,5 @@
+// Left-boundary slot occupancy tracker.
+//
 /// Left-boundary occupancy tracker.
 /// Each slot is a bool: true = occupied, false = free.
 pub struct Boundary {

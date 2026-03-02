@@ -1,3 +1,5 @@
+// Orb entity: types, two-phase activation, and collection.
+// crate::config
 use crate::config::{ORB_ACTIVATION_DECAY_PER_SEC, ORB_ACTIVATION_HIT_COUNT};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

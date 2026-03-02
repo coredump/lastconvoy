@@ -1,3 +1,5 @@
+// Player entity: position, movement, and fire timing.
+// crate::config
 use crate::config::{
     DRONE_HEIGHT, DRONE_Y_OFFSETS, PLAYER_HEIGHT, PLAYER_LANE_PADDING, SCREEN_H,
     TOP_UPGRADE_LANE_TOP,
@@ -31,7 +33,8 @@ impl Player {
 
     pub fn update(&mut self, axis: f32, dt: f32, has_top_drone: bool, has_bottom_drone: bool) {
         let top_drone_overhang = if has_top_drone {
-            -DRONE_Y_OFFSETS[0].min(0.0) // positive: how far above player the drone extends
+            // Positive: how far above player the top drone extends.
+            -DRONE_Y_OFFSETS[0].min(0.0)
         } else {
             0.0
         };

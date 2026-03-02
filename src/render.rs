@@ -1,3 +1,5 @@
+// Render pipeline: offscreen target, integer scaling, letterbox blit.
+// macroquad
 use macroquad::camera::{Camera2D, set_camera, set_default_camera};
 use macroquad::color::BLACK;
 use macroquad::math::{Rect, vec2};
@@ -52,7 +54,8 @@ impl RenderPipeline {
             macroquad::color::WHITE,
             DrawTextureParams {
                 dest_size: Some(vec2(dest_w, dest_h)),
-                flip_y: true, // macroquad render targets are upside-down
+                // macroquad render targets are upside-down.
+                flip_y: true,
                 ..Default::default()
             },
         );

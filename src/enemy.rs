@@ -1,3 +1,5 @@
+// Enemy entity: kinds, states, HP, damage flash, and movement.
+// crate::config, macroquad
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use macroquad::prelude::{Color, WHITE};

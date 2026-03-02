@@ -1,8 +1,10 @@
-pub const SHIELD_FLASH_DURATION: f32 = 0.3;
-pub const MAX_SHIELD_SEGMENTS: usize = 3;
-
+// Shield segment system: normal/explosive segments and hit resolution.
+//
 use crate::config::{SHAKE_DURATION, SHAKE_INTENSITY};
 use crate::sprite::ShakeEffect;
+
+pub const SHIELD_FLASH_DURATION: f32 = 0.3;
+pub const MAX_SHIELD_SEGMENTS: usize = 3;
 
 pub struct ShieldSegment {
     pub active: bool,
@@ -110,7 +112,8 @@ impl ShieldSystem {
             .segments
             .iter()
             .rposition(|s| !s.explosive)
-            .unwrap_or(self.segments.len() - 1); // fall back to the explosive segment
+            // Fall back to the explosive segment if no normal segment exists.
+            .unwrap_or(self.segments.len() - 1);
 
         let seg = self.segments.remove(idx);
         self.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);

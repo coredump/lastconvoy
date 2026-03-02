@@ -1,3 +1,5 @@
+// Bitmap font loader and text renderer using Monogram atlas.
+// macroquad, serde_json
 use macroquad::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -120,7 +122,8 @@ impl BitmapFont {
             .unwrap_or(5)
             .max(1);
 
-        let cell_w = max_bits + 1; // 1px breathing room
+        // +1px breathing room between glyph columns.
+        let cell_w = max_bits + 1;
         let cell_h = line_height;
         let cols = 32_u32;
         let rows_count = ((entries.len() as u32).saturating_add(cols - 1)) / cols;

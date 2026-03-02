@@ -1,3 +1,5 @@
+// Elite event variants and spawn scheduling.
+//
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EliteVariant {
     /// Single massive elite.
