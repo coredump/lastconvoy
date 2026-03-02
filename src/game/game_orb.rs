@@ -267,7 +267,7 @@ impl GameState {
     }
 
     pub(super) fn spawn_upgrade_floating_text(&mut self, tag: &str, x: f32, y: f32) {
-        let width = self.ui_font.measure(tag, 1, 1).x;
+        let width = self.monogram_font.measure(tag, 1, 1).x;
         self.floating_texts.push(FloatingText {
             text: tag.to_string(),
             x: x - width * 0.5,

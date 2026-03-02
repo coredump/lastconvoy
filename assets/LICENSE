@@ -15,8 +15,7 @@ attribution.
 
 ## Monogram font
 
-`assets/fonts/monogram-bitmap.png`, `assets/fonts/monogram-bitmap.json`,
-`assets/fonts/monogram-italic-bitmap.png`
+`assets/fonts/monogram/monogram-bitmap.png`, `assets/fonts/monogram/monogram-bitmap.json`
 
 Monogram by Vitreous Humour (datagoblin).
 Licensed under CC0 1.0 Universal (Public Domain Dedication).
@@ -24,9 +23,31 @@ https://datagoblin.itch.io/monogram
 
 ---
 
+## AtariGames font
+
+`assets/fonts/atarigames/atarigames-bitmap.png`, `assets/fonts/atarigames/atarigames-bitmap.json`
+
+AtariGames by Kieran. From the Nb Pixel Font Bundle by nimblebeastscollective.
+Licensed under CC0 1.0 Universal (Public Domain Dedication) — free to use,
+modify, and distribute in personal and commercial projects without attribution.
+https://nimblebeastscollective.itch.io/nb-pixel-font-bundle
+
+---
+
+## Gravity Pixel Font
+
+`assets/fonts/gravity/gravitybold8-bitmap.png`, `assets/fonts/gravity/gravitybold8-bitmap.json`,
+`assets/fonts/gravity/gravityregular5-bitmap.png`, `assets/fonts/gravity/gravityregular5-bitmap.json`
+
+Gravity Pixel Font (Bold8 and Regular5) by John Watson (jotson).
+Free for personal and commercial use.
+https://jotson.itch.io/gravity-pixel-font
+
+---
+
 ## Edunline font
 
-`assets/fonts/edunline-bitmap.png`, `assets/fonts/edunline-bitmap.json`
+`assets/fonts/edunline/edunline-bitmap.png`, `assets/fonts/edunline/edunline-bitmap.json`
 
 Edunline is a Freeware font by Brian Kent.
 

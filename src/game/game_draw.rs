@@ -187,13 +187,13 @@ impl GameState {
             1,
         );
 
-        let time_size = self.ui_font.measure(&time_line, 2, 1);
+        let time_size = self.ui_font.measure(&time_line, 1, 1);
         let time_x = (SCREEN_W as f32 - time_size.x) * 0.5;
         self.ui_font.draw(
             &time_line,
             time_x,
             88.0,
-            2,
+            1,
             Color::from_rgba(245, 245, 245, 255),
             1,
         );
@@ -235,24 +235,18 @@ impl GameState {
         let overlay = Color::from_rgba(0, 0, 0, 200);
         draw_rectangle(0.0, 0.0, SCREEN_W as f32, 180.0, overlay);
 
-        let name1 = "LCDSHOOTSYSTEM";
-        let name2 = "LAST CONVOY SHOOT SYSTEM";
-        let name1_sz = self.logo_font.measure(name1, 1, 1);
-        let name2_sz = self.ui_font.measure(name2, 1, 1);
-        let name1_x = (SCREEN_W as f32 - name1_sz.x) * 0.5;
-        let name2_x = (SCREEN_W as f32 - name2_sz.x) * 0.5;
-        self.logo_font.draw(
-            name1,
-            name1_x,
-            22.0,
-            1,
-            Color::from_rgba(255, 220, 80, 255),
-            1,
-        );
+        let logo_y = 28.0_f32;
+        let logo_x = (SCREEN_W as f32 - self.logo_sprite.tile_w as f32) * 0.5;
+        self.logo_sprite.draw(logo_x, logo_y);
+
+        let subtitle = "LAST CONVOY DEFENSE";
+        let sub_sz = self.ui_font.measure(subtitle, 1, 1);
+        let sub_x = (SCREEN_W as f32 - sub_sz.x) * 0.5;
+        let sub_y = logo_y + self.logo_sprite.tile_h as f32 + 5.0;
         self.ui_font.draw(
-            name2,
-            name2_x,
-            42.0,
+            subtitle,
+            sub_x,
+            sub_y,
             1,
             Color::from_rgba(200, 200, 200, 255),
             1,
@@ -266,7 +260,7 @@ impl GameState {
         ];
         let label_col = Color::from_rgba(180, 220, 255, 255);
         let value_col = Color::from_rgba(230, 230, 230, 255);
-        let mut y = 62.0_f32;
+        let mut y = 78.0_f32;
         for (label, value) in controls {
             let lsz = self.ui_font.measure(label, 1, 1);
             let mid = SCREEN_W as f32 * 0.5;
@@ -442,8 +436,9 @@ impl GameState {
         let timer = self.format_run_timer();
         let size = self.ui_font.measure(&timer, 1, 1);
         let x = SCREEN_W as f32 - 7.0 - size.x;
+        let y = ((TOP_BORDER_BOTTOM - TOP_BORDER_TOP + 1) as f32 - size.y) * 0.5 + 2.0;
         self.ui_font
-            .draw(&timer, x, 4.0, 1, Color::from_rgba(220, 220, 220, 255), 1);
+            .draw(&timer, x, y, 1, Color::from_rgba(220, 220, 220, 255), 1);
     }
 
     fn draw_floating_texts(&self) {
@@ -451,7 +446,7 @@ impl GameState {
             let alpha = (t.life / t.ttl).clamp(0.0, 1.0);
             let mut color = t.color;
             color.a *= alpha;
-            self.ui_font.draw(&t.text, t.x, t.y, 1, color, 1);
+            self.monogram_font.draw(&t.text, t.x, t.y, 1, color, 1);
         }
     }
 

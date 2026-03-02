@@ -196,20 +196,28 @@ impl BitmapFont {
         let mut max_w = 0.0_f32;
         let mut line_w = 0.0_f32;
         let mut lines = 1_u32;
+        let mut first_offset = 0.0_f32;
+        let mut is_line_start = true;
 
         for ch in text.chars() {
             if ch == '\n' {
                 max_w = max_w.max(line_w);
                 line_w = 0.0;
+                is_line_start = true;
                 lines += 1;
                 continue;
             }
 
             if let Some(g) = self.glyph_for(ch) {
+                if is_line_start {
+                    first_offset = first_offset.min(g.x_offset * scale);
+                    is_line_start = false;
+                }
                 line_w += g.x_advance * scale + spacing;
             }
         }
         max_w = max_w.max(line_w);
+        max_w -= first_offset.min(0.0);
 
         Vec2::new(max_w.max(0.0), lines as f32 * self.line_height * scale)
     }
@@ -217,7 +225,11 @@ impl BitmapFont {
     pub fn draw(&self, text: &str, x: f32, y: f32, scale: i32, color: Color, spacing: i32) {
         let scale = scale.max(1) as f32;
         let spacing = spacing.max(0) as f32;
-        let mut pen_x = x;
+        let first_offset = text
+            .chars()
+            .find_map(|ch| self.glyph_for(ch))
+            .map_or(0.0, |g| g.x_offset * scale);
+        let mut pen_x = x - first_offset.min(0.0);
         let mut pen_y = y;
 
         for ch in text.chars() {

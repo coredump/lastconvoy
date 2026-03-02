@@ -162,6 +162,8 @@ pub struct GameState {
     pub color_blend_material: Material,
     pub ui_font: BitmapFont,
     pub logo_font: BitmapFont,
+    pub monogram_font: BitmapFont,
+    pub logo_sprite: Sprite,
     pub floating_texts: Vec<FloatingText>,
     pub explosion_sprite: Sprite,
     pub explosions: Vec<Explosion>,
@@ -199,6 +201,8 @@ impl GameState {
         bg_texture: Texture2D,
         ui_font: BitmapFont,
         logo_font: BitmapFont,
+        monogram_font: BitmapFont,
+        logo_sprite: Sprite,
     ) -> Self {
         let player_y = ((ENEMY_LANE_TOP + ENEMY_LANE_BOTTOM) / 2) as f32;
         let player = Player::new(
@@ -275,6 +279,8 @@ impl GameState {
             config,
             ui_font,
             logo_font,
+            monogram_font,
+            logo_sprite,
             floating_texts: Vec::new(),
             explosion_sprite,
             explosions: Vec::new(),
@@ -459,6 +465,7 @@ impl GameState {
 
     pub fn update(&mut self, dt: f32) {
         if self.at_title {
+            self.logo_sprite.update(dt);
             if get_keys_pressed().into_iter().next().is_some() {
                 self.at_title = false;
                 self.log_run_start("new_game");

@@ -98,12 +98,12 @@ cargo build --target wasm32-unknown-unknown --release  # WASM
 - One concern per module. Keep `main.rs` thin.
 - Naming: `Player`, `Enemy`, `EnemyKind`, `Orb`, `Drone`, `ShieldSegment`, `EliteEvent`.
 - Commit messages: `P1.X: brief description`.
-- Text font policy: use `assets/fonts/monogram-bitmap.png` + `assets/fonts/monogram-bitmap.json` as the default UI font source; the same JSON also applies to `monogram-italic-bitmap.png`.
+- Text font policy: `ui_font` uses **AtariGames** (`assets/fonts/atarigames/atarigames-bitmap.{png,json}`); Monogram assets remain at `assets/fonts/monogram/`; `logo_font` uses **Edunline** (`assets/fonts/edunline/edunline-bitmap.{png,json}`). AB-test alternates (GravityBold8, LowIndustrial) remain at `assets/fonts/gravity/` and `assets/fonts/lowindustrial/`. GravityRegular5 bitmap also at `assets/fonts/gravity/gravityregular5-bitmap.{png,json}`.
 - No `unsafe` unless unavoidable.
 - No tests in Phase 1. Tests allowed Phase 2+.
 
 ## Phase 1 status
-P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 UPDATED (offense tracks converted from permanent levels to temporary refreshable buffs; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). P1.14 COMPLETE (explosion effect on enemy death, title/pause screens, upgrade HUD redesign with drone placeholder + vertical timer bars, touch controls marked broken for P2.0 redesign). All clippy warnings resolved (2026-03-01).
+P1.0–P1.7 COMPLETE. P1.8 (orbs two-phase) STRUCTURALLY COMPLETE, pending gameplay verification. P1.9 UPDATED (offense tracks converted from permanent levels to temporary refreshable buffs; Explosive core logic implemented with polish/verification pending). P1.10 DONE (drone system fully implemented; Drone orb in normal pool). P1.14 COMPLETE (explosion effect on enemy death, title/pause screens, upgrade HUD redesign with drone placeholder + vertical timer bars, touch controls marked broken for P2.0 redesign). P1.15 UI POLISH (2026-03-02): per-frame animation durations, monogram_font + logo_sprite added, title screen redesign with logo sprite, floating text font switched to monogram, run timer centered in top bar.
 
 Recent additions (balance + UI + state management):
 - **Offense buff model**: Damage/FireRate/Burst/Pierce/Stagger are now temporary buffs with per-type durations and fixed magnitudes; collecting an active buff refreshes timer (no tier stacking).
@@ -129,8 +129,15 @@ Recent additions (balance + UI + state management):
 - **Sprite::tile_w/tile_h fields** (2026-03-01): added to `Sprite` struct for frame-rect computation support for animated explosions.
 - **Touch controls flagged** (2026-03-01): current touch input marked broken and not ready for use; SPEC §15 updated; P2.0 task created for touch redesign.
 - **Release workflow rule** (v0.1.0): always bump `Cargo.toml` version first, commit, then tag+push+GitHub release with changelog from previous tag.
+- **Per-frame animation durations** (2026-03-02): `sprite.rs` now stores `frame_durations: Vec<f32>` (per-frame) + `tag_frame_offset: Vec<u32>` instead of single `tag_frame_dur`. Frames sorted alphabetically in from_json(). Animation loop reads durations from per-frame index.
+- **Monogram font and logo sprite** (2026-03-02): New GameState fields `monogram_font: BitmapFont` (from `assets/fonts/monogram/monogram-bitmap.{png,json}`) and `logo_sprite: Sprite` (from `assets/sprites/ui/logo.json`, 191×21 per frame, 7-frame looping animation). Loaded in main.rs, passed to GameState::new(). Animation enabled with per-frame durations (frame 0=1000ms, others 16-2000ms).
+- **Title screen redesign** (2026-03-02): Replaced text title with logo_sprite drawn at centered x, y=30. Subtitle 'LAST CONVOY DEFENSE' positioned dynamically at y=logo_y+sprite_height+5px (currently y=56). Controls list moved to y=78.
+- **Floating text font** (2026-03-02): Upgrade pickup text now uses monogram_font (lighter appearance) instead of ui_font.
+- **Run timer centering** (2026-03-02): Timer now vertically centered in top bar: y = ((TOP_BORDER_BOTTOM - TOP_BORDER_TOP + 1) as f32 - size.y) * 0.5 + 2.0.
+- **Logo animation re-enabled** (2026-03-02): Logo sprite animation now active with per-frame durations. Asset updates applied to fix color persistence artifact in frame transitions. logo_sprite.update(dt) called in at_title state.
+- **Logo dimensions dynamic** (2026-03-02): Sprite tile_w/tile_h (191×21) read at runtime; subtitle y-position auto-adjusts based on sprite.tile_h. No hardcoded dimensions in code.
 
-Source files now include: `main.rs`, `config.rs`, `game.rs`, `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, **`text.rs`**.
+Source files now include: `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, `text.rs`, `sprite.rs`.
 
 Next priorities: (1) Verify P1.8 and explosive shield gameplay feel in practice; (2) Verify P1.10 drone behavior in-game; (3) Continue Phase 1 scaling/event verification in `TASKS.md`.
 

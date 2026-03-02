@@ -157,18 +157,29 @@ async fn main() {
     bg_texture.set_filter(FilterMode::Nearest);
 
     let ui_font = BitmapFont::load(
-        "assets/fonts/monogram-bitmap.png",
-        "assets/fonts/monogram-bitmap.json",
+        "assets/fonts/atarigames/atarigames-bitmap.png",
+        "assets/fonts/atarigames/atarigames-bitmap.json",
     )
     .await
     .expect("Failed to load Monogram bitmap font");
 
     let logo_font = BitmapFont::load(
-        "assets/fonts/edunline-bitmap.png",
-        "assets/fonts/edunline-bitmap.json",
+        "assets/fonts/edunline/edunline-bitmap.png",
+        "assets/fonts/edunline/edunline-bitmap.json",
     )
     .await
     .expect("Failed to load Edunline bitmap font");
+
+    let monogram_font = BitmapFont::load(
+        "assets/fonts/monogram/monogram-bitmap.png",
+        "assets/fonts/monogram/monogram-bitmap.json",
+    )
+    .await
+    .expect("Failed to load Monogram bitmap font");
+
+    let logo_sprite = Sprite::from_json("assets/sprites/ui/logo.json")
+        .await
+        .expect("Failed to load logo sprite");
 
     let mut state = GameState::new(
         config,
@@ -199,6 +210,8 @@ async fn main() {
         bg_texture,
         ui_font,
         logo_font,
+        monogram_font,
+        logo_sprite,
     );
     let pipeline = RenderPipeline::new();
 

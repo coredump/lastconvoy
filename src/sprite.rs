@@ -104,16 +104,12 @@ impl FlashEffect {
 pub struct Sprite {
     pub texture: Texture2D,
     anim: AnimatedSprite,
-    /// Which tags use pingpong direction.
     tag_pingpong: Vec<bool>,
-    /// Frame count per tag.
     tag_frame_count: Vec<u32>,
-    /// Frame duration in seconds per tag.
-    tag_frame_dur: Vec<f32>,
-    // Animation state — managed manually to support pingpong + external dt.
+    frame_durations: Vec<f32>,
+    tag_frame_offset: Vec<u32>,
     timer: f32,
     current_frame: u32,
-    // +1 = forward, -1 = reverse (pingpong only).
     pp_dir: i8,
     /// Named slices from Aseprite export, in frame-local coordinates.
     pub slices: HashMap<String, Rect>,
@@ -132,39 +128,42 @@ impl Sprite {
         let parsed: AsepriteJson =
             serde_json::from_str(&text).map_err(|e| format!("Failed to parse {json_path}: {e}"))?;
 
-        let first = parsed
-            .frames
-            .values()
-            .next()
-            .ok_or_else(|| format!("No frames in {json_path}"))?;
+        let mut sorted_frames: Vec<(&String, &AseFrame)> = parsed.frames.iter().collect();
+        sorted_frames.sort_by_key(|(k, _)| k.as_str());
+        let first = sorted_frames
+            .first()
+            .ok_or_else(|| format!("No frames in {json_path}"))?
+            .1;
         let tile_w = first.frame.w as u32;
         let tile_h = first.frame.h as u32;
-        // All frames in the sheet share the same duration for now.
-        let frame_dur = first.duration as f32 / 1000.0;
-        let fps = ((1.0 / frame_dur).round() as u32).max(1);
+        let frame_durations: Vec<f32> = sorted_frames
+            .iter()
+            .map(|(_, f)| f.duration as f32 / 1000.0)
+            .collect();
+        let fallback_fps = ((1.0 / frame_durations[0]).round() as u32).max(1);
+        let total_frames = sorted_frames.len() as u32;
 
-        let total_frames = parsed.frames.len() as u32;
-
-        let (anims, tag_pingpong, tag_frame_count, tag_frame_dur) =
+        let (anims, tag_pingpong, tag_frame_count, tag_frame_offset) =
             if parsed.meta.frameTags.is_empty() {
                 (
                     vec![Animation {
                         name: "default".to_string(),
                         row: 0,
                         frames: total_frames,
-                        fps,
+                        fps: fallback_fps,
                     }],
                     vec![false],
                     vec![total_frames],
-                    vec![frame_dur],
+                    vec![0u32],
                 )
             } else {
                 let mut anims = Vec::new();
                 let mut pingpong = Vec::new();
                 let mut counts = Vec::new();
-                let mut durs = Vec::new();
+                let mut offsets = Vec::new();
                 for (i, tag) in parsed.meta.frameTags.iter().enumerate() {
                     let count = tag.to - tag.from + 1;
+                    let fps = ((1.0 / frame_durations[tag.from as usize]).round() as u32).max(1);
                     anims.push(Animation {
                         name: tag.name.clone(),
                         row: i as u32,
@@ -173,9 +172,9 @@ impl Sprite {
                     });
                     pingpong.push(tag.direction == "pingpong");
                     counts.push(count);
-                    durs.push(frame_dur);
+                    offsets.push(tag.from);
                 }
-                (anims, pingpong, counts, durs)
+                (anims, pingpong, counts, offsets)
             };
 
         let mut anim = AnimatedSprite::new(tile_w, tile_h, &anims, false);
@@ -208,7 +207,8 @@ impl Sprite {
             anim,
             tag_pingpong,
             tag_frame_count,
-            tag_frame_dur,
+            frame_durations,
+            tag_frame_offset,
             timer: 0.0,
             current_frame: 0,
             pp_dir: 1,
@@ -219,12 +219,15 @@ impl Sprite {
         })
     }
 
-    /// Advance the animation by `dt` seconds.
     pub fn update(&mut self, dt: f32) {
         let tag_idx = self.anim.current_animation();
-        let frame_dur = self.tag_frame_dur[tag_idx];
+        let offset = self.tag_frame_offset[tag_idx] as usize;
         self.timer += dt;
-        while self.timer >= frame_dur {
+        loop {
+            let frame_dur = self.frame_durations[offset + self.current_frame as usize];
+            if self.timer < frame_dur {
+                break;
+            }
             self.timer -= frame_dur;
             let count = self.tag_frame_count[tag_idx];
             if self.tag_pingpong[tag_idx] {

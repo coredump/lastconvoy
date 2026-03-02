@@ -110,6 +110,8 @@ Roughly in order:
 | Source code | [MIT](LICENSE) |
 | Original sprites | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) |
 | Monogram font (datagoblin) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) — public domain |
+| AtariGames font (Kieran) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) — public domain, from [Nb Pixel Font Bundle](https://nimblebeastscollective.itch.io/nb-pixel-font-bundle) by nimblebeastscollective |
+| Gravity Pixel Font — Bold8 + Regular5 (John Watson / jotson) | Free for personal and commercial use — [itch.io](https://jotson.itch.io/gravity-pixel-font) |
 | Edunline font (Brian Kent) | Freeware — personal and commercial use permitted; no resale or modification without permission |
 | Ansimuz parallax background + explosions | Personal and commercial use permitted; redistribution/resale as standalone assets not permitted |
 
