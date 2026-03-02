@@ -1,9 +1,9 @@
 # LCDshootsystem — TASKS (Agentic Implementation Plan)
 
 This plan assumes the current repo layout:
-- `src/main.rs` (hello-world entry point)
-- `Cargo.toml` with `macroquad` dependency
-- `assets/` (to be created)
+- `src/` — `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), plus `boundary.rs`, `debug_log.rs`, `drone.rs`, `elite.rs`, `enemy.rs`, `input.rs`, `orb.rs`, `player.rs`, `projectile.rs`, `render.rs`, `shield.rs`, `sprite.rs`, `text.rs`, `upgrade.rs`
+- `assets/` — sprites, fonts
+- `config.toml` — runtime tuning overrides (serde + TOML)
 - Rust + Cargo, native dev builds, WASM for release
 
 If anything conflicts:
@@ -16,107 +16,28 @@ If anything conflicts:
 ## Phase 1 — MVP (Core loop only; no menus, no meta, **no tests required**)
 
 ### P1.0 Project scaffolding & config ✓ DONE
-- Create module structure under `src/`:
-  - `config.rs` — all tuning constants (`pub const` or a `Config` struct)
-  - `game.rs` — top-level game state struct and main update/draw loop
-  - `input.rs` — 1D input system
-  - `player.rs` — player entity
-  - `enemy.rs` — enemy types and spawning
-  - `projectile.rs` — projectile entity and pool
-  - `orb.rs` — upgrade orb entity
-  - `drone.rs` — drone entity
-  - `shield.rs` — shield segment model
-  - `upgrade.rs` — upgrade track definitions
-  - `elite.rs` — elite event system
-  - `boundary.rs` — boundary breach lock and cooldown system
-  - `render.rs` — integer-scaled render-to-texture pipeline
-  - `text.rs` — BitmapFont bitmap text renderer (Monogram assets)
-- Centralize all tuning constants in `config.rs` as compile-time defaults:
-  - lane bounds, speeds, caps, timers, scaling curves
-  - boundary breach timing and cooldown durations
-  - orb caps, orb HP curve
-  - elite interval + random offset range
-- Implement **runtime config file** loading (see SPEC §17):
-  - Use TOML format with serde crate dependency.
-  - Define a serializable `RuntimeConfig` struct covering key tuning values.
-  - On startup: attempt to load from `config.toml` next to the binary.
-  - If missing or malformed: fall back to compile-time defaults, log a warning, continue.
-  - Write a default config file on first run if none exists (so users have a template to edit).
-- Set up `main.rs` to create a macroquad window, load config, instantiate game state, run the loop.
-- Create `assets/` directory for sprites (can start with placeholder rects).
+Module structure under `src/` (see preamble), config.rs compile-time defaults, config.toml runtime overrides (serde + TOML). All tuning constants centralised; silent fallback if config.toml missing or malformed.
 
 ### P1.1 Rendering & scaling ✓ DONE
-- Create an offscreen `RenderTarget` at 320×180 (internal resolution).
-- Each frame: draw all gameplay to the render target, then blit to screen with integer scaling.
-- Compute largest integer scale that fits the window (×2 through ×6).
-- Letterbox (black bars) when window aspect doesn't match; center the scaled image.
-- Portrait windows: gameplay stays landscape, letterbox top/bottom — never rotate or pause.
+320×180 RenderTarget, integer-scaled blit to screen, letterbox, landscape-always.
 
 ### P1.2 Input plumbing (1D) ✓ DONE
-- Read keyboard state each frame:
-  - Default: W/S + Up/Down → produce axis value -1/0/+1.
-  - Rotate Input mode (config flag): A/D + Left/Right instead.
-  - Opposing keys cancel to 0.
-- Read gamepad if connected:
-  - Default: left stick Y + dpad up/down.
-  - Rotate Input mode: left stick X + dpad left/right.
-  - Apply analog deadzone from config.
-- Touch input (for WASM):
-  - Detect vertical drag on left 20% of screen.
-  - Map drag delta to axis value; release → 0.
-- Combine sources: keyboard OR gamepad OR touch (last-active wins or max magnitude).
-- Output: single `f32` axis value in [-1.0, 1.0].
+Keyboard (W/S/Up/Down), gamepad (left stick Y + dpad), touch (left-strip drag); single f32 axis out. Rotate Input mode flag in config.
 
 ### P1.3 Player ✓ DONE
-- Player entity: position fixed at left side (x from config), y moves vertically.
-- Clamp y within playfield bounds (top border bottom edge to bottom border top edge).
-- Apply input axis × speed × delta_time to y each frame.
-- Auto-fire: spawn a projectile forward on a timer (fire rate from config).
-- Projectile travels right at configured speed; despawns off-screen.
-- Player projectiles tagged as `source: Player` (matters for orb interaction).
+Fixed X, vertical movement, auto-fire projectiles, clamp to playfield.
 
 ### P1.4 Lane visuals ✓ DONE
-- Draw top border (rows 0–20), top upgrade lane background (21–42), enemy lane background (43–136), bottom upgrade lane background (137–158), bottom border (159–179).
-- Divider: 4 px, styled as energy rail / barrier (not flat color).
-- Borders: styled as structural framing (not UI bars).
-- Use placeholder colors from the palette spec; refine art later.
+Four fixed vertical bands rendered with palette colours; energy-rail dividers; structural border framing.
 
-### P1.5 Enemies (small / medium / heavy / large) ✓ DONE (spawning + movement + collision + boundary arrival + shielded enemies + stacking)
-- Define an `EnemyKind` enum: `Small`, `Medium`, `Heavy`, `Large`.
-- Each kind has: size, HP, speed, boundary behavior, sprite (placeholder rect initially).
-- Continuous spawning system driven by a timer (interval from config, decreases over time).
-  - Early run (~first 60s): mostly Small.
-  - Medium introduced after config threshold time.
-  - Heavy introduced later than Medium.
-  - Large introduced later than Heavy.
-- Movement: right → left within enemy lane bounds.
-- Collision with player projectiles: reduce HP, despawn projectile (unless piercing).
-- Boundary arrival behavior:
-  - All: trigger 1 damage event on player (via breach wind-up mechanism), then despawn.
-- Shielded enemies:
-  - Some enemies spawn with an extra shield HP layer (must be broken before main HP).
-  - No shield regen.
-  - Frequency increases slowly over time (config curve).
+### P1.5 Enemies ✓ DONE
+EnemyKind enum (Small/Medium/Heavy/Large), time-gated introduction, shielded variant ramp, movement + collision, boundary arrival + breach wind-up.
 
 ### P1.6 Shields & death ✓ DONE
-- Player has N shield segments (starting count from config).
-- Each damage event removes exactly 1 segment.
-- 0 segments + damage event → player death.
-- Shield loss: visual feedback (flash, segment disappears).
-- On death: immediately reset game state and restart (no game-over screen yet).
-- Losing shields never removes drones or reduces offense.
-- **NOTE**: Vec<ShieldSegment> conversion complete. ShieldSystem in shield.rs used throughout.
+N shield segments; 1 damage = 1 segment; 0 segments + damage = death → immediate restart. Vec<ShieldSegment> / ShieldSystem in shield.rs used throughout. Shield loss has visual feedback.
 
-### P1.7 Boundary breach system ✓ DONE (replaced old slot/damage-tick model)
-- Enemy state machine: `Moving → Breaching` (no `Queued` state).
-- On reaching `BOUNDARY_X`: if breach is free, enemy enters `Breaching` (wind-up begins); else clamped at `BOUNDARY_X + 24px` and stays `Moving` (compresses naturally).
-- Wind-up timer per kind (`windup_time_*` in config). When elapsed ≥ windup_time: breach event fires → 1 shield consumed (or player dies) → enemy despawned.
-- Simultaneous breach window (0.10 s): a second arrival within the window joins the current breach group.
-- On breach group empty: lock released; compressed Moving enemies advance naturally; frontmost starts next breach.
-- Stagger knockback resets state to Moving and removes from breach group, releasing lock early.
-- Explosive shield detonation: kills non-elite enemies in zone, pushes Large/Elite back, clears breach group, applies micro-stall (0.25 s freeze).
-- Old slot-based boundary model (`boundary.rs`, `BOUNDARY_SLOT_COUNT`, `BOUNDARY_DAMAGE_TICK`) removed.
-- Enemy stacking (no overlap) unchanged.
+### P1.7 Boundary breach system ✓ DONE
+Breach-lock + wind-up + simultaneous-breach window (0.10 s) + re-breach cooldown. Enemies stack behind slower/stopped ones (no overlap). Old slot-based model removed. Stagger releases lock early; explosive detonation clears breach group + micro-stall.
 
 ### P1.8 Upgrade orbs (two-phase) ✓ STRUCTURALLY COMPLETE
 - Orb entity: position, HP, activated flag, current upgrade type, kind.
@@ -152,11 +73,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - **Remaining**: visual/audio for explosion (flash, particle hints); gameplay verification that detonation + stall reads correctly in play.
 
 ### P1.10 Drone system ✓ DONE
-- Attached drones: persist for the run, positioned relative to player.
-- Each drone auto-fires on the same timer as player.
-- Drone projectiles damage enemies and interact with orbs equally to player shots.
-- (Detached / cross-lane drones deferred to later upgrade pool expansion.)
-- **Status**: Fully implemented — Drone struct with x/y/fire_timer; drones updated, positioned, and fire each frame in game loop. Drone orb track active in pool.
+Attached drones persist for the run, positioned relative to player, auto-fire on same timer. Drone shots interact with orbs equally to player shots. Drone orb in normal pool.
 
 ### P1.11 Time-based scaling baseline ⚠ PARTIAL
 - All scaling curves defined in `config.rs`.
@@ -192,16 +109,16 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - On death: resume spawning, apply small scaling bump.
 - **Status**: miniboss_timer exists in GameState but no spawn or event logic implemented.
 
-### P1.14 MVP polish (still Phase 1) ✓ COMPLETE
-- Visual feedback for:
-  - Shield loss (segment flash/pop). ⚠ Needs Vec<ShieldSegment> implementation
-  - Orb activation state change (color/glow shift). ✓ Color tint changes per phase in draw_orbs()
-  - Elite/Mini-Boss arrival (subtle screen cue, no stage screen). ⚠ Not yet (no events)
-  - Enemy destruction (small particle burst or flash). ✓ Implemented (explosion_2 sprite, 5 frames 40ms each)
-- Object pooling for projectiles and enemies if needed for performance. ✓ Using Vec<T> with retain()
+### P1.14 MVP polish ✓ COMPLETE
+- Orb activation state change (color/glow shift). ✓ Color tint changes per phase in draw_orbs()
+- Enemy destruction (small particle burst or flash). ✓ Implemented (explosion_2 sprite, 5 frames 40ms each)
+- Object pooling for projectiles and enemies. ✓ Using Vec<T> with retain()
 - Frame-rate independence: all movement/timers use `get_frame_time()` delta. ✓ Implemented throughout
-- Title & pause screens: ✓ Implemented (at_title state, any-key-to-start; paused state, P+ESC toggle; controls overlay)
-- Upgrade HUD redesign: ✓ Drone placeholder always visible; Shield/Explosive removed from HUD; expiring buffs shown with vertical timer bars only when active
+- Title & pause screens. ✓ Implemented (at_title state, any-key-to-start; paused state, P+ESC toggle; controls overlay)
+- Upgrade HUD redesign. ✓ Drone placeholder always visible; Shield/Explosive removed from HUD; expiring buffs shown with vertical timer bars only when active
+
+### P1.15 UI polish ✓ DONE (2026-03-02)
+Per-frame animation durations in sprite.rs, monogram_font + logo_sprite, title screen logo, floating text font switch, run timer centering.
 
 **Phase 1 DoD (Definition of Done)**
 - Playable loop: start → title screen → any-key-to-start → survive → die → restart. ✓ WORKING
@@ -210,7 +127,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - Upgrade HUD with drone placeholder and vertical timer bars. ✓ COMPLETE
 - Touch input works (at least in WASM build). ⚠ **BROKEN — see P2.0**
 - Orbs work exactly as specified (activate then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
-- Elites and Mini-Bosses work with enemy spawn pause (orbs continue). ⚠ NOT STARTED (no event pause logic)
+- Elites and Mini-Bosses work with enemy spawn pause (orbs continue). ⚠ NOT STARTED (P1.12/P1.13 blocking)
 - Boundary breach lock and compression work. ✓ COMPLETE
 - No menus required. ✓ (title/pause screens are state overlays, not full menus)
 - No tests required. ✓

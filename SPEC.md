@@ -43,7 +43,7 @@ Coordinate ranges (locked):
 - Fixed on left side.
 - Single-axis movement (vertical only) within playfield (and between lanes).
 - Auto-fires forward.
-- Shoots only the lane the ship is in (cross-lane influence only via **temporary detached drones**, see §7).
+- Shoots only the lane the ship is in (cross-lane influence only via **temporary remote drones**, see §7).
 
 Internal movement axis model:
 - -1 = up, 0 = neutral, +1 = down
@@ -68,12 +68,12 @@ Canonical enemy size table:
 
 Enemy lane height 115 px; max standard enemy height 48 px; boss hard cap 72 px.
 
-Enemy classes:
-- **Small:** 1 HP. On reaching the left boundary: winds up, triggers **one** breach event, then despawns.
-- **Medium:** multi HP. On reaching boundary: winds up (0.5 s), triggers one breach event, then despawns.
-- **Heavy:** ~6–8 HP. On reaching boundary: winds up (1.0 s), triggers one breach event, then despawns. Introduced later than Medium.
-- **Large:** high HP. On reaching boundary: winds up (1.3 s), triggers one breach event, then despawns.
-- **Mini-Boss:** ~25–40 HP. Event-based only (see §13). On reaching boundary: winds up, triggers one breach event, then despawns.
+Enemy classes (breach behavior for all classes: see §8):
+- **Small:** 1 HP.
+- **Medium:** multi HP. Introduced before Heavy.
+- **Heavy:** ~6–8 HP. Introduced later than Medium.
+- **Large:** high HP.
+- **Mini-Boss:** ~25–40 HP. Event-based only (see §13).
 - **Boss:** Reserved tier. No gameplay rules defined yet.
 
 Wind-up times are tuning values — see `config.toml` (`windup_time_*`). A heavier enemy has a longer wind-up, giving the player more time to intercept it before the breach resolves. Enemy differentiation comes from HP, speed, and wind-up time — **not** from breach damage amount (all non-boss enemies deal exactly 1 breach event).
@@ -110,15 +110,14 @@ Wind-up times are tuning values — see `config.toml` (`windup_time_*`). A heavi
 - The Explosive Shield upgrade allows only one explosive segment at a time. If collected with no shield segments and below cap, it grants a new explosive segment.
 
 ### Damage events (breach model)
-When an enemy completes its wind-up at the boundary, a **breach event** fires:
+See §8 for the full breach mechanics (lock, queuing, cooldown, stagger interactions).
+
+Core breach resolution:
 - If player has shield: remove exactly one segment (normal segments first; explosive last).
 - If player has no shield: player dies instantly.
 - The breaching enemy is despawned immediately after resolution.
 
 All enemies deal exactly **1 breach event** — there is no multi-damage or spillover.
-
-Damage sources:
-- Any enemy kind that reaches the left boundary and completes its wind-up.
 
 **Losing shields never removes drones and never reduces offense.**
 
@@ -128,7 +127,7 @@ Definition:
 
 Drone types:
 - **Attached drones:** persist for the run, move with the main ship.
-- **Detached / cross-lane drones:** temporary; despawn after duration (TTL).
+- **Remote drones:** temporary; despawn after duration (TTL).
 
 Shot-type modifiers apply to **all** shooting entities (player + drones).
 
@@ -239,9 +238,11 @@ On elite trigger:
 - Spawn elite event in enemy lane.
 - Upgrade orbs continue spawning.
 
+**Not yet implemented** (P1.12). Rules below are authoritative for implementation.
+
 ### Elite variants (random per event)
 - **A)** Single massive elite
-- **C)** Massive elite + support enemies
+- **B)** Massive elite + support enemies
 
 ### Elite behavior
 - Moves right → left (approach window is DPS check).
@@ -255,6 +256,8 @@ After elite death:
 - Apply a small global scaling bump consistent with controlled growth.
 
 ## 13. Mini-Boss Events
+
+**Not yet implemented** (P1.13). Rules below are authoritative for implementation.
 
 Purpose: rare punctuation events distinct from Elite events.
 
