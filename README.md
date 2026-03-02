@@ -2,8 +2,6 @@
 
 Minimalist systemic roguelite shooter. Endless run. You hold the line or you die.
 
-**[Play in browser](https://coredump.github.io/lastconvoy/)** — no install required.
-
 ---
 
 ## About
