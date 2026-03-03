@@ -122,11 +122,11 @@ spawn_ramp_start_coverage = 0.15
 # its timer (no stacking tiers). While active, that orb type is excluded from
 # the spawn pool until it expires.
 
-buff_damage_duration = 14.0
-buff_fire_rate_duration = 12.0
-buff_burst_duration = 16.0
-buff_pierce_duration = 10.0
-buff_stagger_duration = 12.0
+buff_damage_duration = 24.0
+buff_fire_rate_duration = 22.0
+buff_burst_duration = 26.0
+buff_pierce_duration = 20.0
+buff_stagger_duration = 22.0
 
 # Buff magnitudes while active.
 buff_damage_value = 1.5

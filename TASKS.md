@@ -120,6 +120,9 @@ Attached drones persist for the run, positioned relative to player, auto-fire on
 ### P1.15 UI polish ✓ DONE (2026-03-02)
 Per-frame animation durations in sprite.rs, monogram_font + logo_sprite, title screen logo, floating text font switch, run timer centering.
 
+### P1.16 Screen flash on shield loss ✓ DONE (2026-03-03)
+Brief full-screen red tint overlay on any shield hit (absorbed, explosive, or death). Reuses `FlashEffect` from sprite.rs. Constants in config.rs (`SHIELD_FLASH_COLOR/DURATION/COOLDOWN`); `screen_flash: FlashEffect` field on `GameState`; triggered in `take_player_damage()`; drawn before game-over/pause overlays.
+
 **Phase 1 DoD (Definition of Done)**
 - Playable loop: start → title screen → any-key-to-start → survive → die → restart. ✓ WORKING
 - Pause overlay (P+ESC) with controls list implemented. ✓ WORKING

@@ -2,6 +2,7 @@
 // serde, toml, crate types
 use crate::enemy::EnemyKind;
 use crate::orb::OrbType;
+use macroquad::color::Color;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,9 @@ pub const PLAYER_STARTING_SHIELDS: u32 = 0;
 // Hit shake
 pub const SHAKE_INTENSITY: f32 = 2.0;
 pub const SHAKE_DURATION: f32 = 0.15;
+pub const SHIELD_FLASH_COLOR: Color = Color::new(1.0, 0.3, 0.3, 0.6);
+pub const SHIELD_FLASH_DURATION: f32 = 0.08;
+pub const SHIELD_FLASH_COOLDOWN: f32 = 0.0;
 
 // Enemy flash colors and timing
 pub const DAMAGE_FLASH_COLOR: macroquad::prelude::Color =

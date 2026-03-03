@@ -131,6 +131,7 @@ cargo deny check                   # license + advisory check
 - **P1.10** (drone system): DONE — fully implemented; Drone orb in normal pool.
 - **P1.14** (explosion FX, title/pause screens, HUD redesign, touch flagged): COMPLETE.
 - **P1.15** (UI polish 2026-03-02): DONE — per-frame animation durations, monogram_font + logo_sprite, title screen logo, floating text font, run timer centering.
+- **P1.16** (screen flash on shield loss 2026-03-03): DONE — brief red full-screen overlay on any shield hit via `FlashEffect`; `screen_flash` field on `GameState`.
 
 Source files: `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, `text.rs`, `sprite.rs`.
 

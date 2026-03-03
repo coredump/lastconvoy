@@ -4,7 +4,8 @@ use crate::config::{
     BASE_DAMAGE_VALUE, BOUNDARY_X, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT,
     DRONE_REMOTE_WIDTH, DRONE_Y_OFFSETS, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_WIDTH,
     PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_SPEED, PROJECTILE_W, SCREEN_W,
-    SHAKE_DURATION, SHAKE_INTENSITY, STAGGER_KNOCKBACK_PX,
+    SHAKE_DURATION, SHAKE_INTENSITY, SHIELD_FLASH_COLOR, SHIELD_FLASH_COOLDOWN,
+    SHIELD_FLASH_DURATION, STAGGER_KNOCKBACK_PX,
 };
 use crate::enemy::{EnemyKind, EnemyState};
 use crate::projectile::{Projectile, ProjectileSource};
@@ -15,6 +16,11 @@ use super::{GameState, aabb_overlap};
 impl GameState {
     pub(super) fn take_player_damage(&mut self) {
         self.player.shake.trigger(SHAKE_INTENSITY, SHAKE_DURATION);
+        self.screen_flash.trigger(
+            SHIELD_FLASH_COLOR,
+            SHIELD_FLASH_DURATION,
+            SHIELD_FLASH_COOLDOWN,
+        );
         match self.shields.take_hit() {
             ShieldHitResult::NoShield => {
                 if !self.game_over {

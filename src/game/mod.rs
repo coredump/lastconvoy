@@ -19,7 +19,7 @@ use crate::orb::Orb;
 use crate::player::Player;
 use crate::projectile::Projectile;
 use crate::shield::ShieldSystem;
-use crate::sprite::Sprite;
+use crate::sprite::{FlashEffect, Sprite};
 use crate::text::BitmapFont;
 
 mod game_buff;
@@ -172,6 +172,7 @@ pub struct GameState {
     pub explosions: Vec<Explosion>,
     pub(super) orb_activated_this_frame: bool,
     pub portrait: bool,
+    pub screen_flash: FlashEffect,
 }
 
 impl GameState {
@@ -290,6 +291,7 @@ impl GameState {
             explosions: Vec::new(),
             orb_activated_this_frame: false,
             portrait: false,
+            screen_flash: FlashEffect::new(),
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -593,6 +595,7 @@ impl GameState {
     }
 
     fn update_animations(&mut self, dt: f32) {
+        self.screen_flash.update(dt);
         self.orb_sprite_damage.update(dt);
         self.orb_sprite_shield.update(dt);
         self.orb_sprite_drone.update(dt);

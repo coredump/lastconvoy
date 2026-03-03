@@ -1,8 +1,9 @@
 // All drawing methods: world, HUD, orbs, overlays, background.
 // super::GameState, macroquad, crate::config, crate::enemy, crate::orb
 use crate::config::{
-    BOUNDARY_X, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, SCREEN_W, TOP_BORDER_BOTTOM, TOP_BORDER_TOP,
-    TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
+    BOUNDARY_X, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, SCREEN_H, SCREEN_W, TOP_BORDER_BOTTOM,
+    TOP_BORDER_TOP, TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP, UPGRADE_LANE_BOTTOM,
+    UPGRADE_LANE_TOP,
 };
 use crate::drone::RemoteDroneLane;
 use crate::enemy::{EnemyKind, EnemyState};
@@ -94,6 +95,11 @@ impl GameState {
         self.draw_run_timer_hud();
         self.draw_pause_button();
         self.draw_floating_texts();
+
+        let flash = self.screen_flash.tint();
+        if flash != WHITE {
+            draw_rectangle(0.0, 0.0, SCREEN_W as f32, SCREEN_H as f32, flash);
+        }
 
         if self.game_over {
             self.draw_game_over();
