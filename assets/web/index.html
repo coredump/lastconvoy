@@ -2,27 +2,225 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <title>LCDShootSystem</title>
     <style>
-        html,
-        body,
-        canvas {
+        @font-face {
+            font-family: 'Edunline';
+            src: url('assets/fonts/edunline.ttf') format('truetype');
+            font-display: block;
+        }
+    </style>
+    <style>
+        :root {
+            --space-bg:      #0a0e16;
+            --cyan-light:    #3fd5f0;
+            --cyan-mid:      #0097b8;
+            --cyan-dark:     #005b70;
+            --teal-light:    #4fd9c3;
+        }
+
+        html, body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
-            position: absolute;
+            background: var(--space-bg);
+        }
+
+        canvas {
+            margin: 0;
+            padding: 0;
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             background: black;
             z-index: 0;
+        }
+
+        @media (orientation: portrait) {
+            canvas {
+                width: 100dvh !important;
+                height: 100dvw !important;
+                top: 100dvh !important;
+                left: 0 !important;
+                right: auto !important;
+                bottom: auto !important;
+                transform-origin: 0 0 !important;
+                transform: rotate(-90deg) !important;
+            }
+        }
+
+        #boot {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            background: var(--space-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Edunline', monospace;
+            transition: opacity 0.5s ease;
+        }
+
+        #boot.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .boot-title {
+            font-size: clamp(36px, 9vw, 80px);
+            color: var(--cyan-light);
+            text-shadow:
+                0 0 6px var(--cyan-light),
+                0 0 20px rgba(63, 213, 240, 0.35);
+            letter-spacing: 0.08em;
+            margin-bottom: 0.9em;
+        }
+
+        .boot-sub {
+            font-size: clamp(10px, 2vw, 16px);
+            color: var(--cyan-dark);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin-bottom: 3em;
+        }
+
+        .boot-bar-wrap {
+            width: clamp(180px, 38vw, 340px);
+            height: 8px;
+            background: #0d1a24;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .boot-bar-fill {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 0;
+            background: var(--cyan-mid);
+            box-shadow: 0 0 8px var(--cyan-mid);
+            transition: width 0.3s ease;
+        }
+
+        .boot-status {
+            font-size: clamp(8px, 1.4vw, 12px);
+            color: var(--cyan-dark);
+            letter-spacing: 0.2em;
+            margin-top: 1.2em;
+            min-height: 1.6em;
+        }
+
+        .cursor {
+            animation: blink 0.8s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0; }
         }
     </style>
 </head>
 <body>
     <canvas id="glcanvas" tabindex='1'></canvas>
+
+    <div id="boot">
+        <div class="boot-title">LCDShootSystem</div>
+        <div class="boot-sub">last convoy defense</div>
+        <div class="boot-bar-wrap"><div class="boot-bar-fill" id="boot-bar"></div></div>
+        <div class="boot-status"><span id="boot-msg">LOADING</span><span class="cursor">_</span></div>
+    </div>
+
     <!-- Minified and statically hosted version of https://github.com/not-fl3/macroquad/blob/master/js/mq_js_bundle.js -->
     <script src="mq_js_bundle.js"></script>
-    <script>load("lastconvoy.wasm");</script> <!-- Your compiled WASM binary -->
+    <script>
+        importObject.env.get_device_portrait = function() {
+            return (window.innerWidth < window.innerHeight) ? 1 : 0;
+        };
+    </script>
+    <script>
+        (function() {
+            if (navigator.maxTouchPoints <= 0) return;
+            function requestFs() {
+                var el = document.documentElement;
+                var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+                if (fn) fn.call(el);
+            }
+            window.addEventListener('touchstart', requestFs, { once: true });
+            window.addEventListener('click', requestFs, { once: true });
+        })();
+    </script>
+    <script>
+        // syncSize: force macroquad to re-read canvas dimensions.
+        // macroquad reads canvas.width (pixel attr) via canvas_width(), which is
+        // set by its resize() fn using canvas.clientWidth. iOS does not reliably
+        // update clientWidth after rotation or at init, so we set explicit inline
+        // px dimensions first, then dispatch a synthetic resize event so
+        // macroquad's window.onresize handler re-runs resize() with correct values.
+        // visualViewport updates synchronously on iOS; innerWidth may be stale.
+        var syncSizeCanvas = document.getElementById('glcanvas');
+        function syncSize() {
+            var vp = window.visualViewport;
+            var w = vp ? Math.round(vp.width)  : window.innerWidth;
+            var h = vp ? Math.round(vp.height) : window.innerHeight;
+            var portrait = h > w;
+            if (portrait) {
+                syncSizeCanvas.style.width  = '';
+                syncSizeCanvas.style.height = '';
+            } else {
+                syncSizeCanvas.style.width  = w + 'px';
+                syncSizeCanvas.style.height = h + 'px';
+            }
+            syncSizeCanvas.width = 1;  // force dirty: prevents macroquad resize() early-exit on stale dimensions
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        window.addEventListener('orientationchange', function() {
+            setTimeout(syncSize, 100);
+            setTimeout(syncSize, 400);
+        });
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncSize);
+        }
+    </script>
+    <script>
+        var bootEl  = document.getElementById('boot');
+        var msgEl   = document.getElementById('boot-msg');
+        var barEl   = document.getElementById('boot-bar');
+
+        var msgs = ['LOADING', 'LOADING ASSETS', 'COMPILING', 'READY'];
+        var mi = 0;
+        var statusTimer = setInterval(function() {
+            mi = Math.min(mi + 1, msgs.length - 2);
+            msgEl.textContent = msgs[mi];
+            barEl.style.width = (20 + mi * 22) + '%';
+        }, 700);
+
+        function dismissBoot() {
+            clearInterval(statusTimer);
+            msgEl.textContent = msgs[msgs.length - 1];
+            barEl.style.width = '100%';
+            setTimeout(function() { bootEl.classList.add('hidden'); }, 300);
+            setTimeout(function() { bootEl.style.display = 'none'; }, 900);
+        }
+
+        var loadResult = load("lastconvoy.wasm");
+        if (loadResult && typeof loadResult.then === 'function') {
+            loadResult.then(function() {
+                // macroquad's window.onresize is now live; fix canvas size
+                // in case setup_canvas_size ran with stale iOS viewport values.
+                syncSize();
+                setTimeout(dismissBoot, 200);
+            });
+        } else {
+            setTimeout(dismissBoot, 3500);
+        }
+    </script>
 </body>
 </html>

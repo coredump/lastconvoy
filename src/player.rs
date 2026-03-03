@@ -31,9 +31,8 @@ impl Player {
         }
     }
 
-    pub fn update(&mut self, axis: f32, dt: f32, has_top_drone: bool, has_bottom_drone: bool) {
+    fn y_bounds(has_top_drone: bool, has_bottom_drone: bool) -> (f32, f32) {
         let top_drone_overhang = if has_top_drone {
-            // Positive: how far above player the top drone extends.
             -DRONE_Y_OFFSETS[0].min(0.0)
         } else {
             0.0
@@ -45,8 +44,19 @@ impl Player {
         };
         let y_min = TOP_UPGRADE_LANE_TOP as f32 + top_drone_overhang + PLAYER_LANE_PADDING;
         let y_max = SCREEN_H as f32 - PLAYER_HEIGHT - bottom_drone_overhang - PLAYER_LANE_PADDING;
-        self.y = (self.y + axis * self.speed * dt).clamp(y_min, y_max);
+        (y_min, y_max)
+    }
 
+    pub fn update(&mut self, axis: f32, dt: f32, has_top_drone: bool, has_bottom_drone: bool) {
+        let (y_min, y_max) = Self::y_bounds(has_top_drone, has_bottom_drone);
+        self.y = (self.y + axis * self.speed * dt).clamp(y_min, y_max);
+        self.fire_timer -= dt;
+        self.shake.update(dt);
+    }
+
+    pub fn set_y_direct(&mut self, y: f32, dt: f32, has_top_drone: bool, has_bottom_drone: bool) {
+        let (y_min, y_max) = Self::y_bounds(has_top_drone, has_bottom_drone);
+        self.y = y.clamp(y_min, y_max);
         self.fire_timer -= dt;
         self.shake.update(dt);
     }

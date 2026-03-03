@@ -1,21 +1,29 @@
 // Keyboard and touch input aggregation into a vertical axis.
 // macroquad, crate::config
 use macroquad::input::{KeyCode, TouchPhase, is_key_down, touches};
-use macroquad::window::screen_width;
+use macroquad::time::get_time;
+use macroquad::window::{screen_height, screen_width};
 
-use crate::config::{Config, TOUCH_STRIP_WIDTH_FRAC};
+use crate::config::{Config, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, TOUCH_STRIP_WIDTH_FRAC};
 
-/// Pixels of vertical drag that map to full axis deflection (±1.0).
-const TOUCH_FULL_DEFLECTION_PX: f32 = 60.0;
+const TOUCH_FULL_DEFLECTION_PX: f32 = 24.0;
+const TAP_MAX_DURATION_SECS: f64 = 0.3;
+const TAP_MAX_DRAG_PX: f32 = 10.0;
 
 struct TouchTracking {
     id: u64,
+    start_x: f32,
     start_y: f32,
+    start_time: f64,
+    is_movement: bool,
+    is_drag: bool,
 }
 
-/// Normalised vertical axis: -1 = up, 0 = neutral, +1 = down.
 pub struct InputState {
     pub axis: f32,
+    pub touch_tapped: bool,
+    pub touch_tapped_pos: Option<(f32, f32)>,
+    pub touch_target_y: Option<f32>,
     touch_tracking: Option<TouchTracking>,
 }
 
@@ -23,20 +31,29 @@ impl InputState {
     pub fn new() -> Self {
         Self {
             axis: 0.0,
+            touch_tapped: false,
+            touch_tapped_pos: None,
+            touch_target_y: None,
             touch_tracking: None,
         }
     }
 
-    /// Update axis from all input sources. Call once per frame before any gameplay logic.
-    pub fn update(&mut self, config: &Config) {
+    pub fn update(
+        &mut self,
+        config: &Config,
+        portrait: bool,
+        player_y: f32,
+        scale: u32,
+        offset_x: f32,
+        offset_y: f32,
+    ) {
+        self.touch_tapped = false;
+        self.touch_tapped_pos = None;
+        self.touch_target_y = None;
+
         let keyboard_axis = self.read_keyboard(config);
+        let touch_axis = self.read_touch(portrait, player_y, scale, offset_x, offset_y);
 
-        // TODO(Phase 2): add gamepad support via the `gilrs` crate or equivalent.
-        // macroquad 0.4 removed its built-in gamepad API.
-
-        let touch_axis = self.read_touch();
-
-        // Keyboard takes priority; fall back to touch.
         self.axis = if keyboard_axis != 0.0 {
             keyboard_axis
         } else {
@@ -61,32 +78,78 @@ impl InputState {
         }
     }
 
-    fn read_touch(&mut self) -> f32 {
-        let strip_x_limit = screen_width() * TOUCH_STRIP_WIDTH_FRAC;
+    fn screen_to_game(sx: f32, sy: f32, scale: u32, offset_x: f32, offset_y: f32) -> (f32, f32) {
+        let s = scale as f32;
+        ((sx - offset_x) / s, (sy - offset_y) / s)
+    }
+
+    fn read_touch(
+        &mut self,
+        portrait: bool,
+        player_y: f32,
+        scale: u32,
+        offset_x: f32,
+        offset_y: f32,
+    ) -> f32 {
+        let strip_threshold = if portrait {
+            screen_height() * (1.0 - TOUCH_STRIP_WIDTH_FRAC)
+        } else {
+            screen_width() * TOUCH_STRIP_WIDTH_FRAC
+        };
         let mut axis = 0.0;
 
         for touch in touches() {
+            let pos = touch.position;
             match touch.phase {
                 TouchPhase::Started => {
-                    if touch.position.x <= strip_x_limit && self.touch_tracking.is_none() {
+                    if self.touch_tracking.is_none() {
+                        let in_strip = if portrait {
+                            pos.y >= strip_threshold
+                        } else {
+                            pos.x <= strip_threshold
+                        };
+                        let (gx, gy) =
+                            Self::screen_to_game(pos.x, pos.y, scale, offset_x, offset_y);
+                        let on_player = (PLAYER_X..=PLAYER_X + PLAYER_WIDTH).contains(&gx)
+                            && (player_y..=player_y + PLAYER_HEIGHT).contains(&gy);
+                        let is_drag = on_player;
                         self.touch_tracking = Some(TouchTracking {
                             id: touch.id,
-                            start_y: touch.position.y,
+                            start_x: pos.x,
+                            start_y: pos.y,
+                            start_time: get_time(),
+                            is_movement: in_strip || is_drag,
+                            is_drag,
                         });
                     }
                 }
                 TouchPhase::Moved | TouchPhase::Stationary => {
                     if let Some(ref tracking) = self.touch_tracking
                         && tracking.id == touch.id
+                        && tracking.is_movement
                     {
-                        let delta = touch.position.y - tracking.start_y;
-                        axis = (delta / TOUCH_FULL_DEFLECTION_PX).clamp(-1.0, 1.0);
+                        if tracking.is_drag {
+                            let (_, gy) =
+                                Self::screen_to_game(pos.x, pos.y, scale, offset_x, offset_y);
+                            self.touch_target_y = Some(gy);
+                        } else {
+                            let delta = pos.y - tracking.start_y;
+                            axis = (delta / TOUCH_FULL_DEFLECTION_PX).clamp(-1.0, 1.0);
+                        }
                     }
                 }
                 TouchPhase::Ended | TouchPhase::Cancelled => {
                     if let Some(ref tracking) = self.touch_tracking
                         && tracking.id == touch.id
                     {
+                        let duration = get_time() - tracking.start_time;
+                        let drag = ((pos.x - tracking.start_x).powi(2)
+                            + (pos.y - tracking.start_y).powi(2))
+                        .sqrt();
+                        if duration < TAP_MAX_DURATION_SECS && drag < TAP_MAX_DRAG_PX {
+                            self.touch_tapped = true;
+                            self.touch_tapped_pos = Some((pos.x, pos.y));
+                        }
                         self.touch_tracking = None;
                     }
                 }

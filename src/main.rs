@@ -213,11 +213,13 @@ async fn main() {
         monogram_font,
         logo_sprite,
     );
-    let pipeline = RenderPipeline::new();
+    let mut pipeline = RenderPipeline::new();
 
     loop {
         let dt = get_frame_time();
-        state.update(dt);
+        state.portrait = pipeline.is_portrait();
+        let (offset_x, offset_y) = pipeline.offset();
+        state.update(dt, pipeline.scale(), offset_x, offset_y);
         pipeline.begin();
         state.draw();
         pipeline.end_and_blit();

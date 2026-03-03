@@ -4,10 +4,13 @@ use macroquad::prelude::*;
 
 use crate::config::{
     BIG_INJECT_BASE_INTERVAL, Config, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_HEIGHT,
-    PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, SHOT_BARRIER_BOTTOM_Y, SHOT_BARRIER_GATE_X_MAX,
+    PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, SCREEN_W, SHOT_BARRIER_BOTTOM_Y, SHOT_BARRIER_GATE_X_MAX,
     SHOT_BARRIER_TOP_Y, SPAWN_TICK_INTERVAL, TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP,
     UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
+
+pub(super) const PAUSE_BTN_X: f32 = SCREEN_W as f32 - 14.0;
+pub(super) const PAUSE_BTN_Y_MAX: f32 = 20.0;
 use crate::drone::{Drone, RemoteDrone};
 use crate::elite::EliteEvent;
 use crate::enemy::Enemy;
@@ -168,6 +171,7 @@ pub struct GameState {
     pub explosion_sprite: Sprite,
     pub explosions: Vec<Explosion>,
     pub(super) orb_activated_this_frame: bool,
+    pub portrait: bool,
 }
 
 impl GameState {
@@ -285,6 +289,7 @@ impl GameState {
             explosion_sprite,
             explosions: Vec::new(),
             orb_activated_this_frame: false,
+            portrait: false,
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -463,10 +468,19 @@ impl GameState {
         ));
     }
 
-    pub fn update(&mut self, dt: f32) {
+    pub fn update(&mut self, dt: f32, scale: u32, offset_x: f32, offset_y: f32) {
+        self.input.update(
+            &self.config,
+            self.portrait,
+            self.player.y,
+            scale,
+            offset_x,
+            offset_y,
+        );
+
         if self.at_title {
             self.logo_sprite.update(dt);
-            if get_keys_pressed().into_iter().next().is_some() {
+            if get_keys_pressed().into_iter().next().is_some() || self.input.touch_tapped {
                 self.at_title = false;
                 self.log_run_start("new_game");
             }
@@ -477,13 +491,20 @@ impl GameState {
             if is_key_pressed(KeyCode::Space)
                 || is_key_pressed(KeyCode::Enter)
                 || is_key_pressed(KeyCode::R)
+                || self.input.touch_tapped
             {
                 self.reset();
             }
             return;
         }
 
-        if is_key_pressed(KeyCode::P) || is_key_pressed(KeyCode::Escape) {
+        let pause_tapped = self.input.touch_tapped_pos.is_some_and(|(tx, ty)| {
+            let s = scale as f32;
+            let gx = (tx - offset_x) / s;
+            let gy = (ty - offset_y) / s;
+            gx >= PAUSE_BTN_X && gy <= PAUSE_BTN_Y_MAX
+        });
+        if is_key_pressed(KeyCode::P) || is_key_pressed(KeyCode::Escape) || pause_tapped {
             self.paused = !self.paused;
         }
         if self.paused {
@@ -505,13 +526,15 @@ impl GameState {
             self.log_balance_snapshot();
         }
 
-        self.input.update(&self.config);
-
-        let axis = self.input.axis;
         let has_top_drone = !self.drones.is_empty();
         let has_bottom_drone = self.drones.len() >= 2;
-        self.player
-            .update(axis, dt, has_top_drone, has_bottom_drone);
+        if let Some(target_y) = self.input.touch_target_y {
+            self.player
+                .set_y_direct(target_y, dt, has_top_drone, has_bottom_drone);
+        } else {
+            self.player
+                .update(self.input.axis, dt, has_top_drone, has_bottom_drone);
+        }
 
         self.update_firing(dt);
         self.update_projectiles(dt);

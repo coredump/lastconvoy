@@ -18,7 +18,7 @@ If anything in the repo conflicts with this document regarding gameplay rules, *
 ## 2. Orientation & rendering
 - Canonical world orientation: **landscape**.
 - World/camera never rotates.
-- If viewport is portrait: keep gameplay landscape, center canvas, letterbox; **do not pause** and **do not rotate gameplay**.
+- If viewport is portrait on WASM: apply CSS `rotate(90deg)` to the canvas element so the landscape game fills the screen. Game world, UI, and movement axes are unchanged. Scale uses swapped screen dimensions. On native, letterbox as normal.
 - Scaling: Integer only (×1, ×2, ×3, ×4, ×5, ×6). No fractional scaling.
 
 ## 3. Lanes
@@ -293,9 +293,11 @@ Purpose: rare punctuation events distinct from Elite events.
 - Opposing inputs cancel; analog deadzone applies.
 
 ## 16. Touch controls & menus
-- **Touch controls need rework** — current implementation is broken and not ready for use. See TASKS.md for the redesign task.
-- Intended design (to be implemented): vertical touch strip on left; drag up/down; release stops.
-- All menus/settings must be fully operable via touch (no keyboard-only flows) once reworked.
+- **Movement:** Touch strip on the left of the game view (20% of canvas width). Drag up/down to move player; release returns to neutral. Full deflection at 24px drag. Portrait WASM: strip is at the top of the rotated canvas; drag left/right maps to game up/down.
+- **Tap to advance:** Any tap starts the game from title screen; any tap restarts from game-over screen.
+- **Pause button:** Persistent pause/resume icon in the top-right of the HUD (game coords ~300..318, 0..18). Tap toggles pause.
+- **Run timer:** Displayed on the left of the top border (moved to make room for the pause button).
+- All menus must be fully operable via touch.
 
 ## 17. Meta progression & story (phase-gated)
 - Meta progression is not part of MVP.

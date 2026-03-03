@@ -9,7 +9,7 @@ use crate::enemy::{EnemyKind, EnemyState};
 use crate::orb::{OrbPhase, OrbType};
 use macroquad::prelude::*;
 
-use super::{EXPLOSION_FRAME_COUNT, EXPLOSION_FRAME_DUR, GameState};
+use super::{EXPLOSION_FRAME_COUNT, EXPLOSION_FRAME_DUR, GameState, PAUSE_BTN_X};
 
 impl GameState {
     pub fn draw(&mut self) {
@@ -92,6 +92,7 @@ impl GameState {
         self.draw_shield_hud();
         self.draw_upgrade_hud();
         self.draw_run_timer_hud();
+        self.draw_pause_button();
         self.draw_floating_texts();
 
         if self.game_over {
@@ -254,9 +255,8 @@ impl GameState {
 
         let controls: &[(&str, &str)] = &[
             ("UP / DOWN", "MOVE"),
-            ("SHOOT", "AUTO-FIRES"),
             ("COLLECT ORB", "PASS THROUGH ORB"),
-            ("PAUSE", "P  /  ESC"),
+            ("PAUSE", "P  /  ESC  /  TAP"),
         ];
         let label_col = Color::from_rgba(180, 220, 255, 255);
         let value_col = Color::from_rgba(230, 230, 230, 255);
@@ -271,9 +271,9 @@ impl GameState {
         }
 
         let prompt = if self.paused {
-            "P / ESC  RESUME"
+            "P / ESC / TAP  RESUME"
         } else {
-            "ANY KEY  START"
+            "ANY KEY / TAP  START"
         };
         let psz = self.ui_font.measure(prompt, 1, 1);
         let px = (SCREEN_W as f32 - psz.x) * 0.5;
@@ -316,16 +316,7 @@ impl GameState {
         let y = 5.0_f32;
         let mut x = shield_area_end;
         let bar_dark = Color::from_rgba(40, 40, 40, 255);
-        let teal_placeholder = Color::from_rgba(0, 50, 44, 255);
         let teal_fill = Color::from_rgba(79, 217, 195, 255);
-
-        if !self.drones.is_empty() {
-            self.orb_sprite_drone
-                .draw_frozen_scaled(x, y, icon_size, icon_size, WHITE);
-        } else {
-            draw_rectangle(x, y, icon_size, icon_size, teal_placeholder);
-        }
-        x += icon_size + icon_gap;
 
         {
             let ratio = if self.config.buff_damage_duration > 0.0 {
@@ -435,10 +426,19 @@ impl GameState {
     fn draw_run_timer_hud(&self) {
         let timer = self.format_run_timer();
         let size = self.ui_font.measure(&timer, 1, 1);
-        let x = SCREEN_W as f32 - 7.0 - size.x;
+        let x = PAUSE_BTN_X - 4.0 - size.x;
         let y = ((TOP_BORDER_BOTTOM - TOP_BORDER_TOP + 1) as f32 - size.y) * 0.5 + 2.0;
         self.ui_font
             .draw(&timer, x, y, 1, Color::from_rgba(220, 220, 220, 255), 1);
+    }
+
+    fn draw_pause_button(&self) {
+        let bx = PAUSE_BTN_X + 1.0;
+        let by = 6.0;
+        let bar_h = 10.0;
+        let col = Color::from_rgba(180, 180, 180, 200);
+        draw_rectangle(bx, by, 3.0, bar_h, col);
+        draw_rectangle(bx + 5.0, by, 3.0, bar_h, col);
     }
 
     fn draw_floating_texts(&self) {

@@ -12,28 +12,11 @@ run = """
   cp ./assets/web/index.html ./deploy/
   cp ./assets/web/mq_js_bundle.js ./deploy/mq_js_bundle.js
   cp -r ./assets/fonts ./deploy/assets/
+  cp ./art/fonts/edunline.ttf ./deploy/assets/fonts/
   cp -r ./assets/sprites ./deploy/assets/
   cp ./config.toml ./deploy/ 2>/dev/null || true
   cp ./target/wasm32-unknown-unknown/release/lastconvoy.wasm ./deploy/
   """
-
-[tasks.watch]
-description = "Watch Rust sources and rebuild WASM on changes"
-run = """
-  cargo watch -w src -s \
-    "cargo build --release --target wasm32-unknown-unknown && \
-     cp ./target/wasm32-unknown-unknown/release/lastconvoy.wasm ./deploy/"
-  """
-
 [tasks.serve]
 description = "Serve deploy/ via Vite with live reload"
-run = "npm run dev"
-
-[tasks.dev]
-description = "Build WASM, watch for Rust changes, and serve with hot reload"
-run = """
-  mise run build_wasm
-  trap 'kill $(jobs -p) 2>/dev/null' EXIT INT TERM
-  mise run watch &
-  npm run dev
-  """
+run = "bun run dev"
