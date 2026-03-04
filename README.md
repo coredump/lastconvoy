@@ -10,7 +10,7 @@ Last Convoy is a lane-pressure shooter, not a bullet-hell. You move on a single 
 
 The run never ends — it only gets harder.
 
-![Last Convoy v0.2](assets/screenshots/v0.2.png)
+![Last Convoy v0.2 — Start Screen](assets/screenshots/start_v0.2.png)
 
 - Endless scaling difficulty
 - Temporary offense buffs (damage, fire rate, burst, pierce, stagger)
@@ -87,6 +87,16 @@ Art contributions are very welcome — the developer is a programmer, not an art
 Dependency licenses are checked with [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny).
 
 Most of the code was written with assistance from [Claude](https://claude.ai/) (Anthropic).
+
+---
+
+## Screenshots
+
+### v0.2
+
+![Start screen](assets/screenshots/start_v0.2.png)
+![Gameplay](assets/screenshots/play_v0.2.png)
+[▶ Gameplay video](assets/screenshots/screencast_v0.2.webm)
 
 ---
 
