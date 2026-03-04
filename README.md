@@ -10,6 +10,8 @@ Last Convoy is a lane-pressure shooter, not a bullet-hell. You move on a single 
 
 The run never ends — it only gets harder.
 
+![Last Convoy v0.2](assets/screenshots/v0.2.png)
+
 - Endless scaling difficulty
 - Temporary offense buffs (damage, fire rate, burst, pierce, stagger)
 - Drone companions
