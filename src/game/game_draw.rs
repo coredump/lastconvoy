@@ -1,7 +1,7 @@
 // All drawing methods: world, HUD, orbs, overlays, background.
 // super::GameState, macroquad, crate::config, crate::enemy, crate::orb
 use crate::config::{
-    BOUNDARY_X, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, SCREEN_H, SCREEN_W, TOP_BORDER_BOTTOM,
+    BOUNDARY_X, Biome, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, SCREEN_H, SCREEN_W, TOP_BORDER_BOTTOM,
     TOP_BORDER_TOP, TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP, UPGRADE_LANE_BOTTOM,
     UPGRADE_LANE_TOP,
 };
@@ -92,6 +92,7 @@ impl GameState {
 
         self.draw_shield_hud();
         self.draw_upgrade_hud();
+        self.draw_biome_hud();
         self.draw_run_timer_hud();
         self.draw_pause_button();
         self.draw_floating_texts();
@@ -106,7 +107,11 @@ impl GameState {
         }
 
         if self.at_title || self.paused {
-            self.draw_title_pause_screen();
+            if let Some(event_name) = self.event_placeholder {
+                self.draw_event_placeholder(event_name);
+            } else {
+                self.draw_title_pause_screen();
+            }
         }
     }
 
@@ -293,14 +298,61 @@ impl GameState {
         );
     }
 
+    fn draw_event_placeholder(&self, name: &str) {
+        let overlay = Color::from_rgba(0, 0, 0, 200);
+        draw_rectangle(0.0, 0.0, SCREEN_W as f32, SCREEN_H as f32, overlay);
+
+        let label = "PLACEHOLDER FOR EVENT...";
+        let lsz = self.ui_font.measure(label, 1, 1);
+        let lx = (SCREEN_W as f32 - lsz.x) * 0.5;
+        self.ui_font
+            .draw(label, lx, 70.0, 1, Color::from_rgba(200, 200, 200, 255), 1);
+
+        let nsz = self.ui_font.measure(name, 1, 1);
+        let nx = (SCREEN_W as f32 - nsz.x) * 0.5;
+        self.ui_font
+            .draw(name, nx, 86.0, 1, Color::from_rgba(240, 240, 180, 255), 1);
+
+        let prompt = "P / ESC / TAP  CONTINUE";
+        let psz = self.ui_font.measure(prompt, 1, 1);
+        let px = (SCREEN_W as f32 - psz.x) * 0.5;
+        self.ui_font.draw(
+            prompt,
+            px,
+            110.0,
+            1,
+            Color::from_rgba(180, 220, 255, 255),
+            1,
+        );
+    }
+
+    fn draw_biome_hud(&self) {
+        let biome_num = match self.current_biome {
+            Biome::InfectedAtmosphere => 1,
+            Biome::LowOrbit => 2,
+            Biome::OuterSystem => 3,
+            Biome::DeepSpace => 4,
+        };
+        let label = format!("BIOME {biome_num}");
+        let sz = self.ui_font.measure(&label, 1, 1);
+        let x = (SCREEN_W as f32 - sz.x) * 0.5;
+        self.ui_font
+            .draw(&label, x, 7.0, 1, Color::from_rgba(220, 220, 220, 255), 1);
+    }
+
     fn draw_shield_hud(&self) {
         let size = 8.0_f32;
         let height = 7.0_f32;
         let gap = 2.0_f32;
         let start_x = 5.0_f32;
         let y = 7.0_f32;
+        let shield_cap = match self.current_biome {
+            Biome::InfectedAtmosphere => 1,
+            Biome::LowOrbit => 2,
+            _ => crate::shield::MAX_SHIELD_SEGMENTS,
+        };
         let dark = Color::from_rgba(40, 40, 40, 255);
-        for i in 0..crate::shield::MAX_SHIELD_SEGMENTS {
+        for i in 0..shield_cap {
             let x = start_x + i as f32 * (size + gap);
             draw_rectangle(x, y, size, height, dark);
         }
@@ -316,7 +368,12 @@ impl GameState {
     }
 
     fn draw_upgrade_hud(&mut self) {
-        let shield_area_end = 5.0 + crate::shield::MAX_SHIELD_SEGMENTS as f32 * (8.0 + 2.0) + 2.0;
+        let shield_cap = match self.current_biome {
+            Biome::InfectedAtmosphere => 1,
+            Biome::LowOrbit => 2,
+            _ => crate::shield::MAX_SHIELD_SEGMENTS,
+        };
+        let shield_area_end = 5.0 + shield_cap as f32 * (8.0 + 2.0) + 2.0;
         let icon_size = 10.0_f32;
         let icon_gap = 2.0_f32;
         let y = 5.0_f32;

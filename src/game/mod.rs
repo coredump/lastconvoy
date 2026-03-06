@@ -3,7 +3,7 @@
 use macroquad::prelude::*;
 
 use crate::config::{
-    BIG_INJECT_BASE_INTERVAL, Config, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_HEIGHT,
+    BIG_INJECT_BASE_INTERVAL, Biome, Config, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_HEIGHT,
     PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, SCREEN_W, SHOT_BARRIER_BOTTOM_Y, SHOT_BARRIER_GATE_X_MAX,
     SHOT_BARRIER_TOP_Y, SPAWN_TICK_INTERVAL, TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP,
     UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
@@ -154,6 +154,10 @@ pub struct GameState {
     pub miniboss_timer: f32,
     pub run_id: u32,
     pub run_time: f32,
+    pub current_biome: Biome,
+    pub biome_time: f32,
+    pub loop_count: u32,
+    pub boss_active: bool,
     pub at_title: bool,
     pub paused: bool,
     pub game_over: bool,
@@ -173,6 +177,7 @@ pub struct GameState {
     pub(super) orb_activated_this_frame: bool,
     pub portrait: bool,
     pub screen_flash: FlashEffect,
+    pub event_placeholder: Option<&'static str>,
 }
 
 impl GameState {
@@ -268,6 +273,10 @@ impl GameState {
             miniboss_timer: config.miniboss_interval,
             run_id: 1,
             run_time: 0.0,
+            current_biome: Biome::InfectedAtmosphere,
+            biome_time: 0.0,
+            loop_count: 0,
+            boss_active: false,
             at_title: true,
             paused: false,
             game_over: false,
@@ -292,6 +301,7 @@ impl GameState {
             orb_activated_this_frame: false,
             portrait: false,
             screen_flash: FlashEffect::new(),
+            event_placeholder: None,
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -433,6 +443,10 @@ impl GameState {
         self.miniboss_timer = self.config.miniboss_interval;
         self.run_id = self.run_id.saturating_add(1);
         self.run_time = 0.0;
+        self.current_biome = Biome::InfectedAtmosphere;
+        self.biome_time = 0.0;
+        self.loop_count = 0;
+        self.boss_active = false;
         self.at_title = false;
         self.paused = false;
         self.game_over = false;
@@ -442,6 +456,7 @@ impl GameState {
         self.floating_texts.clear();
         self.explosions.clear();
         self.orb_activated_this_frame = false;
+        self.event_placeholder = None;
         self.log_run_start("restart");
     }
 
@@ -507,13 +522,23 @@ impl GameState {
             gx >= PAUSE_BTN_X && gy <= PAUSE_BTN_Y_MAX
         });
         if is_key_pressed(KeyCode::P) || is_key_pressed(KeyCode::Escape) || pause_tapped {
-            self.paused = !self.paused;
+            if self.paused && self.event_placeholder.is_some() {
+                let was_boss = self.event_placeholder == Some("Boss Event");
+                self.event_placeholder = None;
+                self.paused = false;
+                if was_boss {
+                    self.boss_active = false;
+                }
+            } else {
+                self.paused = !self.paused;
+            }
         }
         if self.paused {
             return;
         }
 
         self.run_time += dt;
+        self.tick_biome(dt);
         self.update_floating_texts(dt);
         for exp in &mut self.explosions {
             exp.timer += dt;
@@ -592,6 +617,70 @@ impl GameState {
         let overlaps_top = y0 < SHOT_BARRIER_TOP_Y + 1.0 && y1 > SHOT_BARRIER_TOP_Y;
         let overlaps_bottom = y0 < SHOT_BARRIER_BOTTOM_Y + 1.0 && y1 > SHOT_BARRIER_BOTTOM_Y;
         overlaps_top || overlaps_bottom
+    }
+
+    fn biome_duration(&self) -> f32 {
+        match self.current_biome {
+            Biome::InfectedAtmosphere => self.config.biome_1_duration,
+            Biome::LowOrbit => self.config.biome_2_duration,
+            Biome::OuterSystem => self.config.biome_3_duration,
+            Biome::DeepSpace => self.config.biome_4_duration,
+        }
+    }
+
+    fn tick_biome(&mut self, dt: f32) {
+        self.biome_time += dt;
+
+        if self.current_biome >= Biome::LowOrbit {
+            self.elite_timer -= dt;
+            if self.elite_timer <= 0.0 {
+                self.elite_timer = self.config.elite_interval;
+                self.event_placeholder = Some("Elite Event");
+                self.paused = true;
+            }
+        }
+        if self.current_biome >= Biome::OuterSystem {
+            self.miniboss_timer -= dt;
+            if self.miniboss_timer <= 0.0 {
+                self.miniboss_timer = self.config.miniboss_interval;
+                self.event_placeholder = Some("Mini-Boss Event");
+                self.paused = true;
+            }
+        }
+
+        if self.biome_time < self.biome_duration() {
+            return;
+        }
+        if self.current_biome.has_boss_at_end() && !self.boss_active {
+            self.boss_active = true;
+            self.event_placeholder = Some("Boss Event");
+            self.paused = true;
+            self.dlog(&format!(
+                "BIOME_BOSS_TRIGGER biome={:?} loop={}",
+                self.current_biome, self.loop_count
+            ));
+        }
+        if self.boss_active {
+            return;
+        }
+        match self.current_biome.next() {
+            Some(next) => {
+                self.dlog(&format!(
+                    "BIOME_ADVANCE {:?} -> {:?} loop={}",
+                    self.current_biome, next, self.loop_count
+                ));
+                self.current_biome = next;
+                self.biome_time = 0.0;
+                self.elite_timer = self.config.elite_interval;
+            }
+            None => {
+                self.loop_count += 1;
+                self.current_biome = Biome::InfectedAtmosphere;
+                self.biome_time = 0.0;
+                self.elite_timer = self.config.elite_interval;
+                self.dlog(&format!("BIOME_LOOP_RESTART loop={}", self.loop_count));
+            }
+        }
     }
 
     fn update_animations(&mut self, dt: f32) {
