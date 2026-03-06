@@ -63,14 +63,6 @@ enemy_medium_hp = 4
 enemy_heavy_hp = 7
 enemy_large_hp = 14
 
-# --- Enemy introduction times (seconds into the run) ---
-# Before its intro time, an enemy type will not appear in the spawn pool.
-# Set to 0.0 to have all types appear from the start (or use debug_all_enemies).
-
-medium_intro_time = 30.0
-heavy_intro_time = 90.0
-large_intro_time = 150.0
-
 # ---------------------------------------------------------------------------
 # [scaling]
 # ---------------------------------------------------------------------------
@@ -99,6 +91,27 @@ hp_scale_heavy_mult = 2.0
 # HP scaling multiplier applied on top of enemy_hp_scale for large enemies.
 # Large enemies scale 3x faster than the base rate.
 hp_scale_large_mult = 3.0
+
+# ---------------------------------------------------------------------------
+# [biomes]
+# ---------------------------------------------------------------------------
+# The game cycles through 4 biomes per loop. Each biome has a fixed duration
+# before advancing to the next. Completing all 4 restarts the loop with a
+# permanent HP multiplier applied.
+
+# Duration of each biome in seconds.
+biome_1_duration = 120.0
+biome_2_duration = 180.0
+biome_3_duration = 210.0
+biome_4_duration = 240.0
+
+# Flat HP multiplier added per completed loop (loop 0 = 1.0×, loop 1 = 1.5×,
+# loop 2 = 2.0×, …). 0.5 means each loop is 50% harder than the last.
+biome_loop_hp_mult = 0.5
+
+# Seconds into biome 1 before Medium enemies begin appearing. Gives the player
+# a brief window to get oriented before larger threats arrive.
+biome_1_medium_delay = 30.0
 
 # ---------------------------------------------------------------------------
 # [spawn]
@@ -245,8 +258,8 @@ debug_all_enemies = false
 debug_log_gameplay = true
 
 # Path to write gameplay debug logs. Empty string means stderr.
-# Example: debug_log_file = "/tmp/lastconvoy.log"
-debug_log_file = "/tmp/lastconvoy.log"
+# Example: debug_log_file = "lastconvoy_debug.log"
+debug_log_file = "lastconvoy_debug.log"
 
 # ---------------------------------------------------------------------------
 # [explosive_shield]

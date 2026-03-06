@@ -313,11 +313,15 @@ impl GameState {
         self.ui_font
             .draw(name, nx, 86.0, 1, Color::from_rgba(240, 240, 180, 255), 1);
 
-        let prompt = "P / ESC / TAP  CONTINUE";
-        let psz = self.ui_font.measure(prompt, 1, 1);
+        let prompt = if self.event_placeholder_timer > 0.0 {
+            format!("WAIT {}...", self.event_placeholder_timer.ceil() as u32)
+        } else {
+            "P / ESC / TAP  CONTINUE".to_string()
+        };
+        let psz = self.ui_font.measure(&prompt, 1, 1);
         let px = (SCREEN_W as f32 - psz.x) * 0.5;
         self.ui_font.draw(
-            prompt,
+            &prompt,
             px,
             110.0,
             1,

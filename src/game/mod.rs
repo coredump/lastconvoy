@@ -178,6 +178,7 @@ pub struct GameState {
     pub portrait: bool,
     pub screen_flash: FlashEffect,
     pub event_placeholder: Option<&'static str>,
+    pub event_placeholder_timer: f32,
 }
 
 impl GameState {
@@ -302,6 +303,7 @@ impl GameState {
             portrait: false,
             screen_flash: FlashEffect::new(),
             event_placeholder: None,
+            event_placeholder_timer: 0.0,
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -457,6 +459,7 @@ impl GameState {
         self.explosions.clear();
         self.orb_activated_this_frame = false;
         self.event_placeholder = None;
+        self.event_placeholder_timer = 0.0;
         self.log_run_start("restart");
     }
 
@@ -521,15 +524,21 @@ impl GameState {
             let gy = (ty - offset_y) / s;
             gx >= PAUSE_BTN_X && gy <= PAUSE_BTN_Y_MAX
         });
+        if self.event_placeholder.is_some() {
+            self.event_placeholder_timer = (self.event_placeholder_timer - dt).max(0.0);
+        }
         if is_key_pressed(KeyCode::P) || is_key_pressed(KeyCode::Escape) || pause_tapped {
-            if self.paused && self.event_placeholder.is_some() {
+            if self.paused
+                && self.event_placeholder.is_some()
+                && self.event_placeholder_timer <= 0.0
+            {
                 let was_boss = self.event_placeholder == Some("Boss Event");
                 self.event_placeholder = None;
                 self.paused = false;
                 if was_boss {
                     self.boss_active = false;
                 }
-            } else {
+            } else if self.event_placeholder.is_none() {
                 self.paused = !self.paused;
             }
         }
@@ -636,6 +645,7 @@ impl GameState {
             if self.elite_timer <= 0.0 {
                 self.elite_timer = self.config.elite_interval;
                 self.event_placeholder = Some("Elite Event");
+                self.event_placeholder_timer = 5.0;
                 self.paused = true;
             }
         }
@@ -644,6 +654,7 @@ impl GameState {
             if self.miniboss_timer <= 0.0 {
                 self.miniboss_timer = self.config.miniboss_interval;
                 self.event_placeholder = Some("Mini-Boss Event");
+                self.event_placeholder_timer = 5.0;
                 self.paused = true;
             }
         }
@@ -654,6 +665,7 @@ impl GameState {
         if self.current_biome.has_boss_at_end() && !self.boss_active {
             self.boss_active = true;
             self.event_placeholder = Some("Boss Event");
+            self.event_placeholder_timer = 5.0;
             self.paused = true;
             self.dlog(&format!(
                 "BIOME_BOSS_TRIGGER biome={:?} loop={}",
