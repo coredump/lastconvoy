@@ -1,7 +1,7 @@
 // Orb spawning, orb movement/activation, orb collection, floating upgrade text.
 // super::GameState, crate::orb, crate::drone, crate::shield
 use crate::config::{
-    BOUNDARY_X, DRONE_REMOTE_HEIGHT, DRONE_Y_OFFSETS, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP,
+    BOUNDARY_X, Biome, DRONE_REMOTE_HEIGHT, DRONE_Y_OFFSETS, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP,
     MAX_ATTACHED_DRONES, ORB_H, ORB_W, SCREEN_W,
 };
 use crate::drone::{Drone, RemoteDrone, RemoteDroneLane};
@@ -20,32 +20,44 @@ impl GameState {
         if self.orbs.len() >= self.config.max_active_orbs {
             return;
         }
-        let shields_full = self.shields.count() >= crate::shield::MAX_SHIELD_SEGMENTS;
+        let shield_cap = match self.current_biome {
+            Biome::InfectedAtmosphere => 1,
+            Biome::LowOrbit => 2,
+            _ => crate::shield::MAX_SHIELD_SEGMENTS,
+        };
+        let shields_full = self.shields.count() >= shield_cap;
+        let drone_cap = match self.current_biome {
+            Biome::InfectedAtmosphere => 0,
+            Biome::LowOrbit => 1,
+            _ => MAX_ATTACHED_DRONES,
+        };
         let mut pool: Vec<(OrbType, u32)> = Vec::with_capacity(8);
         if !self.burst_buff_active() {
             pool.push((OrbType::Burst, 1));
         }
-        if !self.damage_buff_active() {
+        if self.current_biome >= Biome::LowOrbit && !self.damage_buff_active() {
             pool.push((OrbType::Damage, 1));
         }
         if !shields_full {
             pool.push((OrbType::Shield, 1));
         }
-        let drone_remaining = (MAX_ATTACHED_DRONES.saturating_sub(self.drones.len())) as u32;
+        let drone_remaining = drone_cap.saturating_sub(self.drones.len()) as u32;
         if drone_remaining > 0 {
             pool.push((OrbType::Drone, drone_remaining));
         }
-        pool.push((OrbType::DroneRemote, 1));
+        if self.current_biome >= Biome::LowOrbit {
+            pool.push((OrbType::DroneRemote, 1));
+        }
         if !self.fire_rate_buff_active() {
             pool.push((OrbType::FireRate, 1));
         }
-        if !self.pierce_buff_active() {
+        if !self.pierce_buff_active() && self.current_biome >= Biome::OuterSystem {
             pool.push((OrbType::Pierce, 1));
         }
-        if !self.stagger_buff_active() {
+        if !self.stagger_buff_active() && self.current_biome >= Biome::OuterSystem {
             pool.push((OrbType::Stagger, 1));
         }
-        if !self.shields.has_explosive() {
+        if !self.shields.has_explosive() && self.current_biome >= Biome::DeepSpace {
             pool.push((OrbType::Explosive, 1));
         }
         if let Some(forced) = self.config.debug_force_orb {
@@ -202,13 +214,22 @@ impl GameState {
                     Some("+STAGGER")
                 }
                 OrbType::Shield => {
-                    let before = self.shields.count();
-                    self.shields.add_segments(1);
-                    let after = self.shields.count();
-                    if after > before {
-                        Some("+SHIELD")
-                    } else {
+                    let shield_cap = match self.current_biome {
+                        Biome::InfectedAtmosphere => 1,
+                        Biome::LowOrbit => 2,
+                        _ => crate::shield::MAX_SHIELD_SEGMENTS,
+                    };
+                    if self.shields.count() >= shield_cap {
                         None
+                    } else {
+                        let before = self.shields.count();
+                        self.shields.add_segments(1);
+                        let after = self.shields.count();
+                        if after > before {
+                            Some("+SHIELD")
+                        } else {
+                            None
+                        }
                     }
                 }
                 OrbType::Explosive => {
@@ -228,7 +249,12 @@ impl GameState {
                     }
                 }
                 OrbType::Drone => {
-                    if self.drones.len() < MAX_ATTACHED_DRONES {
+                    let drone_cap = match self.current_biome {
+                        Biome::InfectedAtmosphere => 0,
+                        Biome::LowOrbit => 1,
+                        _ => MAX_ATTACHED_DRONES,
+                    };
+                    if self.drones.len() < drone_cap {
                         let index = self.drones.len();
                         let dy = DRONE_Y_OFFSETS[index.min(DRONE_Y_OFFSETS.len() - 1)];
                         self.drones
