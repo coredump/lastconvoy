@@ -152,7 +152,7 @@ orb_spawn_interval = 4.0
 
 # Maximum number of orbs present on screen simultaneously (global cap across
 # both upgrade lanes).
-max_active_orbs = 2
+max_active_orbs = 4
 
 # Speed of a moving orb across the upgrade lane in pixels per second.
 orb_speed = 25.0

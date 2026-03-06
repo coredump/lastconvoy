@@ -205,7 +205,7 @@ Shot modifiers apply to player shots and can also apply to attached drone shots 
 - Shield is excluded when shields are at cap.
 - No projectile size scaling.
 
-## 11. Spawning & scaling (time-based only)
+## 11. Spawning & scaling (biome-gated, time-based)
 - Enemy spawns are continuous (not wave-based).
 - Time-based scaling only (no kill-based triggers, no player-power rubber-banding).
 - Controlled growth:
@@ -214,11 +214,41 @@ Shot modifiers apply to player shots and can also apply to attached drone shots 
   - Shielded frequency increases slowly
 - Avoid bullet-sponge slog and exponential scaling.
 
+### Biome progression (looping)
+Enemies, elites, and bosses are gated by the current biome. Biomes cycle in order then loop.
+
+| Biome | Name | Duration | Enemies available | Events |
+|-------|------|----------|-------------------|--------|
+| 1 | Infected Atmosphere | 120 s | Small; Medium after 30 s | — |
+| 2 | Low Orbit | 180 s | Medium, Heavy | Elite events begin |
+| 3 | Outer System | 210 s | Medium, Heavy, Large | Elite events; Boss blocks transition |
+| 4 | Deep Space | 240 s | Medium, Heavy, Large | Elite events; Boss blocks loop restart |
+
+Total loop: ~750 s (~12.5 min). On loop restart `loop_count` increments; enemy HP multiplies by `1.0 + loop_count × BIOME_LOOP_HP_MULT` (stacks with time-based HP scaling).
+
+Small enemies are always available as coverage backfill regardless of biome.
+
+### Orb/upgrade biome gating
+Orb types unlock progressively. Pool entries are excluded when the current biome is below the gate.
+
+| Upgrade | Gate |
+|---------|------|
+| Explosive shield | Biome 4 (Deep Space) only |
+| Shield orb | Max 1 segment biome 1, max 2 biome 2, max 3 biome 3+ |
+| Drone (attached) | Not available biome 1; max 1 biome 2; max 2 biome 3+ |
+| DroneRemote | Biome 2+ |
+| Pierce | Biome 3+ |
+| Stagger | Biome 3+ |
+
+Damage, FireRate, and Burst orbs are always available (ungated).
+
+Boss blocks biome transition (`boss_active = true`) until killed; on death `boss_active = false` resumes the cycle.
+
 ### Early-run safety
 - First minute(s) are safer:
   - Mostly small enemies
   - Early orbs, easy to activate
-  - Medium/large introduced later
+  - Medium introduced after 30 s in biome 1; Heavy/Large gate to biomes 2+
 
 ## 12. Elite events (DPS checks)
 Purpose: punctuate runs without formal stages.

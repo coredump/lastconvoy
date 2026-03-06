@@ -41,8 +41,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
 
-      - name: Build
+      - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build debug
+        run: cargo build --features debug-log --target ${{ matrix.target }}
 
       - name: Generate default config.toml
         shell: bash
@@ -53,7 +56,7 @@ jobs:
             touch config.toml.release
           fi
 
-      - name: Package (Linux/macOS)
+      - name: Package release (Linux/macOS)
         if: matrix.ext == 'tar.gz'
         run: |
           mkdir -p dist/${{ matrix.artifact }}
@@ -62,7 +65,7 @@ jobs:
           cp config.toml.release dist/${{ matrix.artifact }}/config.toml
           cd dist && tar czf ${{ matrix.artifact }}.tar.gz ${{ matrix.artifact }}
 
-      - name: Package (Windows)
+      - name: Package release (Windows)
         if: matrix.ext == 'zip'
         shell: pwsh
         run: |
@@ -76,6 +79,32 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}.${{ matrix.ext }}
+
+      - name: Package debug (Linux/macOS)
+        if: matrix.ext == 'tar.gz'
+        run: |
+          mkdir -p dist/${{ matrix.artifact }}-debug
+          cp target/${{ matrix.target }}/debug/lastconvoy dist/${{ matrix.artifact }}-debug/
+          cp -r assets dist/${{ matrix.artifact }}-debug/
+          cp config.toml.release dist/${{ matrix.artifact }}-debug/config.toml
+          touch dist/${{ matrix.artifact }}-debug/lastconvoy_debug.log
+          cd dist && tar czf ${{ matrix.artifact }}-debug.tar.gz ${{ matrix.artifact }}-debug
+
+      - name: Package debug (Windows)
+        if: matrix.ext == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/${{ matrix.artifact }}-debug
+          Copy-Item target/${{ matrix.target }}/debug/lastconvoy.exe dist/${{ matrix.artifact }}-debug/
+          Copy-Item -Recurse assets dist/${{ matrix.artifact }}-debug/
+          Copy-Item config.toml.release dist/${{ matrix.artifact }}-debug/config.toml
+          New-Item -ItemType File -Path dist/${{ matrix.artifact }}-debug/lastconvoy_debug.log | Out-Null
+          Compress-Archive -Path dist/${{ matrix.artifact }}-debug -DestinationPath dist/${{ matrix.artifact }}-debug.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}-debug
+          path: dist/${{ matrix.artifact }}-debug.${{ matrix.ext }}
 
   build-wasm:
     name: Build WASM

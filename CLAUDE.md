@@ -132,10 +132,16 @@ cargo deny check                   # license + advisory check
 - **P1.14** (explosion FX, title/pause screens, HUD redesign, touch flagged): COMPLETE.
 - **P1.15** (UI polish 2026-03-02): DONE — per-frame animation durations, monogram_font + logo_sprite, title screen logo, floating text font, run timer centering.
 - **P1.16** (screen flash on shield loss 2026-03-03): DONE — brief red full-screen overlay on any shield hit via `FlashEffect`; `screen_flash` field on `GameState`.
+- **P1.17** (biome progression 2026-03-06): DONE — `Biome` enum in config.rs; 4-biome looping cycle with biome-gated enemy spawning, loop HP scaling, boss-active blocking hook; `tick_biome()` in GameState.
+- **P1.18** (biome-gated orb pool 2026-03-06): DONE — orb types unlock by biome; shield/drone caps scale with biome; Pierce/Stagger/DroneRemote/Explosive gated; single edit point in `game_orb.rs`.
+- **P1.19** (event placeholders + HUD polish 2026-03-06): DONE — elite/miniboss/boss event timers decrement and pause with placeholder screens; biome indicator on top bar; shield HUD shows biome cap (not hardcoded 3); damage orb gated to biome 2+; burst fires 3 spread shots (main + 2 angled at ±6°); `event_placeholder` field on `GameState`; `vy` field on `Projectile`.
 
 Source files: `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, `text.rs`, `sprite.rs`.
 
 Next priorities: (1) Verify P1.8 and explosive shield gameplay feel in practice; (2) Verify P1.10 drone behavior in-game; (3) Continue Phase 1 scaling/event verification in `TASKS.md`.
+
+## Story & Meta (Phase 4+)
+- **STORY.md** (2026-03-04): Full lore, premise, characters (Custodian, Rael, Voss, The Entity), four biomes (Infected Atmosphere, Low Orbit, Outer System, Deep Space Corridor), tone, story beat structure. Story panel art started at `art/story/base.aseprite`.
 
 ## Before writing code
 1. Check **memory** for prior decisions and context on this area.

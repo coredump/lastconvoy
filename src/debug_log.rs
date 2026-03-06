@@ -14,10 +14,18 @@ impl DebugLog {
             let writer: BufWriter<Box<dyn std::io::Write>> = if path.is_empty() {
                 BufWriter::new(Box::new(std::io::stderr()))
             } else {
-                match OpenOptions::new().create(true).append(true).open(path) {
+                let resolved = if std::path::Path::new(path).is_relative() {
+                    std::env::current_exe()
+                        .ok()
+                        .and_then(|p| p.parent().map(|d| d.join(path)))
+                        .unwrap_or_else(|| std::path::PathBuf::from(path))
+                } else {
+                    std::path::PathBuf::from(path)
+                };
+                match OpenOptions::new().create(true).append(true).open(&resolved) {
                     Ok(f) => BufWriter::new(Box::new(f)),
                     Err(e) => {
-                        eprintln!("[debug_log] Failed to open '{}': {}", path, e);
+                        eprintln!("[debug_log] Failed to open '{}': {}", resolved.display(), e);
                         BufWriter::new(Box::new(std::io::stderr()))
                     }
                 }

@@ -1,13 +1,13 @@
 // Enemy spawn logic: tick_spawn, try_place_enemy, coverage computation.
 // super::GameState, crate::config, crate::enemy
 use crate::config::{
-    BIG_INJECT_BASE_INTERVAL, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT,
+    BIG_INJECT_BASE_INTERVAL, Biome, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT,
     COVERAGE_ZONE_WIDTH, Config, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP,
     ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
     ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
     ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
-    ENEMY_SMALL_W, HEAVY_INTRO_TIME, LARGE_INTRO_TIME, MEDIUM_INTRO_TIME, SCREEN_W,
-    SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
+    ENEMY_SMALL_W, SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES,
+    SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
 };
 use crate::enemy::{Enemy, EnemyKind};
 use macroquad::prelude::rand;
@@ -46,16 +46,32 @@ impl GameState {
         if self.spawn_ctrl.inject_timer <= 0.0 && coverage < inject_coverage_cap {
             let kind = if let Some(forced) = self.config.debug_force_enemy {
                 forced
-            } else if self.config.debug_all_enemies || self.run_time >= LARGE_INTRO_TIME {
-                let r = rand::gen_range(0usize, 3);
-                [EnemyKind::Medium, EnemyKind::Heavy, EnemyKind::Large][r]
-            } else if self.run_time >= HEAVY_INTRO_TIME {
-                let r = rand::gen_range(0usize, 2);
-                [EnemyKind::Medium, EnemyKind::Heavy][r]
-            } else if self.run_time >= MEDIUM_INTRO_TIME {
-                EnemyKind::Medium
+            } else if self.config.debug_all_enemies {
+                let r = rand::gen_range(0usize, 4);
+                [
+                    EnemyKind::Medium,
+                    EnemyKind::Heavy,
+                    EnemyKind::Large,
+                    EnemyKind::Small,
+                ][r]
             } else {
-                EnemyKind::Small
+                match self.current_biome {
+                    Biome::InfectedAtmosphere => {
+                        if self.biome_time >= self.config.biome_1_medium_delay {
+                            EnemyKind::Medium
+                        } else {
+                            EnemyKind::Small
+                        }
+                    }
+                    Biome::LowOrbit => {
+                        let r = rand::gen_range(0usize, 2);
+                        [EnemyKind::Medium, EnemyKind::Heavy][r]
+                    }
+                    Biome::OuterSystem | Biome::DeepSpace => {
+                        let r = rand::gen_range(0usize, 3);
+                        [EnemyKind::Medium, EnemyKind::Heavy, EnemyKind::Large][r]
+                    }
+                }
             };
             let late_pressure = (self.run_time / 600.0).clamp(0.0, 1.0);
             let interval_scale = 1.0 - 0.25 * late_pressure;
@@ -115,7 +131,8 @@ impl GameState {
             EnemyKind::Large => self.config.hp_scale_large_mult,
             _ => 1.0,
         };
-        let hp_mult = 1.0 + self.config.enemy_hp_scale * self.run_time * kind_weight;
+        let loop_scale = 1.0 + self.loop_count as f32 * self.config.biome_loop_hp_mult;
+        let hp_mult = (1.0 + self.config.enemy_hp_scale * self.run_time * kind_weight) * loop_scale;
         let hp = ((hp as f32) * hp_mult).round().max(1.0) as i32;
 
         let y_min = ENEMY_LANE_TOP as f32;

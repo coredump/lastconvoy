@@ -85,6 +85,23 @@ Attached drones persist for the run, positioned relative to player, auto-fire on
   - Orb spawn interval decreases (more orbs over time). ⚠ NEEDS VERIFICATION
 - Tuneable: keep readability-first, avoid bullet-sponge slog or exponential blowup.
 
+### P1.17 Biome progression system ✓ DONE (2026-03-06)
+- 4-biome looping cycle: Infected Atmosphere (120s), Low Orbit (180s), Outer System (210s), Deep Space (240s).
+- Enemy spawn gating by biome: Small only → +Medium (30s ramp) → +Heavy → +Large.
+- `Biome` enum in `src/config.rs`; `current_biome`, `biome_time`, `loop_count`, `boss_active` in `GameState`.
+- `tick_biome()` advances biome when duration expires; blocks on `boss_active` for biomes 3/4.
+- Loop restart increments `loop_count`; HP scales by `1.0 + loop_count × BIOME_LOOP_HP_MULT`.
+- Elite timer gate (biome 2+) and boss trigger hook wired; actual spawn logic pending P1.12/P1.13.
+
+### P1.18 Biome-gated orb/upgrade pool ✓ DONE (2026-03-06)
+- Shield orb capped at 1/2/3 segments for biomes 1/2/3+.
+- Drone (attached) unavailable biome 1; max 1 biome 2; max 2 biome 3+.
+- DroneRemote excluded from pool in biome 1; available biome 2+.
+- Pierce and Stagger excluded from pool until biome 3+.
+- Explosive shield excluded from pool until biome 4 (Deep Space).
+- Collection handlers enforce the same biome-aware caps (Shield and Drone).
+- Single edit point: `src/game/game_orb.rs` (pool construction + collection handlers).
+
 ### P1.12 Elite events ⚠ NOT STARTED
 - Elite event system with its own timer (interval + random offset, from config).
 - On elite trigger:
@@ -97,7 +114,7 @@ Attached drones persist for the run, positioned relative to player, auto-fire on
   - Resume normal enemy spawning.
   - Apply a small global scaling bump (config-defined).
 - `EnemyElite1` is never added to the regular continuous spawn pool.
-- **Status**: EliteEvent struct exists with active/variant/timer fields. Elite spawning can happen via pick_enemy_kind (debug mode only). No timer countdown, no pause/resume logic implemented.
+- **Status**: EliteEvent struct exists with active/variant/timer fields. Elite spawning can happen via pick_enemy_kind (debug mode only). No timer countdown, no pause/resume logic implemented. Biome gate (biome 2+) is wired via `current_biome >= LowOrbit` check needed in tick logic.
 
 ### P1.13 Mini-Boss events ⚠ NOT STARTED
 - Separate timer from elites (interval + random offset, from config).
@@ -107,7 +124,7 @@ Attached drones persist for the run, positioned relative to player, auto-fire on
   - Orb spawning continues.
 - Boundary behavior: enters breach wind-up and deals damage via the standard breach mechanism.
 - On death: resume spawning, apply small scaling bump.
-- **Status**: miniboss_timer exists in GameState but no spawn or event logic implemented.
+- **Status**: miniboss_timer exists in GameState but no spawn or event logic implemented. Boss trigger hook exists in `tick_biome()` — sets `boss_active = true` at end of biomes 3/4; needs actual spawn wired in P1.13.
 
 ### P1.14 MVP polish ✓ COMPLETE
 - Orb activation state change (color/glow shift). ✓ Color tint changes per phase in draw_orbs()

@@ -156,10 +156,15 @@ pub const HP_SCALE_HEAVY_MULT: f32 = 2.0;
 // Large enemies scale HP 3× faster than small.
 pub const HP_SCALE_LARGE_MULT: f32 = 3.0;
 
-// Medium/Large introduction times (seconds into run)
-pub const MEDIUM_INTRO_TIME: f32 = 30.0;
-pub const HEAVY_INTRO_TIME: f32 = 90.0;
-pub const LARGE_INTRO_TIME: f32 = 150.0;
+// Biome durations (seconds per biome); total loop ~750s (~12.5 min)
+pub const BIOME_1_DURATION: f32 = 120.0;
+pub const BIOME_2_DURATION: f32 = 180.0;
+pub const BIOME_3_DURATION: f32 = 210.0;
+pub const BIOME_4_DURATION: f32 = 240.0;
+// HP multiplier added per loop restart (loop 0=1.0×, loop 1=1.5×, loop 2=2.0×, …)
+pub const BIOME_LOOP_HP_MULT: f32 = 0.5;
+// Seconds into biome 1 before Medium enemies begin appearing
+pub const BIOME_1_MEDIUM_DELAY: f32 = 30.0;
 
 // Spawn ramp-up: ease into full density over the first few seconds
 // Seconds to ease from SPAWN_RAMP_START_COVERAGE to full density.
@@ -171,7 +176,14 @@ pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15;
 // Debug
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "debug-log")]
+pub const DEBUG_LOG_GAMEPLAY: bool = true;
+#[cfg(not(feature = "debug-log"))]
 pub const DEBUG_LOG_GAMEPLAY: bool = false;
+
+#[cfg(feature = "debug-log")]
+pub const DEBUG_LOG_FILE: &str = "lastconvoy_debug.log";
+#[cfg(not(feature = "debug-log"))]
 pub const DEBUG_LOG_FILE: &str = "";
 
 pub const BUFF_DAMAGE_DURATION: f32 = 14.0;
@@ -212,6 +224,33 @@ pub const EXPLOSIVE_SHIELD_CLEAR_DISTANCE: f32 = 80.0;
 pub const BG_PARALLAX_SPEED_BACK: f32 = 0.0;
 pub const BG_PARALLAX_SPEED_STARS: f32 = 8.0;
 pub const BG_PARALLAX_SPEED_PROPS: f32 = 0.0;
+
+// ---------------------------------------------------------------------------
+// Biome
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Biome {
+    InfectedAtmosphere,
+    LowOrbit,
+    OuterSystem,
+    DeepSpace,
+}
+
+impl Biome {
+    pub fn next(self) -> Option<Biome> {
+        match self {
+            Biome::InfectedAtmosphere => Some(Biome::LowOrbit),
+            Biome::LowOrbit => Some(Biome::OuterSystem),
+            Biome::OuterSystem => Some(Biome::DeepSpace),
+            Biome::DeepSpace => None,
+        }
+    }
+
+    pub fn has_boss_at_end(self) -> bool {
+        matches!(self, Biome::OuterSystem | Biome::DeepSpace)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // RuntimeConfig — all fields Optional; TOML file only needs overrides
@@ -262,9 +301,12 @@ pub struct RuntimeConfig {
     pub hp_scale_heavy_mult: Option<f32>,
     pub hp_scale_large_mult: Option<f32>,
 
-    pub medium_intro_time: Option<f32>,
-    pub heavy_intro_time: Option<f32>,
-    pub large_intro_time: Option<f32>,
+    pub biome_1_duration: Option<f32>,
+    pub biome_2_duration: Option<f32>,
+    pub biome_3_duration: Option<f32>,
+    pub biome_4_duration: Option<f32>,
+    pub biome_loop_hp_mult: Option<f32>,
+    pub biome_1_medium_delay: Option<f32>,
 
     pub spawn_ramp_duration: Option<f32>,
     pub spawn_ramp_start_coverage: Option<f32>,
@@ -353,9 +395,12 @@ pub struct Config {
     pub hp_scale_heavy_mult: f32,
     pub hp_scale_large_mult: f32,
 
-    pub medium_intro_time: f32,
-    pub heavy_intro_time: f32,
-    pub large_intro_time: f32,
+    pub biome_1_duration: f32,
+    pub biome_2_duration: f32,
+    pub biome_3_duration: f32,
+    pub biome_4_duration: f32,
+    pub biome_loop_hp_mult: f32,
+    pub biome_1_medium_delay: f32,
 
     pub spawn_ramp_duration: f32,
     pub spawn_ramp_start_coverage: f32,
@@ -385,7 +430,7 @@ pub struct Config {
     pub bg_parallax_speed_stars: f32,
     pub bg_parallax_speed_props: f32,
 
-    /// Debug: spawn all enemy kinds from the start (bypasses intro timers).
+    /// Debug: spawn all enemy kinds from the start (bypasses biome gating).
     pub debug_all_enemies: bool,
     pub debug_log_gameplay: bool,
     pub debug_log_file: String,
@@ -393,7 +438,7 @@ pub struct Config {
 
     /// Debug: if Some, only this orb type spawns (bypasses level gates).
     pub debug_force_orb: Option<OrbType>,
-    /// Debug: if Some, only this enemy kind spawns (bypasses intro timers and random selection).
+    /// Debug: if Some, only this enemy kind spawns (bypasses biome gating and random selection).
     pub debug_force_enemy: Option<EnemyKind>,
 }
 
@@ -449,9 +494,12 @@ impl Config {
             hp_scale_heavy_mult: rt.hp_scale_heavy_mult.unwrap_or(HP_SCALE_HEAVY_MULT),
             hp_scale_large_mult: rt.hp_scale_large_mult.unwrap_or(HP_SCALE_LARGE_MULT),
 
-            medium_intro_time: rt.medium_intro_time.unwrap_or(MEDIUM_INTRO_TIME),
-            heavy_intro_time: rt.heavy_intro_time.unwrap_or(HEAVY_INTRO_TIME),
-            large_intro_time: rt.large_intro_time.unwrap_or(LARGE_INTRO_TIME),
+            biome_1_duration: rt.biome_1_duration.unwrap_or(BIOME_1_DURATION),
+            biome_2_duration: rt.biome_2_duration.unwrap_or(BIOME_2_DURATION),
+            biome_3_duration: rt.biome_3_duration.unwrap_or(BIOME_3_DURATION),
+            biome_4_duration: rt.biome_4_duration.unwrap_or(BIOME_4_DURATION),
+            biome_loop_hp_mult: rt.biome_loop_hp_mult.unwrap_or(BIOME_LOOP_HP_MULT),
+            biome_1_medium_delay: rt.biome_1_medium_delay.unwrap_or(BIOME_1_MEDIUM_DELAY),
 
             spawn_ramp_duration: rt.spawn_ramp_duration.unwrap_or(SPAWN_RAMP_DURATION),
             spawn_ramp_start_coverage: rt
