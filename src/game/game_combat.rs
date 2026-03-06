@@ -100,27 +100,27 @@ impl GameState {
         if self.player.should_fire() {
             let proj_x = self.player.x + self.player.width;
             let proj_y = self.player.y + (self.player.height - PROJECTILE_H) / 2.0;
+            let speed = self.config.projectile_speed;
+            let pierce = self.current_pierce();
             if self.burst_ready {
                 self.burst_ready = false;
-                let offset = 4.0;
-                for dy in [-offset, offset] {
-                    self.projectiles.push(Projectile::new(
-                        proj_x,
-                        proj_y + dy,
-                        self.config.projectile_speed,
-                        ProjectileSource::Player,
-                        self.current_pierce(),
-                    ));
-                }
-            } else {
-                self.projectiles.push(Projectile::new(
-                    proj_x,
-                    proj_y,
-                    self.config.projectile_speed,
-                    ProjectileSource::Player,
-                    self.current_pierce(),
-                ));
+                let spread_vy = speed * 0.105;
+                let mut up =
+                    Projectile::new(proj_x, proj_y, speed, ProjectileSource::Player, pierce);
+                up.vy = -spread_vy;
+                self.projectiles.push(up);
+                let mut down =
+                    Projectile::new(proj_x, proj_y, speed, ProjectileSource::Player, pierce);
+                down.vy = spread_vy;
+                self.projectiles.push(down);
             }
+            self.projectiles.push(Projectile::new(
+                proj_x,
+                proj_y,
+                speed,
+                ProjectileSource::Player,
+                pierce,
+            ));
         }
     }
 

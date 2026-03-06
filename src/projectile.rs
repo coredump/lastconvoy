@@ -17,6 +17,7 @@ pub struct Projectile {
     pub x: f32,
     pub y: f32,
     pub speed: f32,
+    pub vy: f32,
     pub source: ProjectileSource,
     pub alive: bool,
     pub pierce_remaining: i32,
@@ -35,6 +36,7 @@ impl Projectile {
             x,
             y,
             speed,
+            vy: 0.0,
             source,
             alive: true,
             pierce_remaining,
@@ -44,6 +46,7 @@ impl Projectile {
 
     pub fn update(&mut self, dt: f32) {
         self.x += self.speed * dt;
+        self.y += self.vy * dt;
     }
 
     pub fn is_off_screen(&self) -> bool {
