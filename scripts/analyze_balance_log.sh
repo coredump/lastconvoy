@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LOG_FILE="/tmp/lastconvoy.log"
+LOG_FILE="./lastconvoy_debug.log"
 SHOW_MODE="all"   # all|last|single
 TARGET_RUN=""
 SHOW_AGGREGATE=1
@@ -54,7 +54,7 @@ done
 if [[ ! -f "$LOG_FILE" ]]; then
   echo "Log file not found: $LOG_FILE"
   echo "Run: cargo run"
-  echo "Expected log path (from config.toml): /tmp/lastconvoy.log"
+  echo "Expected log path (from config.toml): ./lastconvoy_debug.log"
   exit 1
 fi
 
@@ -213,6 +213,39 @@ awk -v mode="$SHOW_MODE" -v target_run="$TARGET_RUN" -v show_aggregate="$SHOW_AG
       (run_key(r, "DroneRemote") in orb_pickups ? orb_pickups[run_key(r, "DroneRemote")] : 0)
 
     print ""
+    print "[Orb economy]"
+    printf "Total spawned: %d  picked up: %d\n", total_orb_spawns[r], total_orb_pickups[r]
+    orb_tl[1]="Burst"; orb_tl[2]="Damage"; orb_tl[3]="Shield"; orb_tl[4]="Drone"
+    orb_tl[5]="DroneRemote"; orb_tl[6]="FireRate"; orb_tl[7]="Pierce"; orb_tl[8]="Stagger"; orb_tl[9]="Explosive"
+    for (oi = 1; oi <= 9; oi++) {
+      ot = orb_tl[oi]
+      sp = (run_key(r, ot) in orb_spawns ? orb_spawns[run_key(r, ot)] : 0)
+      pk = (run_key(r, ot) in orb_pickups ? orb_pickups[run_key(r, ot)] : 0)
+      if (sp > 0 || pk > 0) printf "  %-14s spawned=%-3d picked=%-3d collect_rate=%d%%\n", ot, sp, pk, pct(pk, sp)
+    }
+
+    print ""
+    print "[Spawn vs Kill]"
+    printf "Total enemy spawns: %d\n", total_enemy_spawns[r]
+    ek_tl[1]="Small"; ek_tl[2]="Medium"; ek_tl[3]="Large"; ek_tl[4]="Heavy"
+    ek_tl[5]="Elite"; ek_tl[6]="EnemyElite1"; ek_tl[7]="MiniBoss"
+    for (eki = 1; eki <= 7; eki++) {
+      ek = ek_tl[eki]
+      sp = (run_key(r, ek) in enemy_spawns ? enemy_spawns[run_key(r, ek)] : 0)
+      kl = (run_key(r, ek) in enemy_kills ? enemy_kills[run_key(r, ek)] : 0)
+      if (sp > 0 || kl > 0) printf "  %-14s spawned=%-3d killed=%-3d kill_rate=%d%%\n", ek, sp, kl, pct(kl, sp)
+    }
+
+    print ""
+    print "[Kill sources]"
+    ks_tl[1]="Player"; ks_tl[2]="Drone"; ks_tl[3]="RemoteDrone"
+    for (ksi = 1; ksi <= 3; ksi++) {
+      src = ks_tl[ksi]
+      kc = (run_key(r, src) in kill_by_source ? kill_by_source[run_key(r, src)] : 0)
+      printf "  %-14s kills=%d\n", src, kc
+    }
+
+    print ""
     print "[Heuristic flags]"
     issues = print_heuristics(r, run_min, early_breaches[r], ttk_max_v, buffs_avg)
     issues_by_run[r] = issues
@@ -264,6 +297,18 @@ awk -v mode="$SHOW_MODE" -v target_run="$TARGET_RUN" -v show_aggregate="$SHOW_AG
     if ($0 ~ / ORB_COLLECT /) {
       total_orb_pickups[cur]++
       if (match($0, /ORB_COLLECT ([A-Za-z0-9_>-]+)/, mc)) orb_pickups[run_key(cur, mc[1])]++
+    }
+    if ($0 ~ / ORB_SPAWN /) {
+      total_orb_spawns[cur]++
+      if (match($0, /type=([A-Za-z0-9_]+)/, msp)) orb_spawns[run_key(cur, msp[1])]++
+    }
+    if ($0 ~ / ENEMY_SPAWN /) {
+      total_enemy_spawns[cur]++
+      if (match($0, /kind=([A-Za-z0-9_]+)/, mek)) enemy_spawns[run_key(cur, mek[1])]++
+    }
+    if ($0 ~ / KILL /) {
+      if (match($0, /KILL ([A-Za-z0-9_]+)/, mk)) enemy_kills[run_key(cur, mk[1])]++
+      if (match($0, /source=([A-Za-z0-9_]+)/, ms)) kill_by_source[run_key(cur, ms[1])]++
     }
 
     if ($0 ~ / BALANCE_SNAPSHOT / || $0 ~ / BALANCE /) {
@@ -353,6 +398,9 @@ awk -v mode="$SHOW_MODE" -v target_run="$TARGET_RUN" -v show_aggregate="$SHOW_AG
     agg_pressure_count = 0
     agg_buffs_active_sum = 0
     agg_issues = 0
+    agg_orb_spawns = 0
+    agg_orb_pickups = 0
+    agg_enemy_spawns = 0
 
     for (r = 1; r <= run_count; r++) {
       if (!include_run(r)) continue
@@ -379,6 +427,9 @@ awk -v mode="$SHOW_MODE" -v target_run="$TARGET_RUN" -v show_aggregate="$SHOW_AG
       agg_pressure_count += pressure_count[r]
       agg_buffs_active_sum += buffs_active_sum[r]
       agg_issues += issues_by_run[r]
+      agg_orb_spawns += total_orb_spawns[r]
+      agg_orb_pickups += total_orb_pickups[r]
+      agg_enemy_spawns += total_enemy_spawns[r]
     }
 
     if (reported == 0) {
@@ -419,6 +470,14 @@ awk -v mode="$SHOW_MODE" -v target_run="$TARGET_RUN" -v show_aggregate="$SHOW_AG
     printf "DPS avg: %.2f\n", agg_dps_avg
     printf "Large TTK avg: %.2f s\n", agg_ttk_avg
     printf "Active offense buffs per snapshot (avg): %.2f\n", agg_buffs_avg
+
+    print ""
+    print "[Orb economy]"
+    printf "Total orb spawns: %d  pickups: %d  collect_rate=%d%%\n", agg_orb_spawns, agg_orb_pickups, pct(agg_orb_pickups, agg_orb_spawns)
+
+    print ""
+    print "[Spawn vs Kill]"
+    printf "Total enemy spawns: %d\n", agg_enemy_spawns
 
     print ""
     print "[Heuristic tally]"

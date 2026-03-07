@@ -16,3 +16,4 @@ wasm-check*
 console-*
 hubs/
 .playwright*
+*debug.log
