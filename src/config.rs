@@ -78,8 +78,8 @@ pub const ENEMY_HEAVY_W: f32 = 32.0;
 pub const ENEMY_HEAVY_H: f32 = 24.0;
 pub const ENEMY_LARGE_W: f32 = 40.0;
 pub const ENEMY_LARGE_H: f32 = 32.0;
-pub const ENEMY_ELITE_W: f32 = 48.0;
-pub const ENEMY_ELITE_H: f32 = 40.0;
+pub const ENEMY_XL_W: f32 = 48.0;
+pub const ENEMY_XL_H: f32 = 40.0;
 
 // Enemy HP
 pub const ENEMY_SMALL_HP: i32 = 1;
@@ -103,7 +103,7 @@ pub const WINDUP_TIME_SMALL: f32 = 0.8;
 pub const WINDUP_TIME_MEDIUM: f32 = 0.5;
 pub const WINDUP_TIME_HEAVY: f32 = 1.0;
 pub const WINDUP_TIME_LARGE: f32 = 1.3;
-pub const WINDUP_TIME_ELITE: f32 = 1.0;
+pub const WINDUP_TIME_XL: f32 = 1.0;
 /// If a second enemy arrives at the boundary within this window of the first, it joins the breach group.
 pub const SIMULTANEOUS_BREACH_WINDOW: f32 = 0.10;
 /// Micro-stall duration applied to enemy movement after an explosive shield detonates.
@@ -122,15 +122,9 @@ pub const ORB_H: f32 = 20.0;
 pub const SEAL_BLINK_DELAY: f32 = 0.3;
 pub const SEAL_BLINK_RATE: f32 = 0.12;
 
-// Elite / MiniBoss
-pub const ELITE_INTERVAL: f32 = 60.0;
-pub const ELITE_INTERVAL_JITTER: f32 = 10.0;
-pub const MINIBOSS_INTERVAL: f32 = 180.0;
-pub const MINIBOSS_INTERVAL_JITTER: f32 = 20.0;
-pub const ELITE_HP: i32 = 20;
-pub const MINIBOSS_HP: i32 = 30;
-pub const ELITE_SPEED: f32 = 18.0;
-pub const MINIBOSS_SPEED: f32 = 14.0;
+// XL enemy (regular DeepSpace pool enemy)
+pub const XL_HP: i32 = 20;
+pub const XL_SPEED: f32 = 18.0;
 
 // Coverage-based spawn system
 pub const COVERAGE_ZONE_LEFT: f32 = 96.0;
@@ -168,9 +162,13 @@ pub const BIOME_1_MEDIUM_DELAY: f32 = 30.0;
 
 // Spawn ramp-up: ease into full density over the first few seconds
 // Seconds to ease from SPAWN_RAMP_START_COVERAGE to full density.
-pub const SPAWN_RAMP_DURATION: f32 = 8.0;
+pub const SPAWN_RAMP_DURATION: f32 = 15.0;
 // Coverage target at run start (t=0), before ramp completes.
 pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15;
+// Biome 1 micro-lull: every N seconds, coverage drops to lull_intensity fraction for lull_duration seconds.
+pub const BIOME1_LULL_INTERVAL: f32 = 22.0;
+pub const BIOME1_LULL_DURATION: f32 = 3.0;
+pub const BIOME1_LULL_INTENSITY: f32 = 0.3;
 
 // ---------------------------------------------------------------------------
 // Debug
@@ -225,6 +223,13 @@ pub const BG_PARALLAX_SPEED_BACK: f32 = 0.0;
 pub const BG_PARALLAX_SPEED_STARS: f32 = 8.0;
 pub const BG_PARALLAX_SPEED_PROPS: f32 = 0.0;
 
+/// City biome (biome 1) layer h-scroll speeds (px/s).
+pub const CITY_BG_ACCEL_START: f32 = 0.3;
+pub const CITY_BG_SPEED_BACK: f32 = 4.0;
+pub const CITY_BG_SPEED_MID: f32 = 1.0;
+pub const CITY_BG_SPEED_FRONT: f32 = 8.0;
+pub const CITY_BG_SPEED_STARS: f32 = 2.0;
+
 // ---------------------------------------------------------------------------
 // Biome
 // ---------------------------------------------------------------------------
@@ -247,8 +252,17 @@ impl Biome {
         }
     }
 
+    pub fn entry_label(self) -> &'static str {
+        match self {
+            Biome::InfectedAtmosphere => "Biome 1: Infected Atmosphere",
+            Biome::LowOrbit => "Biome 2: Low Orbit",
+            Biome::OuterSystem => "Biome 3: Outer System",
+            Biome::DeepSpace => "Biome 4: Deep Space",
+        }
+    }
+
     pub fn has_boss_at_end(self) -> bool {
-        matches!(self, Biome::OuterSystem | Biome::DeepSpace)
+        true
     }
 }
 
@@ -282,17 +296,12 @@ pub struct RuntimeConfig {
     pub windup_time_medium: Option<f32>,
     pub windup_time_heavy: Option<f32>,
     pub windup_time_large: Option<f32>,
-    pub windup_time_elite: Option<f32>,
+    pub windup_time_xl: Option<f32>,
 
     pub orb_speed: Option<f32>,
 
-    pub elite_interval: Option<f32>,
-    pub elite_interval_jitter: Option<f32>,
-    pub miniboss_interval: Option<f32>,
-    pub miniboss_interval_jitter: Option<f32>,
-    pub elite_hp: Option<i32>,
-    pub elite_speed: Option<f32>,
-    pub miniboss_hp: Option<i32>,
+    pub xl_hp: Option<i32>,
+    pub xl_speed: Option<f32>,
 
     pub enemy_hp_scale: Option<f32>,
     pub shielded_freq_scale: Option<f32>,
@@ -310,6 +319,9 @@ pub struct RuntimeConfig {
 
     pub spawn_ramp_duration: Option<f32>,
     pub spawn_ramp_start_coverage: Option<f32>,
+    pub biome1_lull_interval: Option<f32>,
+    pub biome1_lull_duration: Option<f32>,
+    pub biome1_lull_intensity: Option<f32>,
 
     pub rotate_input: Option<bool>,
     pub analog_deadzone: Option<f32>,
@@ -335,6 +347,12 @@ pub struct RuntimeConfig {
     pub bg_parallax_speed_back: Option<f32>,
     pub bg_parallax_speed_stars: Option<f32>,
     pub bg_parallax_speed_props: Option<f32>,
+
+    pub city_bg_speed_back: Option<f32>,
+    pub city_bg_speed_mid: Option<f32>,
+    pub city_bg_speed_front: Option<f32>,
+    pub city_bg_speed_stars: Option<f32>,
+    pub city_bg_accel_start: Option<f32>,
 
     // Debug flags
     pub explosive_shield_clear_distance: Option<f32>,
@@ -376,17 +394,12 @@ pub struct Config {
     pub windup_time_medium: f32,
     pub windup_time_heavy: f32,
     pub windup_time_large: f32,
-    pub windup_time_elite: f32,
+    pub windup_time_xl: f32,
 
     pub orb_speed: f32,
 
-    pub elite_interval: f32,
-    pub elite_interval_jitter: f32,
-    pub miniboss_interval: f32,
-    pub miniboss_interval_jitter: f32,
-    pub elite_hp: i32,
-    pub elite_speed: f32,
-    pub miniboss_hp: i32,
+    pub xl_hp: i32,
+    pub xl_speed: f32,
 
     pub enemy_hp_scale: f32,
     pub shielded_freq_scale: f32,
@@ -404,6 +417,9 @@ pub struct Config {
 
     pub spawn_ramp_duration: f32,
     pub spawn_ramp_start_coverage: f32,
+    pub biome1_lull_interval: f32,
+    pub biome1_lull_duration: f32,
+    pub biome1_lull_intensity: f32,
 
     pub rotate_input: bool,
     pub analog_deadzone: f32,
@@ -429,6 +445,12 @@ pub struct Config {
     pub bg_parallax_speed_back: f32,
     pub bg_parallax_speed_stars: f32,
     pub bg_parallax_speed_props: f32,
+
+    pub city_bg_speed_back: f32,
+    pub city_bg_speed_mid: f32,
+    pub city_bg_speed_front: f32,
+    pub city_bg_speed_stars: f32,
+    pub city_bg_accel_start: f32,
 
     /// Debug: spawn all enemy kinds from the start (bypasses biome gating).
     pub debug_all_enemies: bool,
@@ -473,19 +495,12 @@ impl Config {
             windup_time_medium: rt.windup_time_medium.unwrap_or(WINDUP_TIME_MEDIUM),
             windup_time_heavy: rt.windup_time_heavy.unwrap_or(WINDUP_TIME_HEAVY),
             windup_time_large: rt.windup_time_large.unwrap_or(WINDUP_TIME_LARGE),
-            windup_time_elite: rt.windup_time_elite.unwrap_or(WINDUP_TIME_ELITE),
+            windup_time_xl: rt.windup_time_xl.unwrap_or(WINDUP_TIME_XL),
 
             orb_speed: rt.orb_speed.unwrap_or(ORB_SPEED),
 
-            elite_interval: rt.elite_interval.unwrap_or(ELITE_INTERVAL),
-            elite_interval_jitter: rt.elite_interval_jitter.unwrap_or(ELITE_INTERVAL_JITTER),
-            miniboss_interval: rt.miniboss_interval.unwrap_or(MINIBOSS_INTERVAL),
-            miniboss_interval_jitter: rt
-                .miniboss_interval_jitter
-                .unwrap_or(MINIBOSS_INTERVAL_JITTER),
-            elite_hp: rt.elite_hp.unwrap_or(ELITE_HP),
-            elite_speed: rt.elite_speed.unwrap_or(ELITE_SPEED),
-            miniboss_hp: rt.miniboss_hp.unwrap_or(MINIBOSS_HP),
+            xl_hp: rt.xl_hp.unwrap_or(XL_HP),
+            xl_speed: rt.xl_speed.unwrap_or(XL_SPEED),
 
             enemy_hp_scale: rt.enemy_hp_scale.unwrap_or(ENEMY_HP_SCALE),
             shielded_freq_scale: rt.shielded_freq_scale.unwrap_or(SHIELDED_FREQ_SCALE),
@@ -505,6 +520,9 @@ impl Config {
             spawn_ramp_start_coverage: rt
                 .spawn_ramp_start_coverage
                 .unwrap_or(SPAWN_RAMP_START_COVERAGE),
+            biome1_lull_interval: rt.biome1_lull_interval.unwrap_or(BIOME1_LULL_INTERVAL),
+            biome1_lull_duration: rt.biome1_lull_duration.unwrap_or(BIOME1_LULL_DURATION),
+            biome1_lull_intensity: rt.biome1_lull_intensity.unwrap_or(BIOME1_LULL_INTENSITY),
 
             rotate_input: rt.rotate_input.unwrap_or(ROTATE_INPUT),
             analog_deadzone: rt.analog_deadzone.unwrap_or(ANALOG_DEADZONE),
@@ -545,6 +563,12 @@ impl Config {
                 .bg_parallax_speed_props
                 .unwrap_or(BG_PARALLAX_SPEED_PROPS),
 
+            city_bg_speed_back: rt.city_bg_speed_back.unwrap_or(CITY_BG_SPEED_BACK),
+            city_bg_speed_mid: rt.city_bg_speed_mid.unwrap_or(CITY_BG_SPEED_MID),
+            city_bg_speed_front: rt.city_bg_speed_front.unwrap_or(CITY_BG_SPEED_FRONT),
+            city_bg_speed_stars: rt.city_bg_speed_stars.unwrap_or(CITY_BG_SPEED_STARS),
+            city_bg_accel_start: rt.city_bg_accel_start.unwrap_or(CITY_BG_ACCEL_START),
+
             debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
             debug_log_gameplay: rt.debug_log_gameplay.unwrap_or(DEBUG_LOG_GAMEPLAY),
             debug_log_file: rt
@@ -570,6 +594,7 @@ impl Config {
                     "medium" => Some(EnemyKind::Medium),
                     "heavy" => Some(EnemyKind::Heavy),
                     "large" => Some(EnemyKind::Large),
+                    "xl" => Some(EnemyKind::XL),
                     _ => None,
                 }
             }),

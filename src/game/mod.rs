@@ -12,7 +12,6 @@ use crate::config::{
 pub(super) const PAUSE_BTN_X: f32 = SCREEN_W as f32 - 14.0;
 pub(super) const PAUSE_BTN_Y_MAX: f32 = 20.0;
 use crate::drone::{Drone, RemoteDrone};
-use crate::elite::EliteEvent;
 use crate::enemy::Enemy;
 use crate::input::InputState;
 use crate::orb::Orb;
@@ -112,13 +111,17 @@ pub struct GameState {
     pub enemy_medium_sprite: Sprite,
     pub enemy_heavy_sprite: Sprite,
     pub enemy_large_sprite: Sprite,
-    pub enemy_elite_sprite: Sprite,
+    pub enemy_xl_sprite: Sprite,
     pub boundary_shield_sprite: Sprite,
     pub rail_wall_sprite: Sprite,
     pub upgrade_track_sprite: Sprite,
     pub top_bar_sprite: Sprite,
     pub bg_texture: Texture2D,
     pub bg_scroll_offsets: [f32; 3],
+    pub city_biome_texture: Texture2D,
+    pub city_bg_scroll_offsets: [f32; 4],
+    pub low_atmosphere_texture: Texture2D,
+    pub low_atmo_moon_offset: f32,
     pub shot_sprite: Sprite,
     pub shields: ShieldSystem,
     pub enemies: Vec<Enemy>,
@@ -146,18 +149,16 @@ pub struct GameState {
     pub drones: Vec<Drone>,
     pub remote_drones: Vec<RemoteDrone>,
     pub boundary_ctrl: BoundaryController,
-    pub elite_event: EliteEvent,
     pub input: InputState,
     pub spawn_ctrl: SpawnController,
     pub orb_spawn_timer: f32,
-    pub elite_timer: f32,
-    pub miniboss_timer: f32,
     pub run_id: u32,
     pub run_time: f32,
     pub current_biome: Biome,
     pub biome_time: f32,
     pub loop_count: u32,
     pub boss_active: bool,
+    pub biome_transition_pending: bool,
     pub at_title: bool,
     pub paused: bool,
     pub game_over: bool,
@@ -179,6 +180,7 @@ pub struct GameState {
     pub screen_flash: FlashEffect,
     pub event_placeholder: Option<&'static str>,
     pub event_placeholder_timer: f32,
+    pub biome_spawn_pause: f32,
 }
 
 impl GameState {
@@ -190,7 +192,7 @@ impl GameState {
         enemy_medium_sprite: Sprite,
         enemy_heavy_sprite: Sprite,
         enemy_large_sprite: Sprite,
-        enemy_elite_sprite: Sprite,
+        enemy_xl_sprite: Sprite,
         boundary_shield_sprite: Sprite,
         shot_sprite: Sprite,
         orb_sprite_damage: Sprite,
@@ -210,6 +212,8 @@ impl GameState {
         explosion_sprite: Sprite,
         top_bar_sprite: Sprite,
         bg_texture: Texture2D,
+        city_biome_texture: Texture2D,
+        low_atmosphere_texture: Texture2D,
         ui_font: BitmapFont,
         logo_font: BitmapFont,
         monogram_font: BitmapFont,
@@ -232,7 +236,7 @@ impl GameState {
             enemy_medium_sprite,
             enemy_heavy_sprite,
             enemy_large_sprite,
-            enemy_elite_sprite,
+            enemy_xl_sprite,
             boundary_shield_sprite,
             shot_sprite,
             shields: ShieldSystem::new(config.player_starting_shields),
@@ -256,6 +260,10 @@ impl GameState {
             top_bar_sprite,
             bg_texture,
             bg_scroll_offsets: [0.0; 3],
+            city_biome_texture,
+            city_bg_scroll_offsets: [0.0; 4],
+            low_atmosphere_texture,
+            low_atmo_moon_offset: 0.0,
             damage_buff_t: 0.0,
             fire_rate_buff_t: 0.0,
             burst_buff_t: 0.0,
@@ -266,18 +274,16 @@ impl GameState {
             drones: Vec::new(),
             remote_drones: Vec::new(),
             boundary_ctrl: BoundaryController::new(),
-            elite_event: EliteEvent::new(),
             input: InputState::new(),
             spawn_ctrl: SpawnController::new(),
             orb_spawn_timer: 0.0,
-            elite_timer: config.elite_interval,
-            miniboss_timer: config.miniboss_interval,
             run_id: 1,
             run_time: 0.0,
             current_biome: Biome::InfectedAtmosphere,
             biome_time: 0.0,
             loop_count: 0,
             boss_active: false,
+            biome_transition_pending: false,
             at_title: true,
             paused: false,
             game_over: false,
@@ -304,6 +310,7 @@ impl GameState {
             screen_flash: FlashEffect::new(),
             event_placeholder: None,
             event_placeholder_timer: 0.0,
+            biome_spawn_pause: 0.0,
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -438,11 +445,8 @@ impl GameState {
         self.stagger_buff_t = 0.0;
         self.burst_timer = 0.0;
         self.burst_ready = false;
-        self.elite_event = EliteEvent::new();
         self.spawn_ctrl.reset();
         self.orb_spawn_timer = 0.0;
-        self.elite_timer = self.config.elite_interval;
-        self.miniboss_timer = self.config.miniboss_interval;
         self.run_id = self.run_id.saturating_add(1);
         self.run_time = 0.0;
         self.current_biome = Biome::InfectedAtmosphere;
@@ -460,6 +464,9 @@ impl GameState {
         self.orb_activated_this_frame = false;
         self.event_placeholder = None;
         self.event_placeholder_timer = 0.0;
+        self.biome_spawn_pause = 0.0;
+        self.city_bg_scroll_offsets = [0.0; 4];
+        self.low_atmo_moon_offset = 0.0;
         self.log_run_start("restart");
     }
 
@@ -532,12 +539,8 @@ impl GameState {
                 && self.event_placeholder.is_some()
                 && self.event_placeholder_timer <= 0.0
             {
-                let was_boss = self.event_placeholder == Some("Boss Event");
                 self.event_placeholder = None;
                 self.paused = false;
-                if was_boss {
-                    self.boss_active = false;
-                }
             } else if self.event_placeholder.is_none() {
                 self.paused = !self.paused;
             }
@@ -577,10 +580,14 @@ impl GameState {
         self.update_proj_enemy_hits();
         self.cleanup_dead_enemies();
 
-        self.spawn_ctrl.tick_accum += dt;
-        while self.spawn_ctrl.tick_accum >= SPAWN_TICK_INTERVAL {
-            self.spawn_ctrl.tick_accum -= SPAWN_TICK_INTERVAL;
-            self.tick_spawn();
+        if self.biome_spawn_pause > 0.0 {
+            self.biome_spawn_pause -= dt;
+        } else {
+            self.spawn_ctrl.tick_accum += dt;
+            while self.spawn_ctrl.tick_accum >= SPAWN_TICK_INTERVAL {
+                self.spawn_ctrl.tick_accum -= SPAWN_TICK_INTERVAL;
+                self.tick_spawn();
+            }
         }
 
         self.update_boundary(dt);
@@ -597,6 +604,29 @@ impl GameState {
         ];
         for (off, &spd) in self.bg_scroll_offsets.iter_mut().zip(bg_speeds.iter()) {
             *off += spd * dt;
+        }
+
+        if self.current_biome == Biome::LowOrbit {
+            self.low_atmo_moon_offset += 3.0 * dt;
+        }
+
+        if self.current_biome == Biome::InfectedAtmosphere {
+            let t = (self.biome_time / self.biome_duration()).clamp(0.0, 1.0);
+            let accel =
+                self.config.city_bg_accel_start + (1.0 - self.config.city_bg_accel_start) * t;
+            let city_speeds = [
+                self.config.city_bg_speed_back * accel,
+                self.config.city_bg_speed_mid * accel,
+                self.config.city_bg_speed_front * accel,
+                self.config.city_bg_speed_stars * accel,
+            ];
+            for (off, &spd) in self
+                .city_bg_scroll_offsets
+                .iter_mut()
+                .zip(city_speeds.iter())
+            {
+                *off += spd * dt;
+            }
         }
 
         self.update_animations(dt);
@@ -640,25 +670,6 @@ impl GameState {
     fn tick_biome(&mut self, dt: f32) {
         self.biome_time += dt;
 
-        if self.current_biome >= Biome::LowOrbit {
-            self.elite_timer -= dt;
-            if self.elite_timer <= 0.0 {
-                self.elite_timer = self.config.elite_interval;
-                self.event_placeholder = Some("Elite Event");
-                self.event_placeholder_timer = 5.0;
-                self.paused = true;
-            }
-        }
-        if self.current_biome >= Biome::OuterSystem {
-            self.miniboss_timer -= dt;
-            if self.miniboss_timer <= 0.0 {
-                self.miniboss_timer = self.config.miniboss_interval;
-                self.event_placeholder = Some("Mini-Boss Event");
-                self.event_placeholder_timer = 5.0;
-                self.paused = true;
-            }
-        }
-
         if self.biome_time < self.biome_duration() {
             return;
         }
@@ -672,26 +683,66 @@ impl GameState {
                 self.current_biome, self.loop_count
             ));
         }
-        if self.boss_active {
+        if self.boss_active && self.event_placeholder.is_some() {
             return;
         }
-        match self.current_biome.next() {
-            Some(next) => {
-                self.dlog(&format!(
-                    "BIOME_ADVANCE {:?} -> {:?} loop={}",
-                    self.current_biome, next, self.loop_count
-                ));
-                self.current_biome = next;
-                self.biome_time = 0.0;
-                self.elite_timer = self.config.elite_interval;
+        if self.biome_transition_pending {
+            self.biome_transition_pending = false;
+            match self.current_biome.next() {
+                Some(next) => {
+                    self.dlog(&format!(
+                        "BIOME_ADVANCE {:?} -> {:?} loop={}",
+                        self.current_biome, next, self.loop_count
+                    ));
+                    self.current_biome = next;
+                    self.biome_time = 0.0;
+                    self.boss_active = false;
+                    self.enemies.clear();
+                    self.spawn_ctrl.reset();
+                    self.biome_spawn_pause = 1.0;
+                    self.orb_spawn_timer = 0.0;
+                    self.refresh_active_buffs();
+                }
+                None => {
+                    self.loop_count += 1;
+                    self.current_biome = Biome::InfectedAtmosphere;
+                    self.biome_time = 0.0;
+                    self.boss_active = false;
+                    self.enemies.clear();
+                    self.spawn_ctrl.reset();
+                    self.biome_spawn_pause = 1.0;
+                    self.orb_spawn_timer = 0.0;
+                    self.refresh_active_buffs();
+                    self.dlog(&format!("BIOME_LOOP_RESTART loop={}", self.loop_count));
+                }
             }
-            None => {
-                self.loop_count += 1;
-                self.current_biome = Biome::InfectedAtmosphere;
-                self.biome_time = 0.0;
-                self.elite_timer = self.config.elite_interval;
-                self.dlog(&format!("BIOME_LOOP_RESTART loop={}", self.loop_count));
-            }
+        } else {
+            let label = match self.current_biome.next() {
+                Some(next) => next.entry_label(),
+                None => "Loop Restart",
+            };
+            self.event_placeholder = Some(label);
+            self.event_placeholder_timer = 5.0;
+            self.paused = true;
+            self.biome_transition_pending = true;
+        }
+    }
+
+    fn refresh_active_buffs(&mut self) {
+        if self.damage_buff_t > 0.0 {
+            self.damage_buff_t = self.config.buff_damage_duration;
+        }
+        if self.fire_rate_buff_t > 0.0 {
+            self.fire_rate_buff_t = self.config.buff_fire_rate_duration;
+        }
+        if self.burst_buff_t > 0.0 {
+            self.burst_buff_t = self.config.buff_burst_duration;
+        }
+        if self.pierce_buff_t > 0.0 {
+            self.pierce_buff_t = self.config.buff_pierce_duration;
+        }
+        if self.stagger_buff_t > 0.0 {
+            self.stagger_buff_t = self.config.buff_stagger_duration;
         }
     }
 
@@ -714,7 +765,7 @@ impl GameState {
         self.enemy_medium_sprite.update(dt);
         self.enemy_heavy_sprite.update(dt);
         self.enemy_large_sprite.update(dt);
-        self.enemy_elite_sprite.update(dt);
+        self.enemy_xl_sprite.update(dt);
         self.boundary_shield_sprite.update(dt);
         self.rail_wall_sprite.update(dt);
         self.upgrade_track_sprite.update(dt);

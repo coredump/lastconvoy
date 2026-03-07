@@ -2,12 +2,12 @@
 // super::GameState, crate::config, crate::enemy
 use crate::config::{
     BIG_INJECT_BASE_INTERVAL, Biome, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT,
-    COVERAGE_ZONE_WIDTH, Config, ENEMY_ELITE_H, ENEMY_ELITE_W, ENEMY_HEAVY_H, ENEMY_HEAVY_HP,
-    ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H,
-    ENEMY_LARGE_HP, ENEMY_LARGE_SPEED, ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP,
-    ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED,
-    ENEMY_SMALL_W, SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES,
-    SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
+    COVERAGE_ZONE_WIDTH, Config, ENEMY_HEAVY_H, ENEMY_HEAVY_HP, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W,
+    ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H, ENEMY_LARGE_HP, ENEMY_LARGE_SPEED,
+    ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W,
+    ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED, ENEMY_SMALL_W, ENEMY_XL_H, ENEMY_XL_W,
+    SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT,
+    SPAWN_SLOT_WIDTH,
 };
 use crate::enemy::{Enemy, EnemyKind};
 use macroquad::prelude::rand;
@@ -41,6 +41,16 @@ impl GameState {
         }
         let coverage = compute_coverage(&self.enemies);
         let target = coverage_target(self.run_time, &self.config);
+        let target = if self.current_biome == Biome::InfectedAtmosphere {
+            let cycle_pos = self.run_time % self.config.biome1_lull_interval;
+            if cycle_pos < self.config.biome1_lull_duration {
+                target * self.config.biome1_lull_intensity
+            } else {
+                target
+            }
+        } else {
+            target
+        };
 
         let inject_coverage_cap = (target + 0.10).min(1.0);
         if self.spawn_ctrl.inject_timer <= 0.0 && coverage < inject_coverage_cap {
@@ -67,9 +77,18 @@ impl GameState {
                         let r = rand::gen_range(0usize, 2);
                         [EnemyKind::Medium, EnemyKind::Heavy][r]
                     }
-                    Biome::OuterSystem | Biome::DeepSpace => {
+                    Biome::OuterSystem => {
                         let r = rand::gen_range(0usize, 3);
                         [EnemyKind::Medium, EnemyKind::Heavy, EnemyKind::Large][r]
+                    }
+                    Biome::DeepSpace => {
+                        let r = rand::gen_range(0usize, 4);
+                        [
+                            EnemyKind::Medium,
+                            EnemyKind::Heavy,
+                            EnemyKind::Large,
+                            EnemyKind::XL,
+                        ][r]
                     }
                 }
             };
@@ -110,11 +129,11 @@ impl GameState {
                 ENEMY_LARGE_HP,
                 ENEMY_LARGE_SPEED,
             ),
-            EnemyKind::Elite => (
-                ENEMY_ELITE_W,
-                ENEMY_ELITE_H,
-                self.config.elite_hp,
-                self.config.elite_speed,
+            EnemyKind::XL => (
+                ENEMY_XL_W,
+                ENEMY_XL_H,
+                self.config.xl_hp,
+                self.config.xl_speed,
             ),
         };
 
@@ -123,7 +142,7 @@ impl GameState {
             EnemyKind::Medium => self.config.windup_time_medium,
             EnemyKind::Heavy => self.config.windup_time_heavy,
             EnemyKind::Large => self.config.windup_time_large,
-            EnemyKind::Elite => self.config.windup_time_elite,
+            EnemyKind::XL => self.config.windup_time_xl,
         };
 
         let kind_weight = match kind {
@@ -167,7 +186,12 @@ impl GameState {
                 enemy.shielded = true;
                 enemy.shield_hp = 1;
             }
+            let shielded = enemy.shielded;
             self.enemies.push(enemy);
+            self.dlog(&format!(
+                "ENEMY_SPAWN kind={:?} shielded={}",
+                kind, shielded
+            ));
             return;
         }
     }

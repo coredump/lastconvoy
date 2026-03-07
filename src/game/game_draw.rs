@@ -62,7 +62,7 @@ impl GameState {
                 EnemyKind::Medium => &self.enemy_medium_sprite,
                 EnemyKind::Heavy => &self.enemy_heavy_sprite,
                 EnemyKind::Large => &self.enemy_large_sprite,
-                EnemyKind::Elite => &self.enemy_elite_sprite,
+                EnemyKind::XL => &self.enemy_xl_sprite,
             };
             let tint = if e.state == EnemyState::Breaching {
                 e.windup_tint()
@@ -552,36 +552,222 @@ impl GameState {
         {
             let lane_top = ENEMY_LANE_TOP as f32;
             let lane_h = (ENEMY_LANE_BOTTOM - ENEMY_LANE_TOP + 1) as f32;
-            let layer_h = 160.0_f32;
-            let clip_y = (layer_h - lane_h) / 2.0;
-            let tex_w = 284.0_f32;
-            for (i, &offset) in self.bg_scroll_offsets.iter().enumerate() {
-                let src_y = i as f32 * layer_h + clip_y;
-                let src = DrawTextureParams {
-                    source: Some(Rect::new(0.0, src_y, tex_w, lane_h)),
-                    dest_size: Some(vec2(tex_w, lane_h)),
+            if self.current_biome == Biome::InfectedAtmosphere {
+                let layer_w = 320.0_f32;
+                let time_left = (self.biome_duration() - self.biome_time).max(0.0);
+                let frame_ys: [f32; 7] = [0.0, 371.0, 742.0, 1113.0, 1484.0, 1855.0, 2226.0];
+                let vert_offset_max = frame_ys[1] - SCREEN_H as f32 + ENEMY_LANE_TOP as f32;
+                let vert_offset = if time_left > 5.0 {
+                    vert_offset_max
+                } else {
+                    let t = (5.0 - time_left) / 5.0;
+                    let ease = (1.0 - t) * (1.0 - t);
+                    vert_offset_max * ease
+                };
+
+                draw_texture_ex(
+                    &self.city_biome_texture,
+                    0.0,
+                    lane_top,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_ys[0] + vert_offset, layer_w, lane_h)),
+                        dest_size: Some(vec2(layer_w, lane_h)),
+                        ..Default::default()
+                    },
+                );
+
+                draw_texture_ex(
+                    &self.city_biome_texture,
+                    0.0,
+                    lane_top,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_ys[1] + vert_offset, layer_w, lane_h)),
+                        dest_size: Some(vec2(layer_w, lane_h)),
+                        ..Default::default()
+                    },
+                );
+
+                let wrapped = self.city_bg_scroll_offsets[0].rem_euclid(layer_w);
+                let src_bb = DrawTextureParams {
+                    source: Some(Rect::new(0.0, frame_ys[2] + vert_offset, layer_w, lane_h)),
+                    dest_size: Some(vec2(layer_w, lane_h)),
                     ..Default::default()
                 };
-                if i == 0 {
-                    draw_texture_ex(&self.bg_texture, BOUNDARY_X, lane_top, WHITE, src);
-                } else {
-                    let speeds = [
-                        self.config.bg_parallax_speed_back,
-                        self.config.bg_parallax_speed_stars,
-                        self.config.bg_parallax_speed_props,
-                    ];
-                    if speeds[i] == 0.0 {
-                        continue;
+                draw_texture_ex(
+                    &self.city_biome_texture,
+                    wrapped - layer_w,
+                    lane_top,
+                    WHITE,
+                    src_bb.clone(),
+                );
+                draw_texture_ex(&self.city_biome_texture, wrapped, lane_top, WHITE, src_bb);
+
+                let wrapped = self.city_bg_scroll_offsets[1].rem_euclid(layer_w);
+                let src_bm = DrawTextureParams {
+                    source: Some(Rect::new(0.0, frame_ys[3] + vert_offset, layer_w, lane_h)),
+                    dest_size: Some(vec2(layer_w, lane_h)),
+                    ..Default::default()
+                };
+                draw_texture_ex(
+                    &self.city_biome_texture,
+                    wrapped - layer_w,
+                    lane_top,
+                    WHITE,
+                    src_bm.clone(),
+                );
+                draw_texture_ex(&self.city_biome_texture, wrapped, lane_top, WHITE, src_bm);
+
+                let wrapped = self.city_bg_scroll_offsets[2].rem_euclid(layer_w);
+                let src_fb = DrawTextureParams {
+                    source: Some(Rect::new(0.0, frame_ys[4] + vert_offset, layer_w, lane_h)),
+                    dest_size: Some(vec2(layer_w, lane_h)),
+                    ..Default::default()
+                };
+                draw_texture_ex(
+                    &self.city_biome_texture,
+                    wrapped - layer_w,
+                    lane_top,
+                    WHITE,
+                    src_fb.clone(),
+                );
+                draw_texture_ex(&self.city_biome_texture, wrapped, lane_top, WHITE, src_fb);
+
+                let wrapped = self.city_bg_scroll_offsets[3].rem_euclid(layer_w);
+                let src_st = DrawTextureParams {
+                    source: Some(Rect::new(0.0, frame_ys[5] + vert_offset, layer_w, lane_h)),
+                    dest_size: Some(vec2(layer_w, lane_h)),
+                    ..Default::default()
+                };
+                draw_texture_ex(
+                    &self.city_biome_texture,
+                    wrapped - layer_w,
+                    lane_top,
+                    WHITE,
+                    src_st.clone(),
+                );
+                draw_texture_ex(&self.city_biome_texture, wrapped, lane_top, WHITE, src_st);
+
+                draw_texture_ex(
+                    &self.city_biome_texture,
+                    0.0,
+                    lane_top,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_ys[6] + vert_offset, layer_w, lane_h)),
+                        dest_size: Some(vec2(layer_w, lane_h)),
+                        ..Default::default()
+                    },
+                );
+            } else if self.current_biome == Biome::LowOrbit {
+                let layer_w = 320.0_f32;
+                let clip_y = ENEMY_LANE_TOP as f32;
+                let frame_ys: [f32; 4] = [0.0, 180.0, 360.0, 540.0];
+
+                draw_texture_ex(
+                    &self.low_atmosphere_texture,
+                    0.0,
+                    lane_top,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_ys[0] + clip_y, layer_w, lane_h)),
+                        dest_size: Some(vec2(layer_w, lane_h)),
+                        ..Default::default()
+                    },
+                );
+
+                let wrapped = self.bg_scroll_offsets[1].rem_euclid(layer_w);
+                let src_stars = DrawTextureParams {
+                    source: Some(Rect::new(0.0, frame_ys[1] + clip_y, layer_w, lane_h)),
+                    dest_size: Some(vec2(layer_w, lane_h)),
+                    ..Default::default()
+                };
+                draw_texture_ex(
+                    &self.low_atmosphere_texture,
+                    wrapped - layer_w,
+                    lane_top,
+                    WHITE,
+                    src_stars.clone(),
+                );
+                draw_texture_ex(
+                    &self.low_atmosphere_texture,
+                    wrapped,
+                    lane_top,
+                    WHITE,
+                    src_stars,
+                );
+
+                draw_texture_ex(
+                    &self.low_atmosphere_texture,
+                    0.0,
+                    lane_top,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_ys[2] + clip_y, layer_w, lane_h)),
+                        dest_size: Some(vec2(layer_w, lane_h)),
+                        ..Default::default()
+                    },
+                );
+
+                let moon_wrapped = self.low_atmo_moon_offset.rem_euclid(layer_w);
+                let src_moon = DrawTextureParams {
+                    source: Some(Rect::new(0.0, frame_ys[3] + clip_y, layer_w, lane_h)),
+                    dest_size: Some(vec2(layer_w, lane_h)),
+                    ..Default::default()
+                };
+                draw_texture_ex(
+                    &self.low_atmosphere_texture,
+                    moon_wrapped - layer_w,
+                    lane_top,
+                    WHITE,
+                    src_moon.clone(),
+                );
+                draw_texture_ex(
+                    &self.low_atmosphere_texture,
+                    moon_wrapped,
+                    lane_top,
+                    WHITE,
+                    src_moon,
+                );
+            } else {
+                let layer_h = 160.0_f32;
+                let clip_y = (layer_h - lane_h) / 2.0;
+                let tex_w = 284.0_f32;
+                for (i, &offset) in self.bg_scroll_offsets.iter().enumerate() {
+                    let src_y = i as f32 * layer_h + clip_y;
+                    let src = DrawTextureParams {
+                        source: Some(Rect::new(0.0, src_y, tex_w, lane_h)),
+                        dest_size: Some(vec2(tex_w, lane_h)),
+                        ..Default::default()
+                    };
+                    if i == 0 {
+                        draw_texture_ex(&self.bg_texture, BOUNDARY_X, lane_top, WHITE, src);
+                    } else {
+                        let speeds = [
+                            self.config.bg_parallax_speed_back,
+                            self.config.bg_parallax_speed_stars,
+                            self.config.bg_parallax_speed_props,
+                        ];
+                        if speeds[i] == 0.0 {
+                            continue;
+                        }
+                        let wrapped = offset.rem_euclid(tex_w);
+                        draw_texture_ex(
+                            &self.bg_texture,
+                            BOUNDARY_X + wrapped - tex_w,
+                            lane_top,
+                            WHITE,
+                            src.clone(),
+                        );
+                        draw_texture_ex(
+                            &self.bg_texture,
+                            BOUNDARY_X + wrapped,
+                            lane_top,
+                            WHITE,
+                            src,
+                        );
                     }
-                    let wrapped = offset.rem_euclid(tex_w);
-                    draw_texture_ex(
-                        &self.bg_texture,
-                        BOUNDARY_X + wrapped - tex_w,
-                        lane_top,
-                        WHITE,
-                        src.clone(),
-                    );
-                    draw_texture_ex(&self.bg_texture, BOUNDARY_X + wrapped, lane_top, WHITE, src);
                 }
             }
         }

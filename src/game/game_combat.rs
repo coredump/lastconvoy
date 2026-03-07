@@ -51,7 +51,7 @@ impl GameState {
                 && e.y < lane_bottom
             {
                 match e.kind {
-                    EnemyKind::Large | EnemyKind::Elite => {
+                    EnemyKind::Large | EnemyKind::XL => {
                         stagger_targets.push(i);
                     }
                     _ => {
@@ -188,9 +188,9 @@ impl GameState {
                             0.0
                         };
                         kill_logs.push(format!(
-                            "KILL {:?} hp_max={} speed={:.1} shielded={} shield_hp={} dmg_total={} shots={} dmg_per_shot={:.2}",
+                            "KILL {:?} hp_max={} speed={:.1} shielded={} shield_hp={} dmg_total={} shots={} dmg_per_shot={:.2} source={:?}",
                             e.kind, e.max_hp, e.speed, e.shielded, e.shield_hp.max(0),
-                            e.damage_taken, e.shots_taken, dps
+                            e.damage_taken, e.shots_taken, dps, p.source
                         ));
                     }
                     if p.pierce_remaining <= 0 {

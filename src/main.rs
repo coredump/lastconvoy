@@ -8,7 +8,6 @@ use macroquad::prelude::*;
 mod config;
 mod debug_log;
 mod drone;
-mod elite;
 mod enemy;
 mod game;
 mod input;
@@ -64,7 +63,7 @@ async fn main() {
     let enemy_large_sprite = Sprite::from_json("assets/sprites/enemies/large.json")
         .await
         .expect("Failed to load enemy_large sprite");
-    let enemy_elite_sprite = Sprite::from_json("assets/sprites/enemies/elite.json")
+    let enemy_xl_sprite = Sprite::from_json("assets/sprites/enemies/elite.json")
         .await
         .expect("Failed to load enemy_elite sprite");
     let boundary_shield_sprite = Sprite::from_json("assets/sprites/objects/boundary_shield.json")
@@ -156,6 +155,16 @@ async fn main() {
         .expect("Failed to load background texture (blue)");
     bg_texture.set_filter(FilterMode::Nearest);
 
+    let city_biome_texture = load_texture("assets/sprites/backgrounds/city_biome.png")
+        .await
+        .expect("Failed to load city_biome background texture");
+    city_biome_texture.set_filter(FilterMode::Nearest);
+
+    let low_atmosphere_texture = load_texture("assets/sprites/backgrounds/low_atmosphere.png")
+        .await
+        .expect("Failed to load low_atmosphere background texture");
+    low_atmosphere_texture.set_filter(FilterMode::Nearest);
+
     let ui_font = BitmapFont::load(
         "assets/fonts/atarigames/atarigames-bitmap.png",
         "assets/fonts/atarigames/atarigames-bitmap.json",
@@ -188,7 +197,7 @@ async fn main() {
         enemy_medium_sprite,
         enemy_heavy_sprite,
         enemy_large_sprite,
-        enemy_elite_sprite,
+        enemy_xl_sprite,
         boundary_shield_sprite,
         shot_sprite,
         orb_sprite_damage,
@@ -208,6 +217,8 @@ async fn main() {
         explosion_sprite,
         top_bar_sprite,
         bg_texture,
+        city_biome_texture,
+        low_atmosphere_texture,
         ui_font,
         logo_font,
         monogram_font,

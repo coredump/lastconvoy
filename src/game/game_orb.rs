@@ -84,7 +84,20 @@ impl GameState {
         let remaining = self.config.max_active_orbs.saturating_sub(self.orbs.len());
         if remaining >= 2 {
             let top_type = roll_orb_type(&pool, total);
-            let bottom_type = roll_orb_type(&pool, total);
+            let bottom_type = {
+                let filtered: Vec<(OrbType, u32)> = pool
+                    .iter()
+                    .filter(|(t, _)| *t != top_type)
+                    .copied()
+                    .collect();
+                let ftotal: u32 = filtered.iter().map(|(_, w)| w).sum();
+                if ftotal > 0 {
+                    roll_orb_type(&filtered, ftotal)
+                } else {
+                    top_type
+                }
+            };
+            let jitter = rand::gen_range(0.0f32, 40.0);
             self.orbs.push(Orb::new(
                 SCREEN_W as f32,
                 self.upgrade_lane_mid_top() - ORB_H / 2.0,
@@ -93,13 +106,25 @@ impl GameState {
                 self.config.orb_speed,
                 top_type,
             ));
-            self.orbs.push(Orb::new(
+            self.dlog(&format!(
+                "ORB_SPAWN type={:?} x={:.0} y={:.0}",
+                top_type,
                 SCREEN_W as f32,
+                self.upgrade_lane_mid_top() - ORB_H / 2.0
+            ));
+            self.orbs.push(Orb::new(
+                SCREEN_W as f32 + jitter,
                 self.upgrade_lane_mid_bottom() - ORB_H / 2.0,
                 ORB_W,
                 ORB_H,
                 self.config.orb_speed,
                 bottom_type,
+            ));
+            self.dlog(&format!(
+                "ORB_SPAWN type={:?} x={:.0} y={:.0}",
+                bottom_type,
+                SCREEN_W as f32 + jitter,
+                self.upgrade_lane_mid_bottom() - ORB_H / 2.0
             ));
         } else if remaining == 1 {
             let top_mid = self.upgrade_lane_mid_top();
@@ -123,13 +148,20 @@ impl GameState {
             } else {
                 bottom_mid
             };
+            let single_type = roll_orb_type(&pool, total);
             self.orbs.push(Orb::new(
                 SCREEN_W as f32,
                 lane_mid - ORB_H / 2.0,
                 ORB_W,
                 ORB_H,
                 self.config.orb_speed,
-                roll_orb_type(&pool, total),
+                single_type,
+            ));
+            self.dlog(&format!(
+                "ORB_SPAWN type={:?} x={:.0} y={:.0}",
+                single_type,
+                SCREEN_W as f32,
+                lane_mid - ORB_H / 2.0
             ));
         }
     }
@@ -226,6 +258,10 @@ impl GameState {
                         self.shields.add_segments(1);
                         let after = self.shields.count();
                         if after > before {
+                            if after >= shield_cap {
+                                self.orbs
+                                    .retain(|o| o.orb_type != OrbType::Shield || o.collected);
+                            }
                             Some("+SHIELD")
                         } else {
                             None
