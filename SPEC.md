@@ -62,8 +62,8 @@ Canonical enemy size table:
 | Medium    | 24×24      | 2 px padding |
 | Heavy     | 32×24      | 2 px padding |
 | Large     | 40×32      | 2 px padding |
-| Elite     | 48×40      | EnemyElite1; 2–3 px padding |
-| Mini-Boss | 64×48      | event-based only; 2–3 px padding |
+| XL        | 48×40      | 2–3 px padding; regular spawn pool (DeepSpace) |
+| Mini-Boss | 64×48      | event-based only; 2–3 px padding (deprecated; see P1.20) |
 | Boss      | 72×72 max  | reserved; no gameplay rules yet |
 
 Enemy lane height 115 px; max standard enemy height 48 px; boss hard cap 72 px.
@@ -102,8 +102,8 @@ Wind-up times are tuning values — see `config.toml` (`windup_time_*`). A heavi
 - The explosive segment always breaks **last** — normal segments are consumed first.
 - When the explosive segment breaks: an explosion occurs 40 px forward from the barrier, spanning the full enemy lane height.
 - Explosion effect on enemies:
-  - Elite and Mini-Boss are pushed back 24 px.
-  - Non-elite enemies within the zone are destroyed.
+  - XL and Mini-Boss are pushed back 24 px.
+  - Non-XL enemies within the zone are destroyed.
   - Breaching enemies in the zone are cleared; breach lock is released immediately.
   - Explosion does **not** affect the upgrade lane.
 - A brief movement freeze (micro-stall, ~0.25 s) is applied after explosion for impact readability.
@@ -196,7 +196,7 @@ Offense orbs are temporary buffs, not permanent levels. Re-collecting an active 
 - **FireRate Buff**: while active, decreases player shot interval.
 - **Burst Buff**: while active, periodically marks the next shot as a burst shot (double-damage multiplier).
 - **Pierce Buff**: while active, projectiles pass through additional enemies. A shot cannot hit the same enemy more than once.
-- **Stagger Buff**: while active, hits displace Small/Medium/Heavy enemies rightward up to 12 px. Does not affect Large/Elite/Mini-Boss.
+- **Stagger Buff**: while active, hits displace Small/Medium/Heavy enemies rightward up to 12 px. Does not affect Large/XL/Mini-Boss.
 
 Shot modifiers apply to player shots and can also apply to attached drone shots when the corresponding config toggle is enabled.
 
@@ -219,10 +219,10 @@ Enemies, elites, and bosses are gated by the current biome. Biomes cycle in orde
 
 | Biome | Name | Duration | Enemies available | Events |
 |-------|------|----------|-------------------|--------|
-| 1 | Infected Atmosphere | 120 s | Small; Medium after 30 s | — |
-| 2 | Low Orbit | 180 s | Medium, Heavy | Elite events begin |
-| 3 | Outer System | 210 s | Medium, Heavy, Large | Elite events; Boss blocks transition |
-| 4 | Deep Space | 240 s | Medium, Heavy, Large | Elite events; Boss blocks loop restart |
+| 1 | Infected Atmosphere | 120 s | Small; Medium after 30 s | Boss placeholder |
+| 2 | Low Orbit | 180 s | Medium, Heavy | XL spawn; Boss placeholder |
+| 3 | Outer System | 210 s | Medium, Heavy, Large | XL spawn; Boss placeholder (blocks transition) |
+| 4 | Deep Space | 240 s | Medium, Heavy, Large, XL | XL spawn; Boss placeholder (blocks loop restart) |
 
 Total loop: ~750 s (~12.5 min). On loop restart `loop_count` increments; enemy HP multiplies by `1.0 + loop_count × BIOME_LOOP_HP_MULT` (stacks with time-based HP scaling).
 
@@ -250,65 +250,15 @@ Boss blocks biome transition (`boss_active = true`) until killed; on death `boss
   - Early orbs, easy to activate
   - Medium introduced after 30 s in biome 1; Heavy/Large gate to biomes 2+
 
-## 12. Elite events (DPS checks)
-Purpose: punctuate runs without formal stages.
+## 12. Elite events (SUPERSEDED BY P1.20)
+This section is archived. Elite event system was replaced by XL enemy in regular spawn pool (P1.20).
 
-The elite entity used in both variants is **EnemyElite1** (`enemy_elite_1_sprite_sheet.png`).
-EnemyElite1 is **not** a fourth regular enemy class — it only appears during elite events,
-never in the continuous enemy spawn pool.
+For XL enemy rules, see §5 (Enemies) and the Biome Progression table (§11).
 
-EnemyElite1 canonical bounding box: 48×40 px (2–3 px padding).
+## 13. Mini-Boss Events (SUPERSEDED BY P1.20)
+This section is archived. Mini-Boss event system was replaced by boss placeholder screens firing at end of every biome (P1.20).
 
-### Timing
-- Time-based interval with small random offset (predictable but not exact).
-
-### Spawn pause behavior
-On elite trigger:
-- Pause normal enemy spawning.
-- Spawn elite event in enemy lane.
-- Upgrade orbs continue spawning.
-
-**Not yet implemented** (P1.12). Rules below are authoritative for implementation.
-
-### Elite variants (random per event)
-- **A)** Single massive elite
-- **B)** Massive elite + support enemies
-
-### Elite behavior
-- Moves right → left (approach window is DPS check).
-- If not killed before boundary:
-  - Enters breach resolution flow at `BOUNDARY_X` (wind-up, then one breach event).
-- Elite scaling is time-only.
-- Can be pushed back 24 px by an explosive shield detonation unless explicitly marked stagger-immune by event logic.
-
-After elite death:
-- Resume normal enemy spawning.
-- Apply a small global scaling bump consistent with controlled growth.
-
-## 13. Mini-Boss Events
-
-**Not yet implemented** (P1.13). Rules below are authoritative for implementation.
-
-Purpose: rare punctuation events distinct from Elite events.
-
-### Timing
-- Separate time-based interval from elite events with a small random offset.
-
-### Spawn behavior
-- Pause normal enemy spawning during the event.
-- Spawn one Mini-Boss in the enemy lane.
-- Upgrade orbs continue spawning.
-
-### Mini-Boss behavior
-- Moves right → left (approach window is a DPS check).
-- If not killed before boundary: enters breach resolution flow at `BOUNDARY_X`
-  (wind-up, then one breach event).
-- Mini-Boss HP scales with time (time-based only, no rubber-banding).
-- Can be pushed back 24 px by an explosive shield detonation unless explicitly marked stagger-immune by event logic.
-
-### After Mini-Boss death
-- Resume normal enemy spawning.
-- Apply a small global scaling bump consistent with controlled growth.
+Boss behavior and gating are defined in the Biome Progression table (§11).
 
 ## 14. UI screens (title, pause, game over)
 - **Title screen**: displayed on startup; shows game name and "Press any key to start" prompt; pressing any key or clicking anywhere begins a new run (enters game state with `at_title = false`).

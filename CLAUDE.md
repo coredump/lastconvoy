@@ -103,7 +103,7 @@ cargo deny check                   # license + advisory check
 - Orbs: two-phase (activate THEN collect). Type is fixed at spawn; no cycling mechanic.
 - Drone shots interact with orbs equally to player shots (activation only; no cycling mechanic).
 - Boundary uses breach-lock + wind-up + re-breach cooldown (no slot occupancy model). Enemies stack behind slower/stopped ones (no overlapping). `BOUNDARY_X` = 36.0 (in front of player), `PLAYER_X` = 8.0.
-- EnemyElite1 and MiniBoss: event-only, never in regular spawn pool.
+- `EnemyKind::XL` (renamed from Elite): regular enemy, DeepSpace biome only. Boss placeholder fires at end of every biome. No mini-boss or elite event timers.
 
 ## Architecture
 - No ECS. Plain structs + `Vec<T>` + `GameState`.
@@ -118,7 +118,7 @@ cargo deny check                   # license + advisory check
 
 ## Conventions
 - One concern per module. Keep `main.rs` thin.
-- Naming: `Player`, `Enemy`, `EnemyKind`, `Orb`, `Drone`, `ShieldSegment`, `EliteEvent`.
+- Naming: `Player`, `Enemy`, `EnemyKind`, `Orb`, `Drone`, `ShieldSegment`.
 - Commit messages: `P1.X: brief description`.
 - Text font policy: `ui_font` uses **AtariGames** (`assets/fonts/atarigames/atarigames-bitmap.{png,json}`); Monogram assets at `assets/fonts/monogram/`; `logo_font` uses **Edunline** (`assets/fonts/edunline/edunline-bitmap.{png,json}`). AB-test alternates (GravityBold8, LowIndustrial) at `assets/fonts/gravity/` and `assets/fonts/lowindustrial/`.
 - No `unsafe` unless unavoidable.
@@ -135,8 +135,9 @@ cargo deny check                   # license + advisory check
 - **P1.17** (biome progression 2026-03-06): DONE — `Biome` enum in config.rs; 4-biome looping cycle with biome-gated enemy spawning, loop HP scaling, boss-active blocking hook; `tick_biome()` in GameState.
 - **P1.18** (biome-gated orb pool 2026-03-06): DONE — orb types unlock by biome; shield/drone caps scale with biome; Pierce/Stagger/DroneRemote/Explosive gated; single edit point in `game_orb.rs`.
 - **P1.19** (event placeholders + HUD polish 2026-03-06): DONE — elite/miniboss/boss event timers decrement and pause with placeholder screens; biome indicator on top bar; shield HUD shows biome cap (not hardcoded 3); damage orb gated to biome 2+; burst fires 3 spread shots (main + 2 angled at ±6°); `event_placeholder` field on `GameState`; `vy` field on `Projectile`. Patch 0.4.1: debug log path fix (CWD-relative), config.toml sync (stale intro times removed, biome fields added), event placeholder 5s minimum hold timer.
+- **P1.20** (XL enemy + boss every biome 2026-03-06): DONE — `EnemyKind::Elite` → `EnemyKind::XL`; XL added to DeepSpace regular spawn pool; boss placeholder fires at end of every biome (all 4); mini-boss and elite event timers removed; `src/elite.rs` deleted; boss re-trigger bug fixed.
 
-Source files: `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `elite.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, `text.rs`, `sprite.rs`.
+Source files: `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, `text.rs`, `sprite.rs`.
 
 Next priorities: (1) Verify P1.8 and explosive shield gameplay feel in practice; (2) Verify P1.10 drone behavior in-game; (3) Continue Phase 1 scaling/event verification in `TASKS.md`.
 

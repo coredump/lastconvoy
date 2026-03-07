@@ -1,7 +1,7 @@
 # LCDshootsystem — TASKS (Agentic Implementation Plan)
 
 This plan assumes the current repo layout:
-- `src/` — `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), plus `boundary.rs`, `debug_log.rs`, `drone.rs`, `elite.rs`, `enemy.rs`, `input.rs`, `orb.rs`, `player.rs`, `projectile.rs`, `render.rs`, `shield.rs`, `sprite.rs`, `text.rs`, `upgrade.rs`
+- `src/` — `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), plus `boundary.rs`, `debug_log.rs`, `drone.rs`, `enemy.rs`, `input.rs`, `orb.rs`, `player.rs`, `projectile.rs`, `render.rs`, `shield.rs`, `sprite.rs`, `text.rs`, `upgrade.rs`
 - `assets/` — sprites, fonts
 - `config.toml` — runtime tuning overrides (serde + TOML)
 - Rust + Cargo, native dev builds, WASM for release
@@ -67,7 +67,7 @@ Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
 - **Pool gating**: active offense buff types are excluded from orb spawn pool until expiry; Shield/Explosive/Drone gates unchanged. ✓
 
 ### P1.9b Explosive Shield ⚠ PARTIAL
-- Detonation logic implemented: `trigger_explosive_shield()` kills non-elite enemies in zone, pushes Large/Elite back, clears breach group, applies micro-stall. ✓
+- Detonation logic implemented: `trigger_explosive_shield()` kills non-XL enemies in zone, pushes Large/XL back, clears breach group, applies micro-stall. ✓
 - `ShieldSystem::convert_to_explosive()` implemented. ✓
 - `OrbType::Explosive` collection wired to `convert_to_explosive()`. ✓
 - **Remaining**: visual/audio for explosion (flash, particle hints); gameplay verification that detonation + stall reads correctly in play.
@@ -91,7 +91,7 @@ Attached drones persist for the run, positioned relative to player, auto-fire on
 - `Biome` enum in `src/config.rs`; `current_biome`, `biome_time`, `loop_count`, `boss_active` in `GameState`.
 - `tick_biome()` advances biome when duration expires; blocks on `boss_active` for biomes 3/4.
 - Loop restart increments `loop_count`; HP scales by `1.0 + loop_count × BIOME_LOOP_HP_MULT`.
-- Elite timer gate (biome 2+) and boss trigger hook wired; actual spawn logic pending P1.12/P1.13.
+- Boss placeholder event screens fire at end of every biome (all 4 biomes).
 
 ### P1.18 Biome-gated orb/upgrade pool ✓ DONE (2026-03-06)
 - Shield orb capped at 1/2/3 segments for biomes 1/2/3+.
@@ -102,29 +102,11 @@ Attached drones persist for the run, positioned relative to player, auto-fire on
 - Collection handlers enforce the same biome-aware caps (Shield and Drone).
 - Single edit point: `src/game/game_orb.rs` (pool construction + collection handlers).
 
-### P1.12 Elite events ⚠ NOT STARTED
-- Elite event system with its own timer (interval + random offset, from config).
-- On elite trigger:
-  - Pause normal enemy spawning.
-  - Randomly choose variant A (single elite) or C (elite + support enemies).
-  - Spawn `EnemyElite1` (48×40 px, from config HP) in enemy lane, moving right → left.
-  - Orb spawning continues uninterrupted.
-- Elite is a DPS check: if not killed before boundary, enters breach wind-up and deals damage like any other enemy.
-- On elite death:
-  - Resume normal enemy spawning.
-  - Apply a small global scaling bump (config-defined).
-- `EnemyElite1` is never added to the regular continuous spawn pool.
-- **Status**: EliteEvent struct exists with active/variant/timer fields. Elite spawning can happen via pick_enemy_kind (debug mode only). No timer countdown, no pause/resume logic implemented. Biome gate (biome 2+) is wired via `current_biome >= LowOrbit` check needed in tick logic.
+### P1.12 Elite events — SUPERSEDED BY P1.20
+Elite event system (timer-based DPS checks) was replaced by XL enemy in regular spawn pool.
 
-### P1.13 Mini-Boss events ⚠ NOT STARTED
-- Separate timer from elites (interval + random offset, from config).
-- On trigger:
-  - Pause normal enemy spawning.
-  - Spawn one Mini-Boss (64×48 px, 25–40 HP scaled by time) in enemy lane.
-  - Orb spawning continues.
-- Boundary behavior: enters breach wind-up and deals damage via the standard breach mechanism.
-- On death: resume spawning, apply small scaling bump.
-- **Status**: miniboss_timer exists in GameState but no spawn or event logic implemented. Boss trigger hook exists in `tick_biome()` — sets `boss_active = true` at end of biomes 3/4; needs actual spawn wired in P1.13.
+### P1.13 Mini-Boss events — SUPERSEDED BY P1.20
+Mini-Boss event system (separate timer, spawn pause) was replaced by boss placeholder screens at end of every biome.
 
 ### P1.14 MVP polish ✓ COMPLETE
 - Orb activation state change (color/glow shift). ✓ Color tint changes per phase in draw_orbs()
@@ -147,7 +129,7 @@ Brief full-screen red tint overlay on any shield hit (absorbed, explosive, or de
 - Upgrade HUD with drone placeholder and vertical timer bars. ✓ COMPLETE
 - Touch input works (at least in WASM build). ⚠ **BROKEN — see P2.0**
 - Orbs work exactly as specified (activate then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
-- Elites and Mini-Bosses work with enemy spawn pause (orbs continue). ⚠ NOT STARTED (P1.12/P1.13 blocking)
+- XL enemy and boss placeholder screens work. ✓ DONE (P1.20)
 - Boundary breach lock and compression work. ✓ COMPLETE
 - No menus required. ✓ (title/pause screens are state overlays, not full menus)
 - No tests required. ✓
@@ -190,7 +172,7 @@ Brief full-screen red tint overlay on any shield hit (absorbed, explosive, or de
 
 ### P2.5 Virtual slot system (boundary visual variety)
 - Conceptually divide the enemy lane into 6 vertical slots.
-- Assign each enemy kind a slot span: Small=1, Medium/Heavy=2, Large/Elite=3.
+- Assign each enemy kind a slot span: Small=1, Medium/Heavy=2, Large/XL=3.
 - When an enemy transitions to Breaching, snap its Y to the nearest unoccupied slot center (with small jitter to avoid grid look).
 - Track occupied slots in `BoundaryController`; release on breach resolution or stagger.
 - No gameplay effect — purely cosmetic, preventing visible column queues.
