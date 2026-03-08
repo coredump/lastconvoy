@@ -1,5 +1,5 @@
 { "frames": {
-   "blue_0": {
+   "outer_system_back": {
     "frame": { "x": 0, "y": 0, "w": 284, "h": 160 },
     "rotated": false,
     "trimmed": false,
@@ -7,7 +7,7 @@
     "sourceSize": { "w": 284, "h": 160 },
     "duration": 100
    },
-   "blue_0": {
+   "outer_system_stars": {
     "frame": { "x": 0, "y": 160, "w": 284, "h": 160 },
     "rotated": false,
     "trimmed": false,
@@ -15,7 +15,7 @@
     "sourceSize": { "w": 284, "h": 160 },
     "duration": 100
    },
-   "blue_0": {
+   "outer_system_props": {
     "frame": { "x": 0, "y": 320, "w": 284, "h": 160 },
     "rotated": false,
     "trimmed": false,
@@ -27,7 +27,7 @@
  "meta": {
   "app": "http://www.aseprite.org/",
   "version": "1.3.16.1-dev",
-  "image": "blue.png",
+  "image": "outer_system.png",
   "format": "RGBA8888",
   "size": { "w": 284, "h": 480 },
   "scale": "1",

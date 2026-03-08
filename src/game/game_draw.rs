@@ -360,14 +360,20 @@ impl GameState {
             let x = start_x + i as f32 * (size + gap);
             draw_rectangle(x, y, size, height, dark);
         }
-        for (i, seg) in self.shields.segments.iter().enumerate() {
+        let n_normal = self
+            .shields
+            .segments
+            .iter()
+            .filter(|s| !s.explosive)
+            .count();
+        let has_explosive = self.shields.has_explosive();
+        for i in 0..n_normal {
             let x = start_x + i as f32 * (size + gap);
-            let color = if seg.explosive {
-                Color::from_rgba(255, 140, 0, 255)
-            } else {
-                Color::from_rgba(0, 200, 80, 255)
-            };
-            draw_rectangle(x, y, size, height, color);
+            draw_rectangle(x, y, size, height, Color::from_rgba(0, 200, 80, 255));
+        }
+        if has_explosive {
+            let x = start_x + n_normal as f32 * (size + gap);
+            draw_rectangle(x, y, size, height, Color::from_rgba(255, 140, 0, 255));
         }
     }
 
@@ -677,7 +683,7 @@ impl GameState {
                     },
                 );
 
-                let wrapped = self.bg_scroll_offsets[1].rem_euclid(layer_w);
+                let wrapped = self.outer_system_scroll_offsets[1].rem_euclid(layer_w);
                 let src_stars = DrawTextureParams {
                     source: Some(Rect::new(0.0, frame_ys[1] + clip_y, layer_w, lane_h)),
                     dest_size: Some(vec2(layer_w, lane_h)),
@@ -730,11 +736,11 @@ impl GameState {
                     WHITE,
                     src_moon,
                 );
-            } else {
+            } else if self.current_biome == Biome::OuterSystem {
                 let layer_h = 160.0_f32;
                 let clip_y = (layer_h - lane_h) / 2.0;
                 let tex_w = 284.0_f32;
-                for (i, &offset) in self.bg_scroll_offsets.iter().enumerate() {
+                for (i, &offset) in self.outer_system_scroll_offsets.iter().enumerate() {
                     let src_y = i as f32 * layer_h + clip_y;
                     let src = DrawTextureParams {
                         source: Some(Rect::new(0.0, src_y, tex_w, lane_h)),
@@ -742,7 +748,13 @@ impl GameState {
                         ..Default::default()
                     };
                     if i == 0 {
-                        draw_texture_ex(&self.bg_texture, BOUNDARY_X, lane_top, WHITE, src);
+                        draw_texture_ex(
+                            &self.outer_system_texture,
+                            BOUNDARY_X,
+                            lane_top,
+                            WHITE,
+                            src,
+                        );
                     } else {
                         let speeds = [
                             self.config.bg_parallax_speed_back,
@@ -754,18 +766,98 @@ impl GameState {
                         }
                         let wrapped = offset.rem_euclid(tex_w);
                         draw_texture_ex(
-                            &self.bg_texture,
+                            &self.outer_system_texture,
                             BOUNDARY_X + wrapped - tex_w,
                             lane_top,
                             WHITE,
                             src.clone(),
                         );
                         draw_texture_ex(
-                            &self.bg_texture,
+                            &self.outer_system_texture,
                             BOUNDARY_X + wrapped,
                             lane_top,
                             WHITE,
                             src,
+                        );
+                    }
+                }
+            } else {
+                let tex_w = 284.0_f32;
+                let lane_h_ds = 115.0_f32;
+                let frame_ys: [f32; 9] =
+                    [0.0, 115.0, 230.0, 345.0, 460.0, 575.0, 690.0, 805.0, 920.0];
+
+                draw_texture_ex(
+                    &self.deep_space_texture,
+                    BOUNDARY_X,
+                    lane_top,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_ys[0], tex_w, lane_h_ds)),
+                        dest_size: Some(vec2(tex_w, lane_h_ds)),
+                        ..Default::default()
+                    },
+                );
+
+                for &frame_y in &frame_ys[1..=3] {
+                    let wrapped = self.deep_space_scroll_offsets[0].rem_euclid(tex_w);
+                    let src = DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_y, tex_w, lane_h_ds)),
+                        dest_size: Some(vec2(tex_w, lane_h_ds)),
+                        ..Default::default()
+                    };
+                    draw_texture_ex(
+                        &self.deep_space_texture,
+                        BOUNDARY_X + wrapped - tex_w,
+                        lane_top,
+                        WHITE,
+                        src.clone(),
+                    );
+                    draw_texture_ex(
+                        &self.deep_space_texture,
+                        BOUNDARY_X + wrapped,
+                        lane_top,
+                        WHITE,
+                        src,
+                    );
+                }
+
+                {
+                    let wrapped = self.deep_space_scroll_offsets[1].rem_euclid(tex_w);
+                    let src = DrawTextureParams {
+                        source: Some(Rect::new(0.0, frame_ys[4], tex_w, lane_h_ds)),
+                        dest_size: Some(vec2(tex_w, lane_h_ds)),
+                        ..Default::default()
+                    };
+                    draw_texture_ex(
+                        &self.deep_space_texture,
+                        BOUNDARY_X + wrapped - tex_w,
+                        lane_top,
+                        WHITE,
+                        src.clone(),
+                    );
+                    draw_texture_ex(
+                        &self.deep_space_texture,
+                        BOUNDARY_X + wrapped,
+                        lane_top,
+                        WHITE,
+                        src,
+                    );
+                }
+
+                {
+                    let x_shift = (self.deep_space_scroll_offsets[2] * 0.4).sin() * 2.0;
+                    for &frame_y in &frame_ys[5..] {
+                        draw_texture_ex(
+                            &self.deep_space_texture,
+                            BOUNDARY_X + x_shift,
+                            lane_top,
+                            WHITE,
+                            DrawTextureParams {
+                                source: Some(Rect::new(0.0, frame_y, tex_w, lane_h_ds)),
+                                dest_size: Some(vec2(tex_w, lane_h_ds)),
+                                ..Default::default()
+                            },
                         );
                     }
                 }

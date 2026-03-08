@@ -230,6 +230,11 @@ pub const CITY_BG_SPEED_MID: f32 = 1.0;
 pub const CITY_BG_SPEED_FRONT: f32 = 8.0;
 pub const CITY_BG_SPEED_STARS: f32 = 2.0;
 
+/// Deep space biome (biome 4) parallax layer h-scroll speeds (px/s).
+pub const DEEP_SPACE_SPEED_NEBULA: f32 = 4.0;
+pub const DEEP_SPACE_SPEED_MID_STARS: f32 = 14.0;
+pub const DEEP_SPACE_SPEED_PORTAL: f32 = 0.3;
+
 // ---------------------------------------------------------------------------
 // Biome
 // ---------------------------------------------------------------------------
@@ -354,6 +359,10 @@ pub struct RuntimeConfig {
     pub city_bg_speed_stars: Option<f32>,
     pub city_bg_accel_start: Option<f32>,
 
+    pub deep_space_speed_nebula: Option<f32>,
+    pub deep_space_speed_mid_stars: Option<f32>,
+    pub deep_space_speed_portal: Option<f32>,
+
     // Debug flags
     pub explosive_shield_clear_distance: Option<f32>,
 
@@ -362,6 +371,7 @@ pub struct RuntimeConfig {
     pub debug_log_file: Option<String>,
     pub debug_force_orb: Option<String>,
     pub debug_force_enemy: Option<String>,
+    pub debug_start_biome: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -452,6 +462,10 @@ pub struct Config {
     pub city_bg_speed_stars: f32,
     pub city_bg_accel_start: f32,
 
+    pub deep_space_speed_nebula: f32,
+    pub deep_space_speed_mid_stars: f32,
+    pub deep_space_speed_portal: f32,
+
     /// Debug: spawn all enemy kinds from the start (bypasses biome gating).
     pub debug_all_enemies: bool,
     pub debug_log_gameplay: bool,
@@ -462,6 +476,8 @@ pub struct Config {
     pub debug_force_orb: Option<OrbType>,
     /// Debug: if Some, only this enemy kind spawns (bypasses biome gating and random selection).
     pub debug_force_enemy: Option<EnemyKind>,
+    /// Debug: if Some, the run starts at this biome instead of InfectedAtmosphere.
+    pub debug_start_biome: Option<Biome>,
 }
 
 impl Config {
@@ -569,6 +585,16 @@ impl Config {
             city_bg_speed_stars: rt.city_bg_speed_stars.unwrap_or(CITY_BG_SPEED_STARS),
             city_bg_accel_start: rt.city_bg_accel_start.unwrap_or(CITY_BG_ACCEL_START),
 
+            deep_space_speed_nebula: rt
+                .deep_space_speed_nebula
+                .unwrap_or(DEEP_SPACE_SPEED_NEBULA),
+            deep_space_speed_mid_stars: rt
+                .deep_space_speed_mid_stars
+                .unwrap_or(DEEP_SPACE_SPEED_MID_STARS),
+            deep_space_speed_portal: rt
+                .deep_space_speed_portal
+                .unwrap_or(DEEP_SPACE_SPEED_PORTAL),
+
             debug_all_enemies: rt.debug_all_enemies.unwrap_or(false),
             debug_log_gameplay: rt.debug_log_gameplay.unwrap_or(DEBUG_LOG_GAMEPLAY),
             debug_log_file: rt
@@ -598,6 +624,26 @@ impl Config {
                     _ => None,
                 }
             }),
+            debug_start_biome: rt.debug_start_biome.as_deref().and_then(|s| {
+                match s.to_lowercase().as_str() {
+                    "1" | "infected_atmosphere" => Some(Biome::InfectedAtmosphere),
+                    "2" | "low_orbit" => Some(Biome::LowOrbit),
+                    "3" | "outer_system" => Some(Biome::OuterSystem),
+                    "4" | "deep_space" => Some(Biome::DeepSpace),
+                    _ => None,
+                }
+            }),
+        }
+    }
+
+    pub fn debug_start_run_time(&self) -> f32 {
+        match self.debug_start_biome {
+            None | Some(Biome::InfectedAtmosphere) => 0.0,
+            Some(Biome::LowOrbit) => self.biome_1_duration,
+            Some(Biome::OuterSystem) => self.biome_1_duration + self.biome_2_duration,
+            Some(Biome::DeepSpace) => {
+                self.biome_1_duration + self.biome_2_duration + self.biome_3_duration
+            }
         }
     }
 }

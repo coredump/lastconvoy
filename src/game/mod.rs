@@ -116,8 +116,10 @@ pub struct GameState {
     pub rail_wall_sprite: Sprite,
     pub upgrade_track_sprite: Sprite,
     pub top_bar_sprite: Sprite,
-    pub bg_texture: Texture2D,
-    pub bg_scroll_offsets: [f32; 3],
+    pub outer_system_texture: Texture2D,
+    pub outer_system_scroll_offsets: [f32; 3],
+    pub deep_space_texture: Texture2D,
+    pub deep_space_scroll_offsets: [f32; 3],
     pub city_biome_texture: Texture2D,
     pub city_bg_scroll_offsets: [f32; 4],
     pub low_atmosphere_texture: Texture2D,
@@ -211,7 +213,8 @@ impl GameState {
         upgrade_track_sprite: Sprite,
         explosion_sprite: Sprite,
         top_bar_sprite: Sprite,
-        bg_texture: Texture2D,
+        outer_system_texture: Texture2D,
+        deep_space_texture: Texture2D,
         city_biome_texture: Texture2D,
         low_atmosphere_texture: Texture2D,
         ui_font: BitmapFont,
@@ -228,6 +231,9 @@ impl GameState {
             config.player_speed,
             config.player_fire_rate,
         );
+        let start_biome = config
+            .debug_start_biome
+            .unwrap_or(Biome::InfectedAtmosphere);
 
         Self {
             player,
@@ -258,8 +264,10 @@ impl GameState {
             rail_wall_sprite,
             upgrade_track_sprite,
             top_bar_sprite,
-            bg_texture,
-            bg_scroll_offsets: [0.0; 3],
+            outer_system_texture,
+            outer_system_scroll_offsets: [0.0; 3],
+            deep_space_texture,
+            deep_space_scroll_offsets: [0.0; 3],
             city_biome_texture,
             city_bg_scroll_offsets: [0.0; 4],
             low_atmosphere_texture,
@@ -278,8 +286,8 @@ impl GameState {
             spawn_ctrl: SpawnController::new(),
             orb_spawn_timer: 0.0,
             run_id: 1,
-            run_time: 0.0,
-            current_biome: Biome::InfectedAtmosphere,
+            run_time: config.debug_start_run_time(),
+            current_biome: start_biome,
             biome_time: 0.0,
             loop_count: 0,
             boss_active: false,
@@ -448,8 +456,11 @@ impl GameState {
         self.spawn_ctrl.reset();
         self.orb_spawn_timer = 0.0;
         self.run_id = self.run_id.saturating_add(1);
-        self.run_time = 0.0;
-        self.current_biome = Biome::InfectedAtmosphere;
+        self.current_biome = self
+            .config
+            .debug_start_biome
+            .unwrap_or(Biome::InfectedAtmosphere);
+        self.run_time = self.config.debug_start_run_time();
         self.biome_time = 0.0;
         self.loop_count = 0;
         self.boss_active = false;
@@ -467,6 +478,7 @@ impl GameState {
         self.biome_spawn_pause = 0.0;
         self.city_bg_scroll_offsets = [0.0; 4];
         self.low_atmo_moon_offset = 0.0;
+        self.deep_space_scroll_offsets = [0.0; 3];
         self.log_run_start("restart");
     }
 
@@ -602,8 +614,27 @@ impl GameState {
             self.config.bg_parallax_speed_stars,
             self.config.bg_parallax_speed_props,
         ];
-        for (off, &spd) in self.bg_scroll_offsets.iter_mut().zip(bg_speeds.iter()) {
+        for (off, &spd) in self
+            .outer_system_scroll_offsets
+            .iter_mut()
+            .zip(bg_speeds.iter())
+        {
             *off += spd * dt;
+        }
+
+        if self.current_biome == Biome::DeepSpace {
+            let ds_speeds = [
+                self.config.deep_space_speed_nebula,
+                self.config.deep_space_speed_mid_stars,
+                self.config.deep_space_speed_portal,
+            ];
+            for (off, &spd) in self
+                .deep_space_scroll_offsets
+                .iter_mut()
+                .zip(ds_speeds.iter())
+            {
+                *off += spd * dt;
+            }
         }
 
         if self.current_biome == Biome::LowOrbit {

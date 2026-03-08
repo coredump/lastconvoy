@@ -150,10 +150,15 @@ async fn main() {
         .await
         .expect("Failed to load top_bar sprite");
 
-    let bg_texture = load_texture("assets/sprites/backgrounds/blue.png")
+    let outer_system_texture = load_texture("assets/sprites/backgrounds/outer_system.png")
         .await
-        .expect("Failed to load background texture (blue)");
-    bg_texture.set_filter(FilterMode::Nearest);
+        .expect("Failed to load outer_system background texture");
+    outer_system_texture.set_filter(FilterMode::Nearest);
+
+    let deep_space_texture = load_texture("assets/sprites/backgrounds/deep_space.png")
+        .await
+        .expect("Failed to load deep_space background texture");
+    deep_space_texture.set_filter(FilterMode::Nearest);
 
     let city_biome_texture = load_texture("assets/sprites/backgrounds/city_biome.png")
         .await
@@ -216,7 +221,8 @@ async fn main() {
         upgrade_track_sprite,
         explosion_sprite,
         top_bar_sprite,
-        bg_texture,
+        outer_system_texture,
+        deep_space_texture,
         city_biome_texture,
         low_atmosphere_texture,
         ui_font,

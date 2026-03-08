@@ -1,0 +1,100 @@
+{ "frames": {
+   "deep_space_base": {
+    "frame": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_back_nebula": {
+    "frame": { "x": 0, "y": 115, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_top_nebula": {
+    "frame": { "x": 0, "y": 230, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_back_stars": {
+    "frame": { "x": 0, "y": 345, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_mid_stars": {
+    "frame": { "x": 0, "y": 460, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_portal_ring_outer": {
+    "frame": { "x": 0, "y": 575, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_portal_fill": {
+    "frame": { "x": 0, "y": 690, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_portal_ring_inner": {
+    "frame": { "x": 0, "y": 805, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   },
+   "deep_space_portal_core": {
+    "frame": { "x": 0, "y": 920, "w": 284, "h": 115 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 284, "h": 115 },
+    "sourceSize": { "w": 284, "h": 115 },
+    "duration": 100
+   }
+ },
+ "meta": {
+  "app": "http://www.aseprite.org/",
+  "version": "1.3.17-dev",
+  "image": "deep_space.png",
+  "format": "RGBA8888",
+  "size": { "w": 284, "h": 1035 },
+  "scale": "1",
+  "frameTags": [
+  ],
+  "layers": [
+   { "name": "Layer 1", "opacity": 255, "blendMode": "normal" },
+   { "name": "nebula field" },
+   { "name": "back_nebula", "group": "nebula field", "opacity": 255, "blendMode": "normal" },
+   { "name": "top_nebula", "group": "nebula field", "opacity": 255, "blendMode": "normal" },
+   { "name": "back_stars", "group": "nebula field", "opacity": 255, "blendMode": "normal" },
+   { "name": "mid_stars", "opacity": 255, "blendMode": "normal" },
+   { "name": "portal" },
+   { "name": "portal_ring_outer", "group": "portal", "opacity": 255, "blendMode": "normal" },
+   { "name": "portal_fill", "group": "portal", "opacity": 255, "blendMode": "normal" },
+   { "name": "portal_ring_inner", "group": "portal", "opacity": 212, "blendMode": "normal" },
+   { "name": "portal_core", "group": "portal", "opacity": 194, "blendMode": "normal" }
+  ],
+  "slices": [
+  ]
+ }
+}

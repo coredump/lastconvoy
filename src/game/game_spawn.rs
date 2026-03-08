@@ -2,12 +2,11 @@
 // super::GameState, crate::config, crate::enemy
 use crate::config::{
     BIG_INJECT_BASE_INTERVAL, Biome, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT,
-    COVERAGE_ZONE_WIDTH, Config, ENEMY_HEAVY_H, ENEMY_HEAVY_HP, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W,
-    ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H, ENEMY_LARGE_HP, ENEMY_LARGE_SPEED,
-    ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_HP, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W,
-    ENEMY_SMALL_H, ENEMY_SMALL_HP, ENEMY_SMALL_SPEED, ENEMY_SMALL_W, ENEMY_XL_H, ENEMY_XL_W,
-    SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT,
-    SPAWN_SLOT_WIDTH,
+    COVERAGE_ZONE_WIDTH, Config, ENEMY_HEAVY_H, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W,
+    ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H, ENEMY_LARGE_SPEED, ENEMY_LARGE_W,
+    ENEMY_MEDIUM_H, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_SPEED,
+    ENEMY_SMALL_W, ENEMY_XL_H, ENEMY_XL_W, SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX,
+    SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
 };
 use crate::enemy::{Enemy, EnemyKind};
 use macroquad::prelude::rand;
@@ -108,25 +107,25 @@ impl GameState {
             EnemyKind::Small => (
                 ENEMY_SMALL_W,
                 ENEMY_SMALL_H,
-                ENEMY_SMALL_HP,
+                self.config.enemy_small_hp,
                 ENEMY_SMALL_SPEED,
             ),
             EnemyKind::Medium => (
                 ENEMY_MEDIUM_W,
                 ENEMY_MEDIUM_H,
-                ENEMY_MEDIUM_HP,
+                self.config.enemy_medium_hp,
                 ENEMY_MEDIUM_SPEED,
             ),
             EnemyKind::Heavy => (
                 ENEMY_HEAVY_W,
                 ENEMY_HEAVY_H,
-                ENEMY_HEAVY_HP,
+                self.config.enemy_heavy_hp,
                 ENEMY_HEAVY_SPEED,
             ),
             EnemyKind::Large => (
                 ENEMY_LARGE_W,
                 ENEMY_LARGE_H,
-                ENEMY_LARGE_HP,
+                self.config.enemy_large_hp,
                 ENEMY_LARGE_SPEED,
             ),
             EnemyKind::XL => (
