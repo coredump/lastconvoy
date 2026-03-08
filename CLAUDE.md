@@ -129,13 +129,14 @@ cargo deny check                   # license + advisory check
 - **P1.8** (orbs two-phase): STRUCTURALLY COMPLETE, pending gameplay verification.
 - **P1.9** (offense buffs): UPDATED — temporary refreshable buffs with per-type durations; Explosive core implemented, polish/verification pending.
 - **P1.10** (drone system): DONE — fully implemented; Drone orb in normal pool.
+- **P1.11** (time-based scaling): UPDATED — HP/speed/shield scaling working; debug start biome system fixed to pre-seed run_time; config.toml HP values now respected in try_place_enemy().
 - **P1.14** (explosion FX, title/pause screens, HUD redesign, touch flagged): COMPLETE.
 - **P1.15** (UI polish 2026-03-02): DONE — per-frame animation durations, monogram_font + logo_sprite, title screen logo, floating text font, run timer centering.
 - **P1.16** (screen flash on shield loss 2026-03-03): DONE — brief red full-screen overlay on any shield hit via `FlashEffect`; `screen_flash` field on `GameState`.
 - **P1.17** (biome progression 2026-03-06): DONE — `Biome` enum in config.rs; 4-biome looping cycle with biome-gated enemy spawning, loop HP scaling, boss-active blocking hook; `tick_biome()` in GameState.
 - **P1.18** (biome-gated orb pool 2026-03-06): DONE — orb types unlock by biome; shield/drone caps scale with biome; Pierce/Stagger/DroneRemote/Explosive gated; single edit point in `game_orb.rs`.
 - **P1.19** (event placeholders + HUD polish 2026-03-06): DONE — elite/miniboss/boss event timers decrement and pause with placeholder screens; biome indicator on top bar; shield HUD shows biome cap (not hardcoded 3); damage orb gated to biome 2+; burst fires 3 spread shots (main + 2 angled at ±6°); `event_placeholder` field on `GameState`; `vy` field on `Projectile`. Patch 0.4.1: debug log path fix (CWD-relative), config.toml sync (stale intro times removed, biome fields added), event placeholder 5s minimum hold timer.
-- **P1.20** (XL enemy + boss every biome 2026-03-06): DONE — `EnemyKind::Elite` → `EnemyKind::XL`; XL added to DeepSpace regular spawn pool; boss placeholder fires at end of every biome (all 4); mini-boss and elite event timers removed; `src/elite.rs` deleted; boss re-trigger bug fixed.
+- **P1.20** (XL enemy + boss every biome 2026-03-07): DONE — `EnemyKind::Elite` → `EnemyKind::XL`; XL added to DeepSpace regular spawn pool; boss placeholder fires at end of every biome (all 4); mini-boss and elite event timers removed; `src/elite.rs` deleted; boss re-trigger bug fixed. Patches (2026-03-08): debug start biome run_time seeding, config HP values now used in try_place_enemy().
 
 Source files: `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, `text.rs`, `sprite.rs`.
 

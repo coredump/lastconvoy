@@ -80,9 +80,10 @@ Attached drones persist for the run, positioned relative to player, auto-fire on
 - Time-only ramps (no kill-count or player-power triggers):
   - Enemy spawn interval decreases (more enemies over time). ✓ IMPLEMENTED
   - Medium / Heavy / Large introduction times. ⚠ NEEDS VERIFICATION
-  - Enemy HP slow ramp for Medium+ tiers. ⚠ NEEDS VERIFICATION
+  - Enemy HP slow ramp for Medium+ tiers. ✓ FIXED (2026-03-08) — HP multiplier computed in `try_place_enemy()` reads from `config.*_hp` instead of compile-time constants; respects config.toml overrides.
   - Shielded enemy frequency ramp. ✓ IMPLEMENTED (enemy.rs spawn_enemy checks SHIELDED_FREQ_SCALE * run_time)
   - Orb spawn interval decreases (more orbs over time). ⚠ NEEDS VERIFICATION
+  - Debug biome start: ✓ FIXED (2026-03-08) — `Config::debug_start_run_time()` computes cumulative prior biome durations; `GameState::new()` and `reset()` call it so enemies have correctly scaled HP/speed/shields when starting on later biomes.
 - Tuneable: keep readability-first, avoid bullet-sponge slog or exponential blowup.
 
 ### P1.17 Biome progression system ✓ DONE (2026-03-06)

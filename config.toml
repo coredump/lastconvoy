@@ -274,6 +274,11 @@ city_bg_speed_front = 12.0
 city_bg_speed_stars = 2.0
 city_bg_accel_start = 0.3
 
+# Deep space biome (biome 4) parallax layer h-scroll speeds (px/s).
+deep_space_speed_nebula = 0.0
+deep_space_speed_mid_stars = 94.0
+deep_space_speed_portal = 0.3
+
 # Force a specific orb type to be the only one that spawns, bypassing normal
 # pool gates (buff-active gating, shield-full checks, etc.).
 # Valid values: "burst", "damage", "shield", "drone", "droneremote", "explosive", "firerate", "pierce", "stagger"
@@ -286,3 +291,8 @@ city_bg_accel_start = 0.3
 # Valid values: "small", "medium", "heavy", "large", "xl"
 # Comment out or remove to restore normal enemy spawning.
 #debug_force_enemy = "large"
+
+# Start the run at a specific biome instead of biome 1. Applies at run start
+# and on every game-over restart. Useful for testing biome-specific content.
+# Valid values: "1"/"infected_atmosphere", "2"/"low_orbit", "3"/"outer_system", "4"/"deep_space"
+# debug_start_biome = "deep_space"
