@@ -250,15 +250,7 @@ Boss blocks biome transition (`boss_active = true`) until killed; on death `boss
   - Early orbs, easy to activate
   - Medium introduced after 30 s in biome 1; Heavy/Large gate to biomes 2+
 
-## 12. Elite events (SUPERSEDED BY P1.20)
-This section is archived. Elite event system was replaced by XL enemy in regular spawn pool (P1.20).
-
-For XL enemy rules, see §5 (Enemies) and the Biome Progression table (§11).
-
-## 13. Mini-Boss Events (SUPERSEDED BY P1.20)
-This section is archived. Mini-Boss event system was replaced by boss placeholder screens firing at end of every biome (P1.20).
-
-Boss behavior and gating are defined in the Biome Progression table (§11).
+*(§12–13 removed: Elite/Mini-Boss event systems superseded by P1.20. See §5 and §11 for XL/Boss rules.)*
 
 ## 14. UI screens (title, pause, game over)
 - **Title screen**: displayed on startup; shows game name and "Press any key to start" prompt; pressing any key or clicking anywhere begins a new run (enters game state with `at_title = false`).

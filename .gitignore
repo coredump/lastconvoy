@@ -17,3 +17,4 @@ console-*
 hubs/
 .playwright*
 *debug.log
+lastconvoy_save*.json

@@ -1,7 +1,7 @@
 # LCDshootsystem — TASKS (Agentic Implementation Plan)
 
 This plan assumes the current repo layout:
-- `src/` — `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), plus `boundary.rs`, `debug_log.rs`, `drone.rs`, `enemy.rs`, `input.rs`, `orb.rs`, `player.rs`, `projectile.rs`, `render.rs`, `shield.rs`, `sprite.rs`, `text.rs`, `upgrade.rs`
+- `src/` — `main.rs`, `config.rs`, `save.rs`, `upgrade_catalog.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_shop.rs, game_spawn.rs), plus `boundary.rs`, `debug_log.rs`, `drone.rs`, `enemy.rs`, `input.rs`, `orb.rs`, `player.rs`, `projectile.rs`, `render.rs`, `shield.rs`, `sprite.rs`, `text.rs`, `upgrade.rs`
 - `assets/` — sprites, fonts
 - `config.toml` — runtime tuning overrides (serde + TOML)
 - Rust + Cargo, native dev builds, WASM for release
@@ -15,126 +15,34 @@ If anything conflicts:
 
 ## Phase 1 — MVP (Core loop only; no menus, no meta, **no tests required**)
 
-### P1.0 Project scaffolding & config ✓ DONE
-Module structure under `src/` (see preamble), config.rs compile-time defaults, config.toml runtime overrides (serde + TOML). All tuning constants centralised; silent fallback if config.toml missing or malformed.
+### P1.0–P1.7 ✓ DONE
+Scaffolding, config, rendering (320×180), input (1D), player, lane visuals, enemies (Small/Medium/Heavy/Large), shields & death, boundary breach system.
 
-### P1.1 Rendering & scaling ✓ DONE
-320×180 RenderTarget, integer-scaled blit to screen, letterbox, landscape-always.
+### P1.8 Upgrade orbs (two-phase) ✓ DONE (needs gameplay verification)
+Two-phase orbs: shoot to activate, collect to gain upgrade. Spawning, movement, collision all implemented.
 
-### P1.2 Input plumbing (1D) ✓ DONE
-Keyboard (W/S/Up/Down), gamepad (left stick Y + dpad), touch (left-strip drag); single f32 axis out. Rotate Input mode flag in config.
-
-### P1.3 Player ✓ DONE
-Fixed X, vertical movement, auto-fire projectiles, clamp to playfield.
-
-### P1.4 Lane visuals ✓ DONE
-Four fixed vertical bands rendered with palette colours; energy-rail dividers; structural border framing.
-
-### P1.5 Enemies ✓ DONE
-EnemyKind enum (Small/Medium/Heavy/Large), time-gated introduction, shielded variant ramp, movement + collision, boundary arrival + breach wind-up.
-
-### P1.6 Shields & death ✓ DONE
-N shield segments; 1 damage = 1 segment; 0 segments + damage = death → immediate restart. Vec<ShieldSegment> / ShieldSystem in shield.rs used throughout. Shield loss has visual feedback.
-
-### P1.7 Boundary breach system ✓ DONE
-Breach-lock + wind-up + simultaneous-breach window (0.10 s) + re-breach cooldown. Enemies stack behind slower/stopped ones (no overlap). Old slot-based model removed. Stagger releases lock early; explosive detonation clears breach group + micro-stall.
-
-### P1.8 Upgrade orbs (two-phase) ✓ STRUCTURALLY COMPLETE
-- Orb entity: position, HP, activated flag, current upgrade type, kind.
-- Continuous timed spawning in upgrade lane (rate increases with time, from config).
-- Max active orb cap enforced; if at cap, delay next spawn.
-- Orbs move right → left in upgrade lane.
-- **Phase 1 — Activation:**
-  - Orb spawns with HP > 0, not yet activated.
-  - All shots (player + drone) reduce orb HP.
-  - At HP = 0 → orb becomes activated (visual change). Type is fixed at spawn.
-- **Collection:**
-  - Player hitbox overlaps activated orb → collect, apply upgrade.
-- Orbs that exit left edge despawn.
-- Orb spawning continues during elite events.
-- **Implementation status**: Orb struct with OrbPhase::Inactive/Active; take_hit() logic correct; spawning, movement, collision, Active-only collection all implemented. Needs gameplay verification.
-
-### P1.9 Upgrade tracks ✓ UPDATED (offense converted to temporary buffs)
-Implemented OrbTypes: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone.
-- **Shield**: +1 shield per collection (up to cap 3). Skipped from pool when full. ✓
-- **Damage buff**: temporary flat damage boost while active (refresh on re-collect; no tier stacking). ✓
-- **FireRate buff**: temporary shot-interval reduction while active (refresh on re-collect; no tier stacking). ✓
-- **Burst buff**: temporary periodic burst-shot readiness while active (refresh on re-collect; no tier stacking). ✓
-- **Pierce buff**: temporary extra pierce while active; same-enemy double-hit bug remains fixed. ✓
-- **Stagger buff**: temporary knockback on hit for Small/Medium/Heavy while active. ✓
-- **Drone**: in normal orb spawn pool; attached drone implemented and active. ✓
-- **Explosive Shield**: core behavior implemented; remaining polish/verification tracked in P1.9b. ⚠
-- **Pool gating**: active offense buff types are excluded from orb spawn pool until expiry; Shield/Explosive/Drone gates unchanged. ✓
+### P1.9 Upgrade tracks ✓ DONE
+All OrbTypes implemented: Shield, Damage, FireRate, Burst, Pierce, Stagger, Drone, Explosive. Offense orbs are temporary refreshable buffs. Pool gating by active buffs.
 
 ### P1.9b Explosive Shield ⚠ PARTIAL
-- Detonation logic implemented: `trigger_explosive_shield()` kills non-XL enemies in zone, pushes Large/XL back, clears breach group, applies micro-stall. ✓
-- `ShieldSystem::convert_to_explosive()` implemented. ✓
-- `OrbType::Explosive` collection wired to `convert_to_explosive()`. ✓
-- **Remaining**: visual/audio for explosion (flash, particle hints); gameplay verification that detonation + stall reads correctly in play.
+Detonation logic done. **Remaining**: visual/audio polish; gameplay verification.
 
 ### P1.10 Drone system ✓ DONE
-Attached drones persist for the run, positioned relative to player, auto-fire on same timer. Drone shots interact with orbs equally to player shots. Drone orb in normal pool.
+Attached drones persist for run, auto-fire, interact with orbs. Drone orb in normal pool.
 
-### P1.11 Time-based scaling baseline ⚠ PARTIAL
-- All scaling curves defined in `config.rs`.
-- Time-only ramps (no kill-count or player-power triggers):
-  - Enemy spawn interval decreases (more enemies over time). ✓ IMPLEMENTED
-  - Medium / Heavy / Large introduction times. ⚠ NEEDS VERIFICATION
-  - Enemy HP slow ramp for Medium+ tiers. ✓ FIXED (2026-03-08) — HP multiplier computed in `try_place_enemy()` reads from `config.*_hp` instead of compile-time constants; respects config.toml overrides.
-  - Shielded enemy frequency ramp. ✓ IMPLEMENTED (enemy.rs spawn_enemy checks SHIELDED_FREQ_SCALE * run_time)
-  - Orb spawn interval decreases (more orbs over time). ⚠ NEEDS VERIFICATION
-  - Debug biome start: ✓ FIXED (2026-03-08) — `Config::debug_start_run_time()` computes cumulative prior biome durations; `GameState::new()` and `reset()` call it so enemies have correctly scaled HP/speed/shields when starting on later biomes.
-- Tuneable: keep readability-first, avoid bullet-sponge slog or exponential blowup.
+### P1.11 Time-based scaling ⚠ PARTIAL
+HP/speed/shield scaling working. Debug biome start fixed. **Remaining**: verify Medium/Heavy/Large intro times; verify orb spawn interval ramp.
 
-### P1.17 Biome progression system ✓ DONE (2026-03-06)
-- 4-biome looping cycle: Infected Atmosphere (120s), Low Orbit (180s), Outer System (210s), Deep Space (240s).
-- Enemy spawn gating by biome: Small only → +Medium (30s ramp) → +Heavy → +Large.
-- `Biome` enum in `src/config.rs`; `current_biome`, `biome_time`, `loop_count`, `boss_active` in `GameState`.
-- `tick_biome()` advances biome when duration expires; blocks on `boss_active` for biomes 3/4.
-- Loop restart increments `loop_count`; HP scales by `1.0 + loop_count × BIOME_LOOP_HP_MULT`.
-- Boss placeholder event screens fire at end of every biome (all 4 biomes).
+### P1.14–P1.16 ✓ DONE
+MVP polish (explosion FX, title/pause screens, HUD), UI polish (animation, fonts, logo), screen flash on shield loss.
 
-### P1.18 Biome-gated orb/upgrade pool ✓ DONE (2026-03-06)
-- Shield orb capped at 1/2/3 segments for biomes 1/2/3+.
-- Drone (attached) unavailable biome 1; max 1 biome 2; max 2 biome 3+.
-- DroneRemote excluded from pool in biome 1; available biome 2+.
-- Pierce and Stagger excluded from pool until biome 3+.
-- Explosive shield excluded from pool until biome 4 (Deep Space).
-- Collection handlers enforce the same biome-aware caps (Shield and Drone).
-- Single edit point: `src/game/game_orb.rs` (pool construction + collection handlers).
+### P1.17–P1.18 ✓ DONE
+Biome progression (4-biome loop with boss blocking), biome-gated orb/upgrade pool.
 
-### P1.12 Elite events — SUPERSEDED BY P1.20
-Elite event system (timer-based DPS checks) was replaced by XL enemy in regular spawn pool.
+### P1.19–P1.20 ✓ DONE
+Event placeholders + HUD polish; XL enemy in DeepSpace spawn pool; boss placeholder fires at end of every biome.
 
-### P1.13 Mini-Boss events — SUPERSEDED BY P1.20
-Mini-Boss event system (separate timer, spawn pause) was replaced by boss placeholder screens at end of every biome.
-
-### P1.14 MVP polish ✓ COMPLETE
-- Orb activation state change (color/glow shift). ✓ Color tint changes per phase in draw_orbs()
-- Enemy destruction (small particle burst or flash). ✓ Implemented (explosion_2 sprite, 5 frames 40ms each)
-- Object pooling for projectiles and enemies. ✓ Using Vec<T> with retain()
-- Frame-rate independence: all movement/timers use `get_frame_time()` delta. ✓ Implemented throughout
-- Title & pause screens. ✓ Implemented (at_title state, any-key-to-start; paused state, P+ESC toggle; controls overlay)
-- Upgrade HUD redesign. ✓ Drone placeholder always visible; Shield/Explosive removed from HUD; expiring buffs shown with vertical timer bars only when active
-
-### P1.15 UI polish ✓ DONE (2026-03-02)
-Per-frame animation durations in sprite.rs, monogram_font + logo_sprite, title screen logo, floating text font switch, run timer centering.
-
-### P1.16 Screen flash on shield loss ✓ DONE (2026-03-03)
-Brief full-screen red tint overlay on any shield hit (absorbed, explosive, or death). Reuses `FlashEffect` from sprite.rs. Constants in config.rs (`SHIELD_FLASH_COLOR/DURATION/COOLDOWN`); `screen_flash: FlashEffect` field on `GameState`; triggered in `take_player_damage()`; drawn before game-over/pause overlays.
-
-**Phase 1 DoD (Definition of Done)**
-- Playable loop: start → title screen → any-key-to-start → survive → die → restart. ✓ WORKING
-- Pause overlay (P+ESC) with controls list implemented. ✓ WORKING
-- Explosion effect on enemy death visible. ✓ WORKING
-- Upgrade HUD with drone placeholder and vertical timer bars. ✓ COMPLETE
-- Touch input works (at least in WASM build). ⚠ **BROKEN — see P2.0**
-- Orbs work exactly as specified (activate then collect). ✓ STRUCTURALLY COMPLETE (needs gameplay verification)
-- XL enemy and boss placeholder screens work. ✓ DONE (P1.20)
-- Boundary breach lock and compression work. ✓ COMPLETE
-- No menus required. ✓ (title/pause screens are state overlays, not full menus)
-- No tests required. ✓
-- Runs natively for dev; builds to WASM for browser. ✓ WASM build exists
+**Phase 1 DoD:** All met except touch input (broken — see P2.0) and gameplay verification (P1.8, P1.9b, P1.11).
 
 ---
 
@@ -190,13 +98,51 @@ Brief full-screen red tint overlay on any shield hit (absorbed, explosive, or de
 ---
 
 ## Phase 3 — Saves + meta progression
-- Save slots (serde + local storage for WASM, filesystem for native).
-- Meta points economy.
-- Permanent upgrades (starting shields/drones, unlock types, increase drops).
-- Optional difficulty modifiers for better rewards.
+
+### P3.0 Persistence foundation ✓ DONE (2026-03-08)
+`src/save.rs`: SaveData with RunRecord/OrbStats/PermanentUpgrades/StoryProgress. Native=JSON file, WASM=quad-storage. Save on death.
+
+### P3.1 Permanent upgrade shop ✓ DONE (2026-03-08)
+`upgrades.toml` catalog (6 upgrades), `src/upgrade_catalog.rs`, `src/game/game_shop.rs`. Title screen PLAY/UPGRADES menu. `apply_permanent_upgrades()` on run start.
+
+### P3.2 Run summary & high score UI ⚠ NOT STARTED
+Depends on: P2.2 game-over screen, P3.0 persistence.
+- On game-over screen: show "NEW BEST" callout if `run_time` / `kills` / `loop_count` beat `save.best_*`.
+- Display lifetime stats (total runs, lifetime kills) on title screen or a new stats screen.
+- Run history accessible from title screen (last N runs, scrollable list).
+
+### P3.3 Meta points economy ⚠ NOT STARTED
+Depends on: P3.0, P3.1.
+- Define meta point earning formula (e.g. kills + biomes × multiplier, shown on game-over screen).
+- Persist `meta_points` / `meta_points_lifetime` in `save.rs` (fields already present).
+- Optional difficulty modifiers (harder = better meta point multiplier).
+
+### P3.4 Save slots ⚠ NOT STARTED
+Depends on: P3.3.
+- Multiple named player profiles (save slots).
+- Each slot is a separate save file (native: `lastconvoy_save_<slot>.json`; WASM: separate localStorage keys).
+- Save slot selection screen from title; delete slot option.
 
 ---
 
 ## Phase 4 — Story layer
-- Static pixel/comic panels + dialogue.
-- Character unlocks and gated "story quest" runs.
+
+### P4.0 Story beat system ⚠ NOT STARTED
+Depends on: P3.0 persistence.
+- Static pixel/comic panel renderer: draw full-screen or letterboxed panel sequence, advance on input.
+- `StoryBeat` struct: id (string key), panel asset path(s), dialogue lines, trigger condition.
+- Trigger conditions: first run, first time reaching a biome, Nth run, etc.
+- On trigger: record beat id in `save.story_progress.seen_beats`; never replay seen beats.
+- Beat assets: `art/story/base.aseprite` already started; export panels to `assets/story/`.
+
+### P4.1 Character unlocks ⚠ NOT STARTED
+Depends on: P4.0.
+- Characters: Custodian (player), Rael, Voss, The Entity (per STORY.md).
+- Unlock conditions tied to story beat completion or meta progression milestones.
+- Persist unlocked character ids in `save.story_progress.unlocked_characters` (field already present).
+- Character selection screen on title; each character may modify starting loadout or passive.
+
+### P4.2 Story quest runs ⚠ NOT STARTED
+Depends on: P4.1.
+- Gated run modes unlocked by story progress (different starting conditions, special enemy patterns, or narrative overlays mid-run).
+- Story quest completion recorded in `save.story_progress.seen_beats` as milestone keys.

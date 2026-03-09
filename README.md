@@ -12,13 +12,14 @@ The run never ends — it only gets harder.
 
 ![Last Convoy v0.2 — Start Screen](assets/screenshots/start_v0.2.png)
 
-- Endless scaling difficulty
+- Endless scaling difficulty across 4 looping biomes
 - Temporary offense buffs (damage, fire rate, burst, pierce, stagger)
 - Drone companions
 - Boundary breach system with shield segments
+- Persistent saves + permanent upgrade shop (meta progression)
 - 320×180 pixel art, integer scaling
 
-> **Note:** The roguelite meta-progression layer (between-run upgrades, unlocks, saves) is not yet implemented. What's here is the core gameplay loop.
+> **Note:** The roguelite meta-progression layer is in early implementation. Persistent saves and a permanent upgrade shop are now functional. Between-run currency, full unlock trees, and the story layer are planned for future phases.
 
 ---
 
@@ -104,13 +105,15 @@ Most of the code was written with assistance from [Claude](https://claude.ai/) (
 
 Roughly in order:
 
-- [ ] Elite and Mini-Boss event systems (spawn pause, DPS checks)
-- [ ] Start screen
-- [ ] Game over summary (time survived, kills, breaches)
+- [x] Biome progression (4-biome looping cycle with boss placeholder)
+- [x] XL enemy class (Deep Space biome)
+- [x] Persistent saves (run records, lifetime stats)
+- [x] Permanent upgrade shop (meta upgrades carried across runs)
+- [ ] Meta points economy (currency earned from kills/biomes)
+- [ ] Run summary screen (game-over stats, high score callout)
+- [ ] Start screen improvements
 - [ ] Settings screen (in-game config editing)
 - [ ] Touch input polish for mobile browsers
-- [ ] Visual polish — shield loss feedback, enemy destruction particles, elite arrival cues
-- [ ] Roguelike meta-progression — saves, meta points, permanent upgrades, unlocks
 - [ ] Story layer — pixel/comic panels, character unlocks, story runs
 
 ---

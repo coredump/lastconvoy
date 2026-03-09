@@ -11,8 +11,7 @@
 ### MCP Servers (provide tools)
 - **Serena** (plugin) — code navigation. Use `find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`. Do NOT memorize project structure; query Serena instead.
 - **Context7** (plugin) — library docs. Use for: macroquad API, serde, TOML, any crate docs. Always call `resolve-library-id` first, then `query-docs`. Do NOT guess at APIs.
-- **contextplus** (project `.mcp.json`) — semantic search, blast radius, static analysis, structural overview. Prefer over alternatives when it's the clearest tool.
-- **memory** — persistent knowledge graph (`.claude/memory.json`). Store architecture decisions, resolved ambiguities, and session learnings here. Call `read_graph` at session start.
+- **claude-mem** (plugin) — persistent cross-session memory and smart code exploration. Use `mcp__plugin_claude-mem_mcp-search__smart_search` to recall prior decisions. Skills: `/claude-mem:mem-search`, `/claude-mem:smart-explore`, `/claude-mem:make-plan`, `/claude-mem:do`.
 - **ripgrep** — content search. Prefer `mcp__ripgrep__search` / `advanced-search` over Bash grep/rg.
 - **filesystem** — file reads/writes/directory ops. Use before falling back to Bash.
 
@@ -20,65 +19,31 @@
 - **feature-dev** — structured 7-phase dev workflow. Use `/feature-dev` when starting a new task from TASKS.md.
 - **commit-commands** — `/commit`, `/commit-push-pr`, `/clean_gone`. Use for all git operations.
 - **claude-code-setup** — automation recommendations.
+- **claude-mem** — `/claude-mem:mem-search` (search persistent memory), `/claude-mem:smart-explore` (AST-based code exploration), `/claude-mem:make-plan` (plan multi-step tasks), `/claude-mem:do` (execute plans via subagents).
 
 ### Hooks
 - **security-guidance** — passive PreToolUse blocker. No action needed.
 
 ### Rules
 - Prefer MCP/tool lookups over reading files or guessing. This saves context.
-- **contextplus when better** — prefer contextplus tools when they provide a clearer answer: use `get_blast_radius` instead of grep for cross-file usages; use `semantic_code_search` / `semantic_identifier_search` for intent-based searches; use `run_static_analysis` for inline cargo checks; use `get_context_tree` / `get_file_skeleton` for structural overviews. Fall back to Serena + ripgrep for precise symbol edits and exact-match searches.
 - **Serena & ripgrep MCPs first** — always use these for code navigation, file search, and content search before Bash/shell tools.
 - **Context7 first** — always query Context7 for library docs before relying on training knowledge.
 - **commit-commands skills first** — use `/commit-commands:commit` for git commits. Commit directly to main (no PRs/branches for now).
-- Store important decisions and resolved questions in **memory** so future sessions don't re-derive them.
+- Store important decisions and resolved questions in **claude-mem** so future sessions don't re-derive them. Use `/claude-mem:mem-search` to check before re-deriving.
 - Use `/feature-dev` for any task that touches multiple files or introduces a new system.
 - Use `/compact` between tasks to shed old context.
 - **Always update CLAUDE.md** when user states a new preference, rule, or workflow for tool usage — so it persists across sessions.
-- **Always sync after any change** — after ANY code or design change, immediately update: (1) memory MCP with decisions/findings, (2) SPEC.md if gameplay rules changed, (3) TASKS.md if task status changed, (4) CLAUDE.md if architecture/status/conventions changed. Do not defer. Keep sync state always current.
+- **Always sync after any change** — after ANY code or design change, immediately update: (1) claude-mem with decisions/findings, (2) SPEC.md if gameplay rules changed, (3) TASKS.md if task status changed, (4) CLAUDE.md if architecture/status/conventions changed. Do not defer. Keep sync state always current.
 
-### MCP usage — detailed rules
-- **Priority order:** (1) contextplus when it's the best tool (blast radius, semantic search, static analysis, structural overview), (2) Serena + ripgrep for precise symbol lookup/editing and exact-match search, (3) Context7 for API docs, (4) memory MCP for decisions/state, (5) filesystem MCP for file reads/writes/directory ops, (6) Bash only as last resort.
-- **Serena** — code navigation only. Use `find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`. Do NOT use Serena `write_memory`/`read_memory` — use memory MCP instead.
-- **memory MCP** — primary persistent store. Call `read_graph` at session start. MEMORY.md is a concise index only; details live in the graph. Always store architecture decisions, resolved ambiguities, and key findings here.
-- **Context7** — always call `resolve-library-id` first, then `query-docs`. Never skip for macroquad/crate API questions.
-- **ripgrep MCP** — prefer `mcp__ripgrep__search` / `advanced-search` over `grep`/`rg` in Bash.
-- Do NOT memorize project structure across sessions — query Serena fresh each time.
-- Do NOT read files speculatively — use symbolic tools to retrieve only what's needed.
-- Do NOT re-derive decisions already in the memory graph — check it first.
+### MCP priority order
+(1) Serena + ripgrep for symbol lookup/editing and content search, (2) claude-mem for persistent decisions and code exploration, (3) Context7 for API docs (`resolve-library-id` first, then `query-docs`), (4) filesystem MCP for file reads/writes, (5) Bash as last resort.
 
-### contextplus — strict workflow rules
-- **`get_context_tree` at every task start — mandatory, no exceptions.** Run before any other exploration.
-- **`get_file_skeleton` before reading any unfamiliar file.** Skip only when the exact symbol/line is already known.
-- **`get_blast_radius` before deleting or modifying any symbol.** Never remove code without checking impact first.
-- **`run_static_analysis` after writing any code.** Catch unused imports, dead code, type errors before moving on.
-- **Batch independent tool calls in parallel.** Never make sequential calls that could run simultaneously.
-- **`propose_commit` is SKIPPED as a file-writing tool** — use filesystem MCP / Edit / Write instead. Its formatting rules apply to NEW files only (do not retroactively reformat existing Rust files).
-
-### contextplus — new file formatting rules (apply to NEW files only)
-- Every new file starts with a 2-line header comment: line 1 = file purpose, line 2 = key dependencies or blank.
-- No inline comments. Logic must be self-evident from naming; add a header comment if explanation is needed.
-- Code ordering within a file: imports → enums → type aliases → constants → functions.
-- Abstraction thresholds: inline code used once and <20 lines; extract to function if >30 lines or used 2+ times.
-
-### contextplus — anti-patterns (STRICT — never do these)
-- Never read a full file without calling `get_file_skeleton` first.
-- Never delete or rename a symbol without calling `get_blast_radius` first.
-- Never leave unused imports or variables after a refactor.
-- Never retry a failing operation in a loop — diagnose root cause or ask the user.
-
-### Execution rules
-1. Think less, execute sooner: make the smallest safe change that can be validated quickly.
-2. Do not serialize 10 independent commands; batch parallelizable reads/searches.
-3. If a command fails, avoid blind retry loops. Diagnose once, pivot strategy, continue.
-4. Cap retry attempts for the same failing operation to 1-2 unless new evidence appears.
-5. Keep outputs concise: short status updates, no verbose reasoning dumps.
-
-### Token-efficiency rules
-1. Treat 100 effective tokens as better than 1000 vague tokens.
-2. Use high-signal tool calls first (`get_file_skeleton`, `get_context_tree`, `get_blast_radius`).
-3. Read full file bodies only when signatures/structure are insufficient.
-4. Avoid repeated scans of unchanged areas.
-5. Prefer direct edits + deterministic validation over extended speculative analysis.
+### Workflow rules
+- Use `get_symbols_overview` or `smart_outline` before reading files. Use `find_referencing_symbols` before deleting/modifying symbols.
+- Run `cargo clippy` after writing code. Batch independent tool calls in parallel.
+- Don't memorize project structure — query Serena fresh. Don't re-derive decisions — check claude-mem first.
+- New files: 2-line header comment, no inline comments, ordering (imports→enums→types→constants→functions).
+- Keep changes small. Cap retries to 1-2. Diagnose failures, don't loop.
 
 ## Toolchain
 - Rust (stable), Cargo, macroquad, serde + toml, rustfmt, clippy.
@@ -124,32 +89,19 @@ cargo deny check                   # license + advisory check
 - No `unsafe` unless unavoidable.
 - No tests in Phase 1. Tests allowed Phase 2+.
 
-## Phase 1 status
-- **P1.0–P1.7**: COMPLETE.
-- **P1.8** (orbs two-phase): STRUCTURALLY COMPLETE, pending gameplay verification.
-- **P1.9** (offense buffs): UPDATED — temporary refreshable buffs with per-type durations; Explosive core implemented, polish/verification pending.
-- **P1.10** (drone system): DONE — fully implemented; Drone orb in normal pool.
-- **P1.11** (time-based scaling): UPDATED — HP/speed/shield scaling working; debug start biome system fixed to pre-seed run_time; config.toml HP values now respected in try_place_enemy().
-- **P1.14** (explosion FX, title/pause screens, HUD redesign, touch flagged): COMPLETE.
-- **P1.15** (UI polish 2026-03-02): DONE — per-frame animation durations, monogram_font + logo_sprite, title screen logo, floating text font, run timer centering.
-- **P1.16** (screen flash on shield loss 2026-03-03): DONE — brief red full-screen overlay on any shield hit via `FlashEffect`; `screen_flash` field on `GameState`.
-- **P1.17** (biome progression 2026-03-06): DONE — `Biome` enum in config.rs; 4-biome looping cycle with biome-gated enemy spawning, loop HP scaling, boss-active blocking hook; `tick_biome()` in GameState.
-- **P1.18** (biome-gated orb pool 2026-03-06): DONE — orb types unlock by biome; shield/drone caps scale with biome; Pierce/Stagger/DroneRemote/Explosive gated; single edit point in `game_orb.rs`.
-- **P1.19** (event placeholders + HUD polish 2026-03-06): DONE — elite/miniboss/boss event timers decrement and pause with placeholder screens; biome indicator on top bar; shield HUD shows biome cap (not hardcoded 3); damage orb gated to biome 2+; burst fires 3 spread shots (main + 2 angled at ±6°); `event_placeholder` field on `GameState`; `vy` field on `Projectile`. Patch 0.4.1: debug log path fix (CWD-relative), config.toml sync (stale intro times removed, biome fields added), event placeholder 5s minimum hold timer.
-- **P1.20** (XL enemy + boss every biome 2026-03-07): DONE — `EnemyKind::Elite` → `EnemyKind::XL`; XL added to DeepSpace regular spawn pool; boss placeholder fires at end of every biome (all 4); mini-boss and elite event timers removed; `src/elite.rs` deleted; boss re-trigger bug fixed. Patches (2026-03-08): debug start biome run_time seeding, config HP values now used in try_place_enemy().
-
-Source files: `main.rs`, `config.rs`, `game/` (mod.rs, game_buff.rs, game_combat.rs, game_draw.rs, game_orb.rs, game_spawn.rs), `player.rs`, `enemy.rs`, `projectile.rs`, `orb.rs`, `drone.rs`, `shield.rs`, `upgrade.rs`, `boundary.rs`, `input.rs`, `render.rs`, `debug_log.rs`, `text.rs`, `sprite.rs`.
-
-Next priorities: (1) Verify P1.8 and explosive shield gameplay feel in practice; (2) Verify P1.10 drone behavior in-game; (3) Continue Phase 1 scaling/event verification in `TASKS.md`.
+## Status
+- **Phase 1**: P1.0–P1.20 DONE. Remaining: gameplay verification (P1.8 orbs, P1.9b explosive, P1.11 scaling).
+- **Phase 3**: P3.0 persistence + P3.1 upgrade shop DONE. Next: P3.3 meta points, P3.2 run summary UI.
+- See `TASKS.md` for full task details and future phases.
 
 ## Story & Meta (Phase 4+)
 - **STORY.md** (2026-03-04): Full lore, premise, characters (Custodian, Rael, Voss, The Entity), four biomes (Infected Atmosphere, Low Orbit, Outer System, Deep Space Corridor), tone, story beat structure. Story panel art started at `art/story/base.aseprite`.
 
 ## Before writing code
-1. Check **memory** for prior decisions and context on this area.
+1. Check **claude-mem** (`/claude-mem:mem-search` or `mcp__plugin_claude-mem_mcp-search__smart_search`) for prior decisions and context on this area.
 2. Read relevant section of `SPEC.md` for gameplay rules.
 3. Check `TASKS.md` for current task and dependencies.
 4. Use **Context7** for any macroquad/crate API questions.
 5. Use **Serena** to find existing code before creating new files.
 6. For non-trivial tasks: use `/feature-dev` to get the structured workflow.
-7. After completing a task: store key decisions in **memory**, then `/compact`.
+7. After completing a task: store key decisions in **claude-mem**, then `/compact`.
