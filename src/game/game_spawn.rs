@@ -45,11 +45,16 @@ impl GameState {
         let target = coverage_target(self.run_time, &self.config);
         let target = if self.current_biome == Biome::InfectedAtmosphere {
             let cycle_pos = self.run_time % self.config.biome1_lull_interval;
-            if cycle_pos < self.config.biome1_lull_duration {
-                target * self.config.biome1_lull_intensity
+            let lull_mult = if cycle_pos < self.config.biome1_lull_duration {
+                self.config.biome1_lull_intensity
             } else {
-                target
-            }
+                1.0
+            };
+            let ramp_t =
+                (self.biome_time / self.config.biome1_coverage_ramp_duration).clamp(0.0, 1.0);
+            let biome1_mult = self.config.biome1_coverage_mult_start
+                + (1.0 - self.config.biome1_coverage_mult_start) * ramp_t;
+            target * lull_mult * biome1_mult
         } else {
             target
         };
@@ -94,8 +99,8 @@ impl GameState {
                     }
                 }
             };
-            let late_pressure = (self.run_time / 600.0).clamp(0.0, 1.0);
-            let interval_scale = 1.0 - 0.25 * late_pressure;
+            let late_pressure = (self.run_time / 720.0).clamp(0.0, 1.0);
+            let interval_scale = 1.0 - 0.40 * late_pressure;
             let jitter = rand::gen_range(-0.3_f32, 0.3);
             self.spawn_ctrl.inject_timer = BIG_INJECT_BASE_INTERVAL * interval_scale + jitter;
             self.try_place_enemy(kind);
@@ -245,7 +250,7 @@ pub(super) fn compute_coverage(enemies: &[crate::enemy::Enemy]) -> f32 {
 
 pub(super) fn coverage_target(run_time: f32, cfg: &Config) -> f32 {
     let t = (run_time / 720.0).min(1.0);
-    let full_target = 0.72 + t * 0.18;
+    let full_target = 0.65 + t * 0.25;
     if cfg.spawn_ramp_duration <= 0.0 {
         return full_target;
     }

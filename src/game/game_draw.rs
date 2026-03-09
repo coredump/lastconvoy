@@ -194,15 +194,13 @@ impl GameState {
             "KILLS {}  BREACHES {}",
             self.kills_total, self.breaches_total
         );
-        let restart = "PRESS SPACE/ENTER/R";
-        let restart2 = "TO RESTART";
 
         let title_size = self.logo_font.measure(title, 1, 1);
         let title_x = (SCREEN_W as f32 - title_size.x) * 0.5;
         self.logo_font.draw(
             title,
             title_x,
-            60.0,
+            38.0,
             1,
             Color::from_rgba(220, 30, 30, 255),
             1,
@@ -213,7 +211,7 @@ impl GameState {
         self.ui_font.draw(
             &time_line,
             time_x,
-            88.0,
+            64.0,
             1,
             Color::from_rgba(245, 245, 245, 255),
             1,
@@ -224,32 +222,49 @@ impl GameState {
         self.ui_font.draw(
             &kb_line,
             kb_x,
-            116.0,
+            78.0,
             1,
             Color::from_rgba(220, 220, 220, 255),
             1,
         );
 
-        let restart_size = self.ui_font.measure(restart, 1, 1);
-        let restart_x = (SCREEN_W as f32 - restart_size.x) * 0.5;
+        let earned_line = format!("+{} META", self.meta_points_earned);
+        let earned_size = self.ui_font.measure(&earned_line, 1, 1);
+        let earned_x = (SCREEN_W as f32 - earned_size.x) * 0.5;
         self.ui_font.draw(
-            restart,
-            restart_x,
-            134.0,
+            &earned_line,
+            earned_x,
+            96.0,
             1,
-            Color::from_rgba(240, 240, 180, 255),
+            Color::from_rgba(79, 217, 195, 255),
             1,
         );
-        let restart2_size = self.ui_font.measure(restart2, 1, 1);
-        let restart2_x = (SCREEN_W as f32 - restart2_size.x) * 0.5;
+
+        let total_line = format!("TOTAL  {}", self.save.meta_points);
+        let total_size = self.ui_font.measure(&total_line, 1, 1);
+        let total_x = (SCREEN_W as f32 - total_size.x) * 0.5;
         self.ui_font.draw(
-            restart2,
-            restart2_x,
-            150.0,
+            &total_line,
+            total_x,
+            110.0,
             1,
-            Color::from_rgba(240, 240, 180, 255),
+            Color::from_rgba(150, 150, 150, 255),
             1,
         );
+
+        let sel_col = Color::from_rgba(240, 240, 180, 255);
+        let unsel_col = Color::from_rgba(140, 140, 140, 255);
+        let menu_items = ["RUN AGAIN", "MAIN MENU"];
+        for (i, item) in menu_items.iter().enumerate() {
+            let selected = i == self.game_over_cursor;
+            let prefix = if selected { "> " } else { "  " };
+            let line = format!("{prefix}{item}");
+            let col = if selected { sel_col } else { unsel_col };
+            let sz = self.ui_font.measure(&line, 1, 1);
+            let lx = (SCREEN_W as f32 - sz.x) * 0.5;
+            self.ui_font
+                .draw(&line, lx, 130.0 + i as f32 * 14.0, 1, col, 1);
+        }
     }
 
     fn draw_title_pause_screen(&self) {

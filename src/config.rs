@@ -147,11 +147,11 @@ pub const SPAWN_MAX_RETRIES: usize = 5;
 pub const BIG_INJECT_BASE_INTERVAL: f32 = 2.2;
 
 // Scaling rates (fractional increase per second)
-pub const ENEMY_HP_SCALE: f32 = 0.003;
+pub const ENEMY_HP_SCALE: f32 = 0.005;
 pub const SHIELDED_FREQ_SCALE: f32 = 0.001;
-// +0.03%/s → 1.18× speed multiplier at 10 min.
-pub const SPEED_SCALE_PER_SEC: f32 = 0.0003;
-pub const SPEED_SCALE_CAP: f32 = 1.5;
+// +0.05%/s → 1.30× speed multiplier at 10 min.
+pub const SPEED_SCALE_PER_SEC: f32 = 0.0005;
+pub const SPEED_SCALE_CAP: f32 = 1.8;
 // Heavy enemies scale HP 2× faster than small.
 pub const HP_SCALE_HEAVY_MULT: f32 = 2.0;
 // Large enemies scale HP 3× faster than small.
@@ -176,6 +176,12 @@ pub const SPAWN_RAMP_START_COVERAGE: f32 = 0.15;
 pub const BIOME1_LULL_INTERVAL: f32 = 22.0;
 pub const BIOME1_LULL_DURATION: f32 = 3.0;
 pub const BIOME1_LULL_INTENSITY: f32 = 0.3;
+// Biome 1 coverage ramp: starts at mult_start and ramps to 1.0 over ramp_duration seconds.
+pub const BIOME1_COVERAGE_MULT_START: f32 = 0.65;
+pub const BIOME1_COVERAGE_RAMP_DURATION: f32 = 100.0;
+
+// Pierce damage decay: each pierce hit multiplies remaining projectile damage by this factor.
+pub const PIERCE_DAMAGE_DECAY: f32 = 0.6;
 
 // ---------------------------------------------------------------------------
 // Debug
@@ -212,8 +218,10 @@ pub const FIRE_RATE_UPGRADE_APPLIES_TO_DRONES: bool = true;
 pub const STAGGER_KNOCKBACK_PX: f32 = 12.0;
 
 pub const MAX_ATTACHED_DRONES: usize = 2;
-/// Base fire interval for attached drones (seconds). Upgraded by FIRE_RATE_UPGRADE_APPLIES_TO_DRONES.
-pub const DRONE_FIRE_RATE: f32 = 0.18;
+/// Base fire interval for attached drones (seconds).
+pub const DRONE_FIRE_RATE: f32 = 0.30;
+/// Buffed drone fire rate (same proportional reduction as player's buff).
+pub const DRONE_FIRE_RATE_BUFFED: f32 = 0.23;
 pub const DRONE_WIDTH: f32 = 24.0;
 pub const DRONE_HEIGHT: f32 = 8.0;
 pub const DRONE_REMOTE_WIDTH: f32 = 24.0;
@@ -338,6 +346,8 @@ pub struct RuntimeConfig {
     pub biome1_lull_interval: Option<f32>,
     pub biome1_lull_duration: Option<f32>,
     pub biome1_lull_intensity: Option<f32>,
+    pub biome1_coverage_mult_start: Option<f32>,
+    pub biome1_coverage_ramp_duration: Option<f32>,
 
     pub rotate_input: Option<bool>,
     pub analog_deadzone: Option<f32>,
@@ -358,7 +368,12 @@ pub struct RuntimeConfig {
 
     pub damage_upgrade_applies_to_drones: Option<bool>,
 
+    pub drone_fire_rate: Option<f32>,
+    pub drone_fire_rate_buffed: Option<f32>,
+
     pub fire_rate_upgrade_applies_to_drones: Option<bool>,
+
+    pub pierce_damage_decay: Option<f32>,
 
     pub bg_parallax_speed_back: Option<f32>,
     pub bg_parallax_speed_stars: Option<f32>,
@@ -373,6 +388,8 @@ pub struct RuntimeConfig {
     pub deep_space_speed_nebula: Option<f32>,
     pub deep_space_speed_mid_stars: Option<f32>,
     pub deep_space_speed_portal: Option<f32>,
+
+    pub meta_points_per_biome: Option<u32>,
 
     // Debug flags
     pub explosive_shield_clear_distance: Option<f32>,
@@ -445,6 +462,8 @@ pub struct Config {
     pub biome1_lull_interval: f32,
     pub biome1_lull_duration: f32,
     pub biome1_lull_intensity: f32,
+    pub biome1_coverage_mult_start: f32,
+    pub biome1_coverage_ramp_duration: f32,
 
     pub rotate_input: bool,
     pub analog_deadzone: f32,
@@ -465,7 +484,12 @@ pub struct Config {
 
     pub damage_upgrade_applies_to_drones: bool,
 
+    pub drone_fire_rate: f32,
+    pub drone_fire_rate_buffed: f32,
+
     pub fire_rate_upgrade_applies_to_drones: bool,
+
+    pub pierce_damage_decay: f32,
 
     pub bg_parallax_speed_back: f32,
     pub bg_parallax_speed_stars: f32,
@@ -486,6 +510,7 @@ pub struct Config {
     pub debug_log_gameplay: bool,
     pub debug_log_file: String,
     pub explosive_shield_clear_distance: f32,
+    pub meta_points_per_biome: u32,
 
     /// Debug: if Some, only this orb type spawns (bypasses level gates).
     pub debug_force_orb: Option<OrbType>,
@@ -558,6 +583,12 @@ impl Config {
             biome1_lull_interval: rt.biome1_lull_interval.unwrap_or(BIOME1_LULL_INTERVAL),
             biome1_lull_duration: rt.biome1_lull_duration.unwrap_or(BIOME1_LULL_DURATION),
             biome1_lull_intensity: rt.biome1_lull_intensity.unwrap_or(BIOME1_LULL_INTENSITY),
+            biome1_coverage_mult_start: rt
+                .biome1_coverage_mult_start
+                .unwrap_or(BIOME1_COVERAGE_MULT_START),
+            biome1_coverage_ramp_duration: rt
+                .biome1_coverage_ramp_duration
+                .unwrap_or(BIOME1_COVERAGE_RAMP_DURATION),
 
             rotate_input: rt.rotate_input.unwrap_or(ROTATE_INPUT),
             analog_deadzone: rt.analog_deadzone.unwrap_or(ANALOG_DEADZONE),
@@ -582,13 +613,19 @@ impl Config {
                 .damage_upgrade_applies_to_drones
                 .unwrap_or(DAMAGE_UPGRADE_APPLIES_TO_DRONES),
 
+            drone_fire_rate: rt.drone_fire_rate.unwrap_or(DRONE_FIRE_RATE),
+            drone_fire_rate_buffed: rt.drone_fire_rate_buffed.unwrap_or(DRONE_FIRE_RATE_BUFFED),
+
             fire_rate_upgrade_applies_to_drones: rt
                 .fire_rate_upgrade_applies_to_drones
                 .unwrap_or(FIRE_RATE_UPGRADE_APPLIES_TO_DRONES),
 
+            pierce_damage_decay: rt.pierce_damage_decay.unwrap_or(PIERCE_DAMAGE_DECAY),
+
             explosive_shield_clear_distance: rt
                 .explosive_shield_clear_distance
                 .unwrap_or(EXPLOSIVE_SHIELD_CLEAR_DISTANCE),
+            meta_points_per_biome: rt.meta_points_per_biome.unwrap_or(50),
 
             bg_parallax_speed_back: rt.bg_parallax_speed_back.unwrap_or(BG_PARALLAX_SPEED_BACK),
             bg_parallax_speed_stars: rt

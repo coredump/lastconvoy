@@ -1,11 +1,10 @@
 // Combat logic: firing, projectile updates, collision, stagger, boundary, drone fire.
 // super::GameState, crate::config, crate::enemy, crate::projectile, crate::shield
 use crate::config::{
-    BASE_DAMAGE_VALUE, BOUNDARY_X, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT,
-    DRONE_REMOTE_WIDTH, DRONE_Y_OFFSETS, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_WIDTH,
-    PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_W, SCREEN_W, SHAKE_DURATION,
-    SHAKE_INTENSITY, SHIELD_FLASH_COLOR, SHIELD_FLASH_COOLDOWN, SHIELD_FLASH_DURATION,
-    STAGGER_KNOCKBACK_PX,
+    BASE_DAMAGE_VALUE, BOUNDARY_X, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT, DRONE_REMOTE_WIDTH,
+    DRONE_Y_OFFSETS, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_WIDTH, PRE_BOUNDARY_STOP_OFFSET,
+    PROJECTILE_H, PROJECTILE_W, SCREEN_W, SHAKE_DURATION, SHAKE_INTENSITY, SHIELD_FLASH_COLOR,
+    SHIELD_FLASH_COOLDOWN, SHIELD_FLASH_DURATION, STAGGER_KNOCKBACK_PX,
 };
 use crate::enemy::{EnemyKind, EnemyState};
 use crate::projectile::{Projectile, ProjectileSource};
@@ -36,6 +35,11 @@ impl GameState {
                         timestamp: crate::save::current_timestamp(),
                     };
                     crate::save::record_run(&mut self.save, record);
+                    let earned = self.furthest_biome * self.config.meta_points_per_biome;
+                    self.save.meta_points = self.save.meta_points.saturating_add(earned);
+                    self.save.meta_points_lifetime =
+                        self.save.meta_points_lifetime.saturating_add(earned);
+                    self.meta_points_earned = earned;
                     crate::save::write_save(&self.save);
                 }
                 self.game_over = true;
@@ -165,7 +169,6 @@ impl GameState {
             } else {
                 base_dmg
             };
-            let proj_dmg = proj_dmg_base.round() as i32;
             for (ei, e) in self.enemies.iter_mut().enumerate() {
                 if e.is_dead() || p.hit_enemies.contains(&e.id) {
                     continue;
@@ -181,7 +184,8 @@ impl GameState {
                     e.height,
                 ) {
                     p.hit_enemies.push(e.id);
-                    e.take_damage(proj_dmg);
+                    let effective_dmg = (proj_dmg_base * p.damage_mult).round().max(1.0) as i32;
+                    e.take_damage(effective_dmg);
                     if !e.is_dead()
                         && !e.stagger_immune
                         && stagger_enabled
@@ -189,7 +193,7 @@ impl GameState {
                             e.kind,
                             EnemyKind::Small | EnemyKind::Medium | EnemyKind::Heavy
                         )
-                        && !(e.kind == EnemyKind::Small && e.hp <= 3 * proj_dmg)
+                        && !(e.kind == EnemyKind::Small && e.hp <= 3 * effective_dmg)
                     {
                         stagger_targets.push(ei);
                     }
@@ -210,6 +214,7 @@ impl GameState {
                         break;
                     }
                     p.pierce_remaining -= 1;
+                    p.damage_mult *= self.config.pierce_damage_decay;
                 }
             }
         }
@@ -439,11 +444,12 @@ impl GameState {
     }
 
     pub(super) fn update_drones(&mut self, dt: f32) {
-        let drone_fire_rate = if self.config.fire_rate_upgrade_applies_to_drones {
-            self.current_fire_rate()
-        } else {
-            DRONE_FIRE_RATE
-        };
+        let drone_fire_rate =
+            if self.config.fire_rate_upgrade_applies_to_drones && self.fire_rate_buff_active() {
+                self.config.drone_fire_rate_buffed
+            } else {
+                self.config.drone_fire_rate
+            };
         let drone_pierce = if self.config.damage_upgrade_applies_to_drones {
             self.current_pierce()
         } else {
@@ -477,7 +483,7 @@ impl GameState {
             for rd in &mut self.remote_drones {
                 rd.fire_timer -= dt;
                 if rd.fire_timer <= 0.0 {
-                    rd.fire_timer = DRONE_FIRE_RATE;
+                    rd.fire_timer = self.config.drone_fire_rate;
                     rd_shots.push(Projectile::new(
                         rd.x + DRONE_REMOTE_WIDTH,
                         rd.y + DRONE_REMOTE_HEIGHT / 2.0 - PROJECTILE_H / 2.0,

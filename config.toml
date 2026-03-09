@@ -70,19 +70,19 @@ enemy_large_hp = 14
 # time. They create a gradual difficulty ramp rather than discrete jumps.
 
 # Fractional HP increase applied to all enemies per second (base rate).
-# e.g. 0.001 = +0.1% per second, roughly 1.06x at 60s and 1.6x at 10 min.
-enemy_hp_scale = 0.003
+# e.g. 0.005 = +0.5% per second, roughly 1.30x at 60s and 3.0x at 10 min.
+enemy_hp_scale = 0.005
 
 # Rate at which shielded-enemy spawn frequency grows, per second.
 shielded_freq_scale = 0.001
 
 # Fractional speed increase per second for all enemies.
-# 0.0003 = +0.03%/s, approximately 1.18x at 10 minutes.
-speed_scale_per_sec = 0.0003
+# 0.0005 = +0.05%/s, approximately 1.30x at 10 minutes.
+speed_scale_per_sec = 0.0005
 
 # Hard cap on the speed multiplier; enemies will never exceed this multiple
 # of their base speed regardless of how long the run goes on.
-speed_scale_cap = 1.5
+speed_scale_cap = 1.8
 
 # HP scaling multiplier applied on top of enemy_hp_scale for heavy enemies.
 # Heavy enemies scale 2x faster than the base rate.
@@ -135,6 +135,11 @@ biome1_lull_interval = 22.0
 biome1_lull_duration = 3.0
 biome1_lull_intensity = 0.3
 
+# Biome 1 coverage ramp: effective coverage starts at mult_start and linearly
+# ramps to 1.0 over ramp_duration seconds into the biome. Composes with lull.
+biome1_coverage_mult_start = 0.65
+biome1_coverage_ramp_duration = 100.0
+
 # ---------------------------------------------------------------------------
 # [offense_buffs]
 # ---------------------------------------------------------------------------
@@ -158,6 +163,16 @@ buff_stagger_enabled = true
 # Toggle whether temporary offense buffs also modify attached drone shots.
 damage_upgrade_applies_to_drones = true
 fire_rate_upgrade_applies_to_drones = true
+
+# Base fire interval for attached drones (seconds). Separate from player rate.
+drone_fire_rate = 0.30
+
+# Drone fire rate when fire-rate buff is active (same proportional reduction).
+drone_fire_rate_buffed = 0.23
+
+# Each pierce hit multiplies remaining projectile damage by this factor.
+# 0.6 = first hit 100%, second hit 60%, third hit 36%, etc. Always min 1 dmg.
+pierce_damage_decay = 0.6
 
 # ---------------------------------------------------------------------------
 # [orbs]
@@ -241,6 +256,15 @@ rotate_input = false
 # Dead zone radius for analogue stick input (0.0-1.0). Stick deflections
 # smaller than this value are ignored to prevent drift on worn controllers.
 analog_deadzone = 0.2
+
+# ---------------------------------------------------------------------------
+# [progression]
+# ---------------------------------------------------------------------------
+
+# Meta points awarded per biome reached on death. A run ending on biome 2
+# awards 2 × this value. Default 50 means biome-2 death = 100 pts.
+# Total upgrade cost to unlock everything is ~865 pts.
+meta_points_per_biome = 30
 
 # ---------------------------------------------------------------------------
 # [debug]

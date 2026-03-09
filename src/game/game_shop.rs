@@ -16,40 +16,73 @@ impl GameState {
         if catalog_len == 0 {
             if is_key_pressed(KeyCode::Escape) {
                 self.at_shop = false;
-            }
-            return;
-        }
-
-        if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-            self.shop_cursor = (self.shop_cursor + 1) % catalog_len;
-        }
-        if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-            self.shop_cursor = (self.shop_cursor + catalog_len - 1) % catalog_len;
-        }
-        if is_key_pressed(KeyCode::Escape) {
-            self.at_shop = false;
-            return;
-        }
-        if is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Enter) {
-            self.try_purchase();
-        }
-
-        if let Some((tx, ty)) = self.input.touch_tapped_pos {
-            let item_area_top = LIST_TOP;
-            let item_area_bottom = LIST_TOP + catalog_len as f32 * ITEM_H;
-            if ty >= item_area_top && ty < item_area_bottom {
-                let idx = ((ty - item_area_top) / ITEM_H) as usize;
-                if idx < catalog_len {
-                    if self.shop_cursor == idx {
-                        self.try_purchase();
-                    } else {
-                        self.shop_cursor = idx;
-                    }
+                if self.post_run_shop {
+                    self.post_run_shop = false;
+                    self.reset();
                 }
-            } else if ty < item_area_top {
-                self.at_shop = false;
             }
-            let _ = tx;
+            return;
+        }
+
+        if self.post_run_shop {
+            let total_items = catalog_len + 1;
+            if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                self.shop_cursor = (self.shop_cursor + 1) % total_items;
+            }
+            if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                self.shop_cursor = (self.shop_cursor + total_items - 1) % total_items;
+            }
+            if is_key_pressed(KeyCode::Escape) {
+                self.at_shop = false;
+                self.post_run_shop = false;
+                self.reset();
+                return;
+            }
+            if is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Enter) {
+                if self.shop_cursor == 0 {
+                    self.at_shop = false;
+                    self.post_run_shop = false;
+                    self.reset();
+                } else {
+                    let upgrade_idx = self.shop_cursor - 1;
+                    let saved_cursor = self.shop_cursor;
+                    self.shop_cursor = upgrade_idx;
+                    self.try_purchase();
+                    self.shop_cursor = saved_cursor;
+                }
+            }
+        } else {
+            if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                self.shop_cursor = (self.shop_cursor + 1) % catalog_len;
+            }
+            if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                self.shop_cursor = (self.shop_cursor + catalog_len - 1) % catalog_len;
+            }
+            if is_key_pressed(KeyCode::Escape) {
+                self.at_shop = false;
+                return;
+            }
+            if is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Enter) {
+                self.try_purchase();
+            }
+
+            if let Some((tx, ty)) = self.input.touch_tapped_pos {
+                let item_area_top = LIST_TOP;
+                let item_area_bottom = LIST_TOP + catalog_len as f32 * ITEM_H;
+                if ty >= item_area_top && ty < item_area_bottom {
+                    let idx = ((ty - item_area_top) / ITEM_H) as usize;
+                    if idx < catalog_len {
+                        if self.shop_cursor == idx {
+                            self.try_purchase();
+                        } else {
+                            self.shop_cursor = idx;
+                        }
+                    }
+                } else if ty < item_area_top {
+                    self.at_shop = false;
+                }
+                let _ = tx;
+            }
         }
     }
 
@@ -102,7 +135,11 @@ impl GameState {
             1,
         );
 
-        let hint = "UP/DN NAVIGATE  SPACE/ENTER BUY  ESC BACK";
+        let hint = if self.post_run_shop {
+            "UP/DN NAVIGATE  SPACE/ENTER SELECT  ESC PLAY"
+        } else {
+            "UP/DN NAVIGATE  SPACE/ENTER BUY  ESC BACK"
+        };
         let hint_sz = self.ui_font.measure(hint, 1, 1);
         let hint_x = (SCREEN_W as f32 - hint_sz.x) * 0.5;
         self.ui_font.draw(
@@ -114,10 +151,42 @@ impl GameState {
             1,
         );
 
+        if self.post_run_shop {
+            let play_y = LIST_TOP;
+            let play_selected = self.shop_cursor == 0;
+            let play_bg = if play_selected {
+                Color::from_rgba(40, 40, 60, 180)
+            } else {
+                Color::from_rgba(0, 0, 0, 0)
+            };
+            draw_rectangle(0.0, play_y, SCREEN_W as f32, ITEM_H, play_bg);
+            let cursor_marker = if play_selected { ">" } else { " " };
+            self.ui_font.draw(
+                cursor_marker,
+                4.0,
+                play_y + 2.0,
+                1,
+                Color::from_rgba(240, 240, 180, 255),
+                1,
+            );
+            let play_col = if play_selected {
+                Color::from_rgba(240, 240, 180, 255)
+            } else {
+                Color::from_rgba(220, 220, 220, 255)
+            };
+            self.ui_font
+                .draw("PLAY", 14.0, play_y + 2.0, 1, play_col, 1);
+        }
+
         let catalog = &self.upgrade_catalog.upgrade;
+        let list_offset = if self.post_run_shop { ITEM_H } else { 0.0 };
         for (i, def) in catalog.iter().enumerate() {
-            let y = LIST_TOP + i as f32 * ITEM_H;
-            let selected = i == self.shop_cursor;
+            let y = LIST_TOP + list_offset + i as f32 * ITEM_H;
+            let selected = if self.post_run_shop {
+                i + 1 == self.shop_cursor
+            } else {
+                i == self.shop_cursor
+            };
             let current_level = self.save.permanent_upgrades.get_level(&def.id);
             let is_maxed = current_level >= def.max_level;
 

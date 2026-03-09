@@ -198,6 +198,9 @@ pub struct GameState {
     pub orb_interval_modifier: f32,
     pub shield_cap_bonus: u32,
     pub projectile_speed_bonus: f32,
+    pub game_over_cursor: usize,
+    pub meta_points_earned: u32,
+    pub post_run_shop: bool,
 }
 
 impl GameState {
@@ -347,6 +350,9 @@ impl GameState {
             orb_interval_modifier: 0.0,
             shield_cap_bonus: 0,
             projectile_speed_bonus: 0.0,
+            game_over_cursor: 0,
+            meta_points_earned: 0,
+            post_run_shop: false,
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -495,6 +501,9 @@ impl GameState {
         self.at_title = false;
         self.paused = false;
         self.game_over = false;
+        self.game_over_cursor = 0;
+        self.meta_points_earned = 0;
+        self.post_run_shop = false;
         self.kills_total = 0;
         self.breaches_total = 0;
         self.balance_log_timer = 0.0;
@@ -577,12 +586,25 @@ impl GameState {
         }
 
         if self.game_over {
-            if is_key_pressed(KeyCode::Space)
+            if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                self.game_over_cursor = 0;
+            }
+            if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                self.game_over_cursor = 1;
+            }
+            let confirm = is_key_pressed(KeyCode::Space)
                 || is_key_pressed(KeyCode::Enter)
-                || is_key_pressed(KeyCode::R)
-                || self.input.touch_tapped
-            {
+                || self.input.touch_tapped;
+            let run_again_hotkey = is_key_pressed(KeyCode::R);
+
+            if run_again_hotkey || (confirm && self.game_over_cursor == 0) {
+                self.game_over = false;
+                self.post_run_shop = true;
+                self.at_shop = true;
+                self.shop_cursor = 0;
+            } else if confirm && self.game_over_cursor == 1 {
                 self.reset();
+                self.at_title = true;
             }
             return;
         }
