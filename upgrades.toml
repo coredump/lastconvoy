@@ -1,0 +1,49 @@
+[[upgrade]]
+id = "starting_shields"
+display_name = "HULL PLATING"
+description = "START WITH EXTRA SHIELDS"
+max_level = 2
+cost_per_level = [50, 150]
+effect_type = "StartingShields"
+effect_per_level = [1.0, 2.0]
+category = "defense"
+
+[[upgrade]]
+id = "starting_drones"
+display_name = "DRONE ESCORT"
+description = "START WITH A DRONE"
+max_level = 2
+cost_per_level = [75, 200]
+effect_type = "StartingDrones"
+effect_per_level = [1.0, 2.0]
+category = "offense"
+
+[[upgrade]]
+id = "orb_drop_frequency"
+display_name = "LOGISTICS"
+description = "ORBS SPAWN MORE OFTEN"
+max_level = 2
+cost_per_level = [40, 100]
+effect_type = "OrbDropFrequency"
+effect_per_level = [2.0, 4.0]
+category = "support"
+
+[[upgrade]]
+id = "starting_damage_level"
+display_name = "PRIMED WEAPONS"
+description = "START WITH DAMAGE BUFF"
+max_level = 1
+cost_per_level = [80]
+effect_type = "StartingDamageLevel"
+effect_per_level = [1.0]
+category = "offense"
+
+[[upgrade]]
+id = "projectile_speed_bonus"
+display_name = "ACCELERATOR"
+description = "FASTER PROJECTILES"
+max_level = 2
+cost_per_level = [50, 120]
+effect_type = "ProjectileSpeedBonus"
+effect_per_level = [30.0, 60.0]
+category = "offense"
