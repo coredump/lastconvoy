@@ -1,12 +1,12 @@
 // Enemy spawn logic: tick_spawn, try_place_enemy, coverage computation.
 // super::GameState, crate::config, crate::enemy
 use crate::config::{
-    BIG_INJECT_BASE_INTERVAL, Biome, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT, COVERAGE_ZONE_RIGHT,
-    COVERAGE_ZONE_WIDTH, Config, ENEMY_HEAVY_H, ENEMY_HEAVY_SPEED, ENEMY_HEAVY_W,
-    ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H, ENEMY_LARGE_SPEED, ENEMY_LARGE_W,
-    ENEMY_MEDIUM_H, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H, ENEMY_SMALL_SPEED,
-    ENEMY_SMALL_W, ENEMY_XL_H, ENEMY_XL_W, SCREEN_W, SHIELDED_FREQ_SCALE, SPAWN_LEAD_PX,
-    SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
+    BIG_INJECT_BASE_INTERVAL, BOSS_1_H, BOSS_1_W, Biome, COVERAGE_HYSTERESIS, COVERAGE_ZONE_LEFT,
+    COVERAGE_ZONE_RIGHT, COVERAGE_ZONE_WIDTH, Config, ENEMY_HEAVY_H, ENEMY_HEAVY_SPEED,
+    ENEMY_HEAVY_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, ENEMY_LARGE_H, ENEMY_LARGE_SPEED,
+    ENEMY_LARGE_W, ENEMY_MEDIUM_H, ENEMY_MEDIUM_SPEED, ENEMY_MEDIUM_W, ENEMY_SMALL_H,
+    ENEMY_SMALL_SPEED, ENEMY_SMALL_W, ENEMY_XL_H, ENEMY_XL_W, SCREEN_W, SHIELDED_FREQ_SCALE,
+    SPAWN_LEAD_PX, SPAWN_MAX_RETRIES, SPAWN_SLOT_COUNT, SPAWN_SLOT_WIDTH,
 };
 use crate::enemy::{Enemy, EnemyKind};
 use macroquad::prelude::rand;
@@ -15,6 +15,9 @@ use super::{GameState, aabb_overlap};
 
 impl GameState {
     pub(super) fn tick_spawn(&mut self) {
+        if self.boss_active {
+            return;
+        }
         self.spawn_ctrl.inject_timer -= crate::config::SPAWN_TICK_INTERVAL;
 
         let ramp_dur = self.config.spawn_ramp_duration;
@@ -134,6 +137,12 @@ impl GameState {
                 self.config.xl_hp,
                 self.config.xl_speed,
             ),
+            EnemyKind::Boss1 => (
+                BOSS_1_W,
+                BOSS_1_H,
+                self.config.boss_1_hp,
+                self.config.boss_1_speed,
+            ),
         };
 
         let windup_time = match kind {
@@ -142,6 +151,7 @@ impl GameState {
             EnemyKind::Heavy => self.config.windup_time_heavy,
             EnemyKind::Large => self.config.windup_time_large,
             EnemyKind::XL => self.config.windup_time_xl,
+            EnemyKind::Boss1 => self.config.windup_time_boss_1,
         };
 
         let kind_weight = match kind {
@@ -180,10 +190,12 @@ impl GameState {
             }
 
             let mut enemy = Enemy::new(x, y, kind, hp, speed, w, h, windup_time);
-            let shield_chance = (SHIELDED_FREQ_SCALE * self.run_time).min(0.5);
-            if rand::gen_range(0.0_f32, 1.0) < shield_chance {
-                enemy.shielded = true;
-                enemy.shield_hp = 1;
+            if kind != EnemyKind::Boss1 {
+                let shield_chance = (SHIELDED_FREQ_SCALE * self.run_time).min(0.5);
+                if rand::gen_range(0.0_f32, 1.0) < shield_chance {
+                    enemy.shielded = true;
+                    enemy.shield_hp = 1;
+                }
             }
             let shielded = enemy.shielded;
             self.enemies.push(enemy);

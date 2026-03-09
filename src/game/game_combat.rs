@@ -3,9 +3,9 @@
 use crate::config::{
     BASE_DAMAGE_VALUE, BOUNDARY_X, DRONE_FIRE_RATE, DRONE_HEIGHT, DRONE_REMOTE_HEIGHT,
     DRONE_REMOTE_WIDTH, DRONE_Y_OFFSETS, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_WIDTH,
-    PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_SPEED, PROJECTILE_W, SCREEN_W,
-    SHAKE_DURATION, SHAKE_INTENSITY, SHIELD_FLASH_COLOR, SHIELD_FLASH_COOLDOWN,
-    SHIELD_FLASH_DURATION, STAGGER_KNOCKBACK_PX,
+    PRE_BOUNDARY_STOP_OFFSET, PROJECTILE_H, PROJECTILE_W, SCREEN_W, SHAKE_DURATION,
+    SHAKE_INTENSITY, SHIELD_FLASH_COLOR, SHIELD_FLASH_COOLDOWN, SHIELD_FLASH_DURATION,
+    STAGGER_KNOCKBACK_PX,
 };
 use crate::enemy::{EnemyKind, EnemyState};
 use crate::projectile::{Projectile, ProjectileSource};
@@ -25,6 +25,18 @@ impl GameState {
             ShieldHitResult::NoShield => {
                 if !self.game_over {
                     self.log_run_end("death");
+                    let record = crate::save::RunRecord {
+                        run_id: self.run_id,
+                        run_time: self.run_time,
+                        kills: self.kills_total,
+                        breaches: self.breaches_total,
+                        furthest_biome: self.furthest_biome,
+                        loop_count: self.loop_count,
+                        orbs_collected: self.orbs_collected.clone(),
+                        timestamp: crate::save::current_timestamp(),
+                    };
+                    crate::save::record_run(&mut self.save, record);
+                    crate::save::write_save(&self.save);
                 }
                 self.game_over = true;
             }
@@ -51,7 +63,7 @@ impl GameState {
                 && e.y < lane_bottom
             {
                 match e.kind {
-                    EnemyKind::Large | EnemyKind::XL => {
+                    EnemyKind::Large | EnemyKind::XL | EnemyKind::Boss1 => {
                         stagger_targets.push(i);
                     }
                     _ => {
@@ -100,7 +112,7 @@ impl GameState {
         if self.player.should_fire() {
             let proj_x = self.player.x + self.player.width;
             let proj_y = self.player.y + (self.player.height - PROJECTILE_H) / 2.0;
-            let speed = self.config.projectile_speed;
+            let speed = self.config.projectile_speed + self.projectile_speed_bonus;
             let pierce = self.current_pierce();
             if self.burst_ready {
                 self.burst_ready = false;
@@ -450,7 +462,7 @@ impl GameState {
                 drone_shots.push(Projectile::new(
                     proj_x,
                     proj_y,
-                    self.config.projectile_speed,
+                    self.config.projectile_speed + self.projectile_speed_bonus,
                     ProjectileSource::Drone,
                     drone_pierce,
                 ));
@@ -469,7 +481,7 @@ impl GameState {
                     rd_shots.push(Projectile::new(
                         rd.x + DRONE_REMOTE_WIDTH,
                         rd.y + DRONE_REMOTE_HEIGHT / 2.0 - PROJECTILE_H / 2.0,
-                        PROJECTILE_SPEED,
+                        self.config.projectile_speed + self.projectile_speed_bonus,
                         ProjectileSource::RemoteDrone,
                         0,
                     ));

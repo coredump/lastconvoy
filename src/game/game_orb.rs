@@ -2,7 +2,7 @@
 // super::GameState, crate::orb, crate::drone, crate::shield
 use crate::config::{
     BOUNDARY_X, Biome, DRONE_REMOTE_HEIGHT, DRONE_Y_OFFSETS, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP,
-    MAX_ATTACHED_DRONES, ORB_H, ORB_W, SCREEN_W,
+    ORB_H, ORB_W, SCREEN_W,
 };
 use crate::drone::{Drone, RemoteDrone, RemoteDroneLane};
 use crate::orb::{Orb, OrbPhase, OrbType};
@@ -16,21 +16,14 @@ impl GameState {
         if self.orb_spawn_timer > 0.0 {
             return;
         }
-        self.orb_spawn_timer = self.config.orb_spawn_interval;
+        self.orb_spawn_timer =
+            (self.config.orb_spawn_interval - self.orb_interval_modifier).max(1.0);
         if self.orbs.len() >= self.config.max_active_orbs {
             return;
         }
-        let shield_cap = match self.current_biome {
-            Biome::InfectedAtmosphere => 1,
-            Biome::LowOrbit => 2,
-            _ => crate::shield::MAX_SHIELD_SEGMENTS,
-        };
+        let shield_cap = self.biome_shield_cap();
         let shields_full = self.shields.count() >= shield_cap;
-        let drone_cap = match self.current_biome {
-            Biome::InfectedAtmosphere => 0,
-            Biome::LowOrbit => 1,
-            _ => MAX_ATTACHED_DRONES,
-        };
+        let drone_cap = self.biome_drone_cap();
         let mut pool: Vec<(OrbType, u32)> = Vec::with_capacity(8);
         if !self.burst_buff_active() {
             pool.push((OrbType::Burst, 1));
@@ -201,6 +194,7 @@ impl GameState {
             let popup_tag = match orb_type {
                 OrbType::Damage => {
                     self.damage_buff_t = self.config.buff_damage_duration;
+                    self.orbs_collected.damage += 1;
                     self.dlog(&format!(
                         "ORB_PICKUP type=DamageBuff ttl_s={:.1}",
                         self.damage_buff_t
@@ -210,6 +204,7 @@ impl GameState {
                 OrbType::FireRate => {
                     self.fire_rate_buff_t = self.config.buff_fire_rate_duration;
                     self.player.fire_rate = self.current_fire_rate();
+                    self.orbs_collected.fire_rate += 1;
                     self.dlog(&format!(
                         "ORB_PICKUP type=FireRateBuff ttl_s={:.1}",
                         self.fire_rate_buff_t
@@ -223,6 +218,7 @@ impl GameState {
                         self.burst_timer = self.config.buff_burst_interval;
                         self.burst_ready = false;
                     }
+                    self.orbs_collected.burst += 1;
                     self.dlog(&format!(
                         "ORB_PICKUP type=BurstBuff ttl_s={:.1}",
                         self.burst_buff_t
@@ -231,6 +227,7 @@ impl GameState {
                 }
                 OrbType::Pierce => {
                     self.pierce_buff_t = self.config.buff_pierce_duration;
+                    self.orbs_collected.pierce += 1;
                     self.dlog(&format!(
                         "ORB_PICKUP type=PierceBuff ttl_s={:.1}",
                         self.pierce_buff_t
@@ -239,6 +236,7 @@ impl GameState {
                 }
                 OrbType::Stagger => {
                     self.stagger_buff_t = self.config.buff_stagger_duration;
+                    self.orbs_collected.stagger += 1;
                     self.dlog(&format!(
                         "ORB_PICKUP type=StaggerBuff ttl_s={:.1}",
                         self.stagger_buff_t
@@ -246,11 +244,7 @@ impl GameState {
                     Some("+STAGGER")
                 }
                 OrbType::Shield => {
-                    let shield_cap = match self.current_biome {
-                        Biome::InfectedAtmosphere => 1,
-                        Biome::LowOrbit => 2,
-                        _ => crate::shield::MAX_SHIELD_SEGMENTS,
-                    };
+                    let shield_cap = self.biome_shield_cap();
                     if self.shields.count() >= shield_cap {
                         None
                     } else {
@@ -258,6 +252,7 @@ impl GameState {
                         self.shields.add_segments(1);
                         let after = self.shields.count();
                         if after > before {
+                            self.orbs_collected.shield += 1;
                             if after >= shield_cap {
                                 self.orbs
                                     .retain(|o| o.orb_type != OrbType::Shield || o.collected);
@@ -275,9 +270,11 @@ impl GameState {
                     let after_has = self.shields.has_explosive();
                     let after_count = self.shields.count();
                     if after_has && !before_has {
+                        self.orbs_collected.explosive += 1;
                         self.dlog("ORB_PICKUP type=Explosive");
                         Some("+EXPLOSIVE")
                     } else if after_count > before_count {
+                        self.orbs_collected.shield += 1;
                         self.dlog("ORB_PICKUP type=ShieldFromExplosive");
                         Some("+SHIELD")
                     } else {
@@ -285,16 +282,13 @@ impl GameState {
                     }
                 }
                 OrbType::Drone => {
-                    let drone_cap = match self.current_biome {
-                        Biome::InfectedAtmosphere => 0,
-                        Biome::LowOrbit => 1,
-                        _ => MAX_ATTACHED_DRONES,
-                    };
+                    let drone_cap = self.biome_drone_cap();
                     if self.drones.len() < drone_cap {
                         let index = self.drones.len();
                         let dy = DRONE_Y_OFFSETS[index.min(DRONE_Y_OFFSETS.len() - 1)];
                         self.drones
                             .push(Drone::new(self.player.x, self.player.y + dy));
+                        self.orbs_collected.drone += 1;
                         self.dlog(&format!("ORB_PICKUP type=Drone index={}", index));
                         Some("+DRONE")
                     } else {
@@ -314,6 +308,7 @@ impl GameState {
                         bottom_y,
                         RemoteDroneLane::Bottom,
                     ));
+                    self.orbs_collected.drone_remote += 1;
                     self.dlog("ORB_PICKUP type=DroneRemote");
                     Some("+REMOTE")
                 }

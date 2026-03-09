@@ -15,10 +15,12 @@ mod orb;
 mod player;
 mod projectile;
 mod render;
+mod save;
 mod shield;
 mod sprite;
 mod text;
 mod upgrade;
+mod upgrade_catalog;
 
 use config::{
     Config, SCREEN_H, SCREEN_W, WINDOW_SCALE, load_runtime_config, save_default_config_if_missing,
@@ -66,6 +68,9 @@ async fn main() {
     let enemy_xl_sprite = Sprite::from_json("assets/sprites/enemies/elite.json")
         .await
         .expect("Failed to load enemy_elite sprite");
+    let enemy_boss_1_sprite = Sprite::from_json("assets/sprites/enemies/boss_1.json")
+        .await
+        .expect("Failed to load boss_1 sprite");
     let boundary_shield_sprite = Sprite::from_json("assets/sprites/objects/boundary_shield.json")
         .await
         .expect("Failed to load boundary_shield sprite");
@@ -203,6 +208,7 @@ async fn main() {
         enemy_heavy_sprite,
         enemy_large_sprite,
         enemy_xl_sprite,
+        enemy_boss_1_sprite,
         boundary_shield_sprite,
         shot_sprite,
         orb_sprite_damage,

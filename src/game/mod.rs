@@ -3,20 +3,22 @@
 use macroquad::prelude::*;
 
 use crate::config::{
-    BIG_INJECT_BASE_INTERVAL, Biome, Config, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, PLAYER_HEIGHT,
-    PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, SCREEN_W, SHOT_BARRIER_BOTTOM_Y, SHOT_BARRIER_GATE_X_MAX,
-    SHOT_BARRIER_TOP_Y, SPAWN_TICK_INTERVAL, TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP,
-    UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
+    BIG_INJECT_BASE_INTERVAL, Biome, Config, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP,
+    MAX_ATTACHED_DRONES, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_X, PROJECTILE_H, SCREEN_W,
+    SHOT_BARRIER_BOTTOM_Y, SHOT_BARRIER_GATE_X_MAX, SHOT_BARRIER_TOP_Y, SPAWN_TICK_INTERVAL,
+    TOP_UPGRADE_LANE_BOTTOM, TOP_UPGRADE_LANE_TOP, UPGRADE_LANE_BOTTOM, UPGRADE_LANE_TOP,
 };
+use crate::upgrade_catalog::{UpgradeCatalog, load_upgrade_catalog};
 
 pub(super) const PAUSE_BTN_X: f32 = SCREEN_W as f32 - 14.0;
 pub(super) const PAUSE_BTN_Y_MAX: f32 = 20.0;
 use crate::drone::{Drone, RemoteDrone};
-use crate::enemy::Enemy;
+use crate::enemy::{Enemy, EnemyKind};
 use crate::input::InputState;
 use crate::orb::Orb;
 use crate::player::Player;
 use crate::projectile::Projectile;
+use crate::save::{OrbStats, SaveData};
 use crate::shield::ShieldSystem;
 use crate::sprite::{FlashEffect, Sprite};
 use crate::text::BitmapFont;
@@ -25,6 +27,7 @@ mod game_buff;
 mod game_combat;
 mod game_draw;
 mod game_orb;
+mod game_shop;
 mod game_spawn;
 
 pub(super) const FLOATING_TEXT_TTL: f32 = 0.8;
@@ -112,6 +115,7 @@ pub struct GameState {
     pub enemy_heavy_sprite: Sprite,
     pub enemy_large_sprite: Sprite,
     pub enemy_xl_sprite: Sprite,
+    pub enemy_boss_1_sprite: Sprite,
     pub boundary_shield_sprite: Sprite,
     pub rail_wall_sprite: Sprite,
     pub upgrade_track_sprite: Sprite,
@@ -183,6 +187,17 @@ pub struct GameState {
     pub event_placeholder: Option<&'static str>,
     pub event_placeholder_timer: f32,
     pub biome_spawn_pause: f32,
+    pub save: SaveData,
+    pub orbs_collected: OrbStats,
+    pub furthest_biome: u32,
+    pub upgrade_catalog: UpgradeCatalog,
+    pub at_shop: bool,
+    pub shop_cursor: usize,
+    pub shop_flash_timer: f32,
+    pub title_cursor: usize,
+    pub orb_interval_modifier: f32,
+    pub shield_cap_bonus: u32,
+    pub projectile_speed_bonus: f32,
 }
 
 impl GameState {
@@ -195,6 +210,7 @@ impl GameState {
         enemy_heavy_sprite: Sprite,
         enemy_large_sprite: Sprite,
         enemy_xl_sprite: Sprite,
+        enemy_boss_1_sprite: Sprite,
         boundary_shield_sprite: Sprite,
         shot_sprite: Sprite,
         orb_sprite_damage: Sprite,
@@ -243,6 +259,7 @@ impl GameState {
             enemy_heavy_sprite,
             enemy_large_sprite,
             enemy_xl_sprite,
+            enemy_boss_1_sprite,
             boundary_shield_sprite,
             shot_sprite,
             shields: ShieldSystem::new(config.player_starting_shields),
@@ -319,6 +336,17 @@ impl GameState {
             event_placeholder: None,
             event_placeholder_timer: 0.0,
             biome_spawn_pause: 0.0,
+            save: crate::save::load_save(),
+            orbs_collected: OrbStats::default(),
+            furthest_biome: biome_ordinal(start_biome),
+            upgrade_catalog: load_upgrade_catalog(),
+            at_shop: false,
+            shop_cursor: 0,
+            shop_flash_timer: 0.0,
+            title_cursor: 0,
+            orb_interval_modifier: 0.0,
+            shield_cap_bonus: 0,
+            projectile_speed_bonus: 0.0,
             additive_material: {
                 use miniquad::{BlendFactor, BlendState, BlendValue, Equation};
                 load_material(
@@ -470,6 +498,8 @@ impl GameState {
         self.kills_total = 0;
         self.breaches_total = 0;
         self.balance_log_timer = 0.0;
+        self.orbs_collected = OrbStats::default();
+        self.furthest_biome = biome_ordinal(self.current_biome);
         self.floating_texts.clear();
         self.explosions.clear();
         self.orb_activated_this_frame = false;
@@ -479,6 +509,7 @@ impl GameState {
         self.city_bg_scroll_offsets = [0.0; 4];
         self.low_atmo_moon_offset = 0.0;
         self.deep_space_scroll_offsets = [0.0; 3];
+        self.apply_permanent_upgrades();
         self.log_run_start("restart");
     }
 
@@ -517,11 +548,30 @@ impl GameState {
             offset_y,
         );
 
+        if self.at_shop {
+            self.update_shop(dt);
+            return;
+        }
+
         if self.at_title {
             self.logo_sprite.update(dt);
-            if get_keys_pressed().into_iter().next().is_some() || self.input.touch_tapped {
-                self.at_title = false;
-                self.log_run_start("new_game");
+            if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                self.title_cursor = 1;
+            }
+            if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                self.title_cursor = 0;
+            }
+            let confirm = is_key_pressed(KeyCode::Space)
+                || is_key_pressed(KeyCode::Enter)
+                || self.input.touch_tapped;
+            if confirm {
+                if self.title_cursor == 1 {
+                    self.at_shop = true;
+                } else {
+                    self.at_title = false;
+                    self.apply_permanent_upgrades();
+                    self.log_run_start("new_game");
+                }
             }
             return;
         }
@@ -701,10 +751,41 @@ impl GameState {
     fn tick_biome(&mut self, dt: f32) {
         self.biome_time += dt;
 
+        // Boss1 (biome 1): real combat — detect death and transition directly.
+        if self.boss_active && self.current_biome == Biome::InfectedAtmosphere {
+            let boss_alive = self
+                .enemies
+                .iter()
+                .any(|e| e.kind == EnemyKind::Boss1 && !e.is_dead());
+            if !boss_alive {
+                self.dlog(&format!(
+                    "BOSS_DEFEATED biome={:?} loop={}",
+                    self.current_biome, self.loop_count
+                ));
+                self.do_biome_advance();
+            }
+            return;
+        }
+
+        // Placeholder bosses (biomes 2-4): wait for placeholder dismissal.
+        if self.boss_active && self.event_placeholder.is_some() {
+            return;
+        }
+
         if self.biome_time < self.biome_duration() {
             return;
         }
+
+        // Biome timer expired.
+        if self.current_biome == Biome::InfectedAtmosphere && !self.boss_active {
+            // Spawn real boss for biome 1.
+            self.boss_active = true;
+            self.spawn_boss_1();
+            return;
+        }
+
         if self.current_biome.has_boss_at_end() && !self.boss_active {
+            // Placeholder boss for biomes 2-4.
             self.boss_active = true;
             self.event_placeholder = Some("Boss Event");
             self.event_placeholder_timer = 5.0;
@@ -714,39 +795,9 @@ impl GameState {
                 self.current_biome, self.loop_count
             ));
         }
-        if self.boss_active && self.event_placeholder.is_some() {
-            return;
-        }
         if self.biome_transition_pending {
             self.biome_transition_pending = false;
-            match self.current_biome.next() {
-                Some(next) => {
-                    self.dlog(&format!(
-                        "BIOME_ADVANCE {:?} -> {:?} loop={}",
-                        self.current_biome, next, self.loop_count
-                    ));
-                    self.current_biome = next;
-                    self.biome_time = 0.0;
-                    self.boss_active = false;
-                    self.enemies.clear();
-                    self.spawn_ctrl.reset();
-                    self.biome_spawn_pause = 1.0;
-                    self.orb_spawn_timer = 0.0;
-                    self.refresh_active_buffs();
-                }
-                None => {
-                    self.loop_count += 1;
-                    self.current_biome = Biome::InfectedAtmosphere;
-                    self.biome_time = 0.0;
-                    self.boss_active = false;
-                    self.enemies.clear();
-                    self.spawn_ctrl.reset();
-                    self.biome_spawn_pause = 1.0;
-                    self.orb_spawn_timer = 0.0;
-                    self.refresh_active_buffs();
-                    self.dlog(&format!("BIOME_LOOP_RESTART loop={}", self.loop_count));
-                }
-            }
+            self.do_biome_advance();
         } else {
             let label = match self.current_biome.next() {
                 Some(next) => next.entry_label(),
@@ -757,6 +808,68 @@ impl GameState {
             self.paused = true;
             self.biome_transition_pending = true;
         }
+    }
+
+    fn do_biome_advance(&mut self) {
+        match self.current_biome.next() {
+            Some(next) => {
+                self.dlog(&format!(
+                    "BIOME_ADVANCE {:?} -> {:?} loop={}",
+                    self.current_biome, next, self.loop_count
+                ));
+                self.current_biome = next;
+                self.furthest_biome = self.furthest_biome.max(biome_ordinal(next));
+                self.biome_time = 0.0;
+                self.boss_active = false;
+                self.enemies.clear();
+                self.spawn_ctrl.reset();
+                self.biome_spawn_pause = 1.0;
+                self.orb_spawn_timer = 0.0;
+                self.refresh_active_buffs();
+            }
+            None => {
+                self.loop_count += 1;
+                self.current_biome = Biome::InfectedAtmosphere;
+                self.biome_time = 0.0;
+                self.boss_active = false;
+                self.enemies.clear();
+                self.spawn_ctrl.reset();
+                self.biome_spawn_pause = 1.0;
+                self.orb_spawn_timer = 0.0;
+                self.refresh_active_buffs();
+                self.dlog(&format!("BIOME_LOOP_RESTART loop={}", self.loop_count));
+            }
+        }
+    }
+
+    fn spawn_boss_1(&mut self) {
+        use crate::config::{BOSS_1_H, BOSS_1_W, ENEMY_LANE_BOTTOM, ENEMY_LANE_TOP, SCREEN_W};
+        let hp_base = self.config.boss_1_hp;
+        let loop_scale = 1.0 + self.loop_count as f32 * self.config.biome_loop_hp_mult;
+        let hp_mult = (1.0 + self.config.enemy_hp_scale * self.run_time) * loop_scale;
+        let hp = ((hp_base as f32) * hp_mult).round().max(1.0) as i32;
+        let speed = self.config.boss_1_speed;
+        let windup = self.config.windup_time_boss_1;
+        let lane_mid = (ENEMY_LANE_TOP as f32 + ENEMY_LANE_BOTTOM as f32) / 2.0;
+        let y = lane_mid - BOSS_1_H / 2.0;
+        let x = SCREEN_W as f32 + 10.0;
+        self.enemies.clear();
+        self.spawn_ctrl.reset();
+        let boss = Enemy::new(
+            x,
+            y,
+            EnemyKind::Boss1,
+            hp,
+            speed,
+            BOSS_1_W,
+            BOSS_1_H,
+            windup,
+        );
+        self.enemies.push(boss);
+        self.dlog(&format!(
+            "BOSS1_SPAWNED hp={} speed={:.1} y={:.1}",
+            hp, speed, y
+        ));
     }
 
     fn refresh_active_buffs(&mut self) {
@@ -774,6 +887,52 @@ impl GameState {
         }
         if self.stagger_buff_t > 0.0 {
             self.stagger_buff_t = self.config.buff_stagger_duration;
+        }
+    }
+
+    pub(super) fn biome_shield_cap(&self) -> usize {
+        let base = match self.current_biome {
+            Biome::InfectedAtmosphere => 1,
+            Biome::LowOrbit => 2,
+            _ => crate::shield::MAX_SHIELD_SEGMENTS,
+        };
+        (base + self.shield_cap_bonus as usize).min(crate::shield::MAX_SHIELD_SEGMENTS)
+    }
+
+    pub(super) fn biome_drone_cap(&self) -> usize {
+        match self.current_biome {
+            Biome::InfectedAtmosphere => 0,
+            Biome::LowOrbit => 1,
+            _ => MAX_ATTACHED_DRONES,
+        }
+    }
+
+    fn apply_permanent_upgrades(&mut self) {
+        let resolved = self
+            .upgrade_catalog
+            .resolve(&self.save.permanent_upgrades.levels);
+
+        self.shield_cap_bonus = resolved.shield_cap_bonus;
+        self.orb_interval_modifier = resolved.orb_interval_reduction;
+        self.projectile_speed_bonus = resolved.projectile_speed_bonus;
+
+        let shield_cap = self.biome_shield_cap();
+        let to_add = (resolved.extra_starting_shields as usize)
+            .min(shield_cap.saturating_sub(self.shields.count()));
+        if to_add > 0 {
+            self.shields.add_segments(to_add as u32);
+        }
+
+        for i in 0..resolved.extra_starting_drones as usize {
+            use crate::config::DRONE_Y_OFFSETS;
+            use crate::drone::Drone;
+            let dy = DRONE_Y_OFFSETS[i.min(DRONE_Y_OFFSETS.len() - 1)];
+            self.drones
+                .push(Drone::new(self.player.x, self.player.y + dy));
+        }
+
+        if resolved.start_with_damage_buff {
+            self.damage_buff_t = self.config.buff_damage_duration;
         }
     }
 
@@ -797,10 +956,20 @@ impl GameState {
         self.enemy_heavy_sprite.update(dt);
         self.enemy_large_sprite.update(dt);
         self.enemy_xl_sprite.update(dt);
+        self.enemy_boss_1_sprite.update(dt);
         self.boundary_shield_sprite.update(dt);
         self.rail_wall_sprite.update(dt);
         self.upgrade_track_sprite.update(dt);
         self.shields.update(dt);
+    }
+}
+
+pub(super) fn biome_ordinal(biome: Biome) -> u32 {
+    match biome {
+        Biome::InfectedAtmosphere => 1,
+        Biome::LowOrbit => 2,
+        Biome::OuterSystem => 3,
+        Biome::DeepSpace => 4,
     }
 }
 

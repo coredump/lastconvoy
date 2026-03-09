@@ -63,6 +63,7 @@ impl GameState {
                 EnemyKind::Heavy => &self.enemy_heavy_sprite,
                 EnemyKind::Large => &self.enemy_large_sprite,
                 EnemyKind::XL => &self.enemy_xl_sprite,
+                EnemyKind::Boss1 => &self.enemy_boss_1_sprite,
             };
             let tint = if e.state == EnemyState::Breaching {
                 e.windup_tint()
@@ -71,6 +72,10 @@ impl GameState {
             };
             let draw_x = e.x + e.shake.offset_x();
             sprite.draw_tinted(draw_x, e.y, tint);
+            if e.kind == EnemyKind::Boss1 {
+                self.enemy_boss_1_sprite
+                    .draw_tinted_row(draw_x, e.y, WHITE, 1);
+            }
             let flash_color = e.flash.tint();
             if flash_color != WHITE {
                 sprite.draw_additive(draw_x, e.y, flash_color, 0.7, &self.additive_material);
@@ -112,6 +117,10 @@ impl GameState {
             } else {
                 self.draw_title_pause_screen();
             }
+        }
+
+        if self.at_shop {
+            self.draw_shop();
         }
     }
 
@@ -281,21 +290,36 @@ impl GameState {
             y += 13.0;
         }
 
-        let prompt = if self.paused {
-            "P / ESC / TAP  RESUME"
+        if self.paused {
+            let prompt = "P / ESC / TAP  RESUME";
+            let psz = self.ui_font.measure(prompt, 1, 1);
+            let px = (SCREEN_W as f32 - psz.x) * 0.5;
+            self.ui_font.draw(
+                prompt,
+                px,
+                155.0,
+                1,
+                Color::from_rgba(240, 240, 180, 255),
+                1,
+            );
         } else {
-            "ANY KEY / TAP  START"
-        };
-        let psz = self.ui_font.measure(prompt, 1, 1);
-        let px = (SCREEN_W as f32 - psz.x) * 0.5;
-        self.ui_font.draw(
-            prompt,
-            px,
-            155.0,
-            1,
-            Color::from_rgba(240, 240, 180, 255),
-            1,
-        );
+            let sel_col = Color::from_rgba(240, 240, 180, 255);
+            let unsel_col = Color::from_rgba(180, 180, 180, 255);
+            let items = ["PLAY", "UPGRADES"];
+            for (i, item) in items.iter().enumerate() {
+                let prefix = if i == self.title_cursor { "> " } else { "  " };
+                let line = format!("{prefix}{item}");
+                let col = if i == self.title_cursor {
+                    sel_col
+                } else {
+                    unsel_col
+                };
+                let sz = self.ui_font.measure(&line, 1, 1);
+                let lx = (SCREEN_W as f32 - sz.x) * 0.5;
+                self.ui_font
+                    .draw(&line, lx, 148.0 + i as f32 * 13.0, 1, col, 1);
+            }
+        }
     }
 
     fn draw_event_placeholder(&self, name: &str) {
@@ -350,11 +374,7 @@ impl GameState {
         let gap = 2.0_f32;
         let start_x = 5.0_f32;
         let y = 7.0_f32;
-        let shield_cap = match self.current_biome {
-            Biome::InfectedAtmosphere => 1,
-            Biome::LowOrbit => 2,
-            _ => crate::shield::MAX_SHIELD_SEGMENTS,
-        };
+        let shield_cap = self.biome_shield_cap();
         let dark = Color::from_rgba(40, 40, 40, 255);
         for i in 0..shield_cap {
             let x = start_x + i as f32 * (size + gap);
@@ -378,11 +398,7 @@ impl GameState {
     }
 
     fn draw_upgrade_hud(&mut self) {
-        let shield_cap = match self.current_biome {
-            Biome::InfectedAtmosphere => 1,
-            Biome::LowOrbit => 2,
-            _ => crate::shield::MAX_SHIELD_SEGMENTS,
-        };
+        let shield_cap = self.biome_shield_cap();
         let shield_area_end = 5.0 + shield_cap as f32 * (8.0 + 2.0) + 2.0;
         let icon_size = 10.0_f32;
         let icon_gap = 2.0_f32;
