@@ -221,6 +221,15 @@ xl_hp = 20
 # Movement speed for XL enemy in pixels per second.
 xl_speed = 18.0
 
+# Hit points for Boss1 (end-of-biome-1 boss).
+boss_1_hp = 60
+
+# Movement speed for Boss1 in pixels per second.
+boss_1_speed = 12.0
+
+# Wind-up duration before Boss1 breach resolves (seconds).
+windup_time_boss_1 = 2.5
+
 # ---------------------------------------------------------------------------
 # [input]
 # ---------------------------------------------------------------------------

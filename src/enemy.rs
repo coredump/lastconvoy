@@ -19,6 +19,7 @@ pub enum EnemyKind {
     Heavy,
     Large,
     XL,
+    Boss1,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

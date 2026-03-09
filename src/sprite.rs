@@ -300,6 +300,24 @@ impl Sprite {
         );
     }
 
+    /// Draw the current frame at (x, y) with a color tint, sampling from `row` instead of row 0.
+    pub fn draw_tinted_row(&self, x: f32, y: f32, tint: Color, row: u32) {
+        let f = self.anim.frame();
+        let mut src = f.source_rect;
+        src.y = row as f32 * self.tile_h as f32;
+        draw_texture_ex(
+            &self.texture,
+            x,
+            y,
+            tint,
+            DrawTextureParams {
+                source: Some(src),
+                dest_size: Some(f.dest_size),
+                ..Default::default()
+            },
+        );
+    }
+
     /// Draw the current frame at (x, y) with a color tint.
     pub fn draw_tinted(&self, x: f32, y: f32, tint: Color) {
         let f = self.anim.frame();

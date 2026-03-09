@@ -126,6 +126,13 @@ pub const SEAL_BLINK_RATE: f32 = 0.12;
 pub const XL_HP: i32 = 20;
 pub const XL_SPEED: f32 = 18.0;
 
+// Boss1 enemy (biome 1 end-of-biome boss)
+pub const BOSS_1_W: f32 = 64.0;
+pub const BOSS_1_H: f32 = 96.0;
+pub const BOSS_1_HP: i32 = 60;
+pub const BOSS_1_SPEED: f32 = 12.0;
+pub const WINDUP_TIME_BOSS_1: f32 = 2.5;
+
 // Coverage-based spawn system
 pub const COVERAGE_ZONE_LEFT: f32 = 96.0;
 pub const COVERAGE_ZONE_RIGHT: f32 = 320.0;
@@ -308,6 +315,10 @@ pub struct RuntimeConfig {
     pub xl_hp: Option<i32>,
     pub xl_speed: Option<f32>,
 
+    pub boss_1_hp: Option<i32>,
+    pub boss_1_speed: Option<f32>,
+    pub windup_time_boss_1: Option<f32>,
+
     pub enemy_hp_scale: Option<f32>,
     pub shielded_freq_scale: Option<f32>,
     pub speed_scale_per_sec: Option<f32>,
@@ -410,6 +421,10 @@ pub struct Config {
 
     pub xl_hp: i32,
     pub xl_speed: f32,
+
+    pub boss_1_hp: i32,
+    pub boss_1_speed: f32,
+    pub windup_time_boss_1: f32,
 
     pub enemy_hp_scale: f32,
     pub shielded_freq_scale: f32,
@@ -517,6 +532,10 @@ impl Config {
 
             xl_hp: rt.xl_hp.unwrap_or(XL_HP),
             xl_speed: rt.xl_speed.unwrap_or(XL_SPEED),
+
+            boss_1_hp: rt.boss_1_hp.unwrap_or(BOSS_1_HP),
+            boss_1_speed: rt.boss_1_speed.unwrap_or(BOSS_1_SPEED),
+            windup_time_boss_1: rt.windup_time_boss_1.unwrap_or(WINDUP_TIME_BOSS_1),
 
             enemy_hp_scale: rt.enemy_hp_scale.unwrap_or(ENEMY_HP_SCALE),
             shielded_freq_scale: rt.shielded_freq_scale.unwrap_or(SHIELDED_FREQ_SCALE),
