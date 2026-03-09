@@ -91,7 +91,7 @@ cargo deny check                   # license + advisory check
 
 ## Status
 - **Phase 1**: P1.0–P1.20 DONE. Remaining: gameplay verification (P1.8 orbs, P1.9b explosive, P1.11 scaling).
-- **Phase 3**: P3.0 persistence + P3.1 upgrade shop DONE. Next: P3.3 meta points, P3.2 run summary UI.
+- **Phase 3**: P3.0–P3.3 DONE (persistence, upgrade shop, game-over screen overhaul, meta points economy). Next: P3.4 save slots.
 - See `TASKS.md` for full task details and future phases.
 
 ## Story & Meta (Phase 4+)

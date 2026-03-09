@@ -105,17 +105,11 @@ Event placeholders + HUD polish; XL enemy in DeepSpace spawn pool; boss placehol
 ### P3.1 Permanent upgrade shop ✓ DONE (2026-03-08)
 `upgrades.toml` catalog (6 upgrades), `src/upgrade_catalog.rs`, `src/game/game_shop.rs`. Title screen PLAY/UPGRADES menu. `apply_permanent_upgrades()` on run start.
 
-### P3.2 Run summary & high score UI ⚠ NOT STARTED
-Depends on: P2.2 game-over screen, P3.0 persistence.
-- On game-over screen: show "NEW BEST" callout if `run_time` / `kills` / `loop_count` beat `save.best_*`.
-- Display lifetime stats (total runs, lifetime kills) on title screen or a new stats screen.
-- Run history accessible from title screen (last N runs, scrollable list).
+### P3.2 Run summary & game over screen ✓ DONE (2026-03-08)
+Cursor-based game-over menu (RUN AGAIN / MAIN MENU). Meta points award displayed as "+N META" on death. Post-run shop flow: PLAY is first item in shop after death. New `GameState` fields: `game_over_cursor`, `meta_points_earned`, `post_run_shop`.
 
-### P3.3 Meta points economy ⚠ NOT STARTED
-Depends on: P3.0, P3.1.
-- Define meta point earning formula (e.g. kills + biomes × multiplier, shown on game-over screen).
-- Persist `meta_points` / `meta_points_lifetime` in `save.rs` (fields already present).
-- Optional difficulty modifiers (harder = better meta point multiplier).
+### P3.3 Meta points economy ✓ DONE (2026-03-08)
+Award formula: `furthest_biome * meta_points_per_biome` (config default 50, currently 30). `meta_points_per_biome` added to config. Persisted via existing `save.rs` fields.
 
 ### P3.4 Save slots ⚠ NOT STARTED
 Depends on: P3.3.
